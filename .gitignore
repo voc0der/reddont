@@ -182,3 +182,6 @@ result
 
 # Database
 *.db
+
+# Local reference screenshots
+/Screenshot_*
