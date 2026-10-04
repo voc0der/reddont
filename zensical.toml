@@ -1,0 +1,110 @@
+[project]
+site_name = "reddont"
+site_description = "A self-hosted, read-only Reddit client. Installation, browsing, SSO, and API documentation."
+site_url = "https://voc0der.github.io/reddont/"
+repo_url = "https://github.com/voc0der/reddont"
+repo_name = "voc0der/reddont"
+edit_uri = "edit/main/docs/"
+docs_dir = "docs"
+site_dir = "site"
+
+nav = [
+  { "Home" = "index.md" },
+  { "Get started" = [
+    { "Quick start" = "getting-started/quick-start.md" },
+    { "Features" = "features.md" },
+    { "Docker and storage" = "deployment/docker.md" },
+  ] },
+  { "Using reddont" = [
+    { "Browsing and subscriptions" = "usage/browsing.md" },
+    { "Preferences and credentials" = "usage/preferences.md" },
+    { "Install as an app" = "usage/pwa.md" },
+  ] },
+  { "Administration" = [
+    { "Accounts and invites" = "administration/accounts.md" },
+    { "Single sign-on" = "administration/sso.md" },
+    { "Reverse proxy and HTTPS" = "deployment/reverse-proxy.md" },
+    { "Backups and updates" = "deployment/maintenance.md" },
+  ] },
+  { "Reference" = [
+    { "Environment variables" = "reference/environment.md" },
+    { "API and feeds" = "reference/api.md" },
+    { "Troubleshooting" = "reference/troubleshooting.md" },
+  ] },
+  { "Development" = [
+    { "Local development" = "development/index.md" },
+    { "Documentation" = "development/documentation.md" },
+    { "Changelog" = "changelog.md" },
+    { "License and credits" = "license.md" },
+  ] },
+]
+
+[project.theme]
+variant = "modern"
+language = "en"
+logo = "assets/logo.svg"
+favicon = "assets/logo.svg"
+font = false
+features = [
+  "content.action.edit",
+  "content.code.copy",
+  "content.tabs.link",
+  "navigation.footer",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.prefetch",
+  "navigation.path",
+  "navigation.sections",
+  "navigation.tabs",
+  "navigation.top",
+  "navigation.tracking",
+  "search.highlight",
+  "toc.follow",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "teal"
+accent = "teal"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+def_list = {}
+md_in_html = {}
+toc.permalink = true
+pymdownx.details = {}
+pymdownx.emoji.emoji_generator = "zensical.extensions.emoji.to_svg"
+pymdownx.emoji.emoji_index = "zensical.extensions.emoji.twemoji"
+pymdownx.highlight.anchor_linenums = true
+pymdownx.highlight.line_spans = "__span"
+pymdownx.highlight.pygments_lang_class = true
+pymdownx.inlinehilite = {}
+pymdownx.snippets.base_path = ["."]
+pymdownx.snippets.check_paths = true
+pymdownx.superfences = {}
+pymdownx.tabbed.alternate_style = true
+pymdownx.tabbed.combine_header_slug = true
+
+[project.validation]
+invalid_links = true
+invalid_link_anchors = true
+unresolved_references = true

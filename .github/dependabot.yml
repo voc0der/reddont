@@ -5,6 +5,18 @@
 
 version: 2
 updates:
+  # Documentation tooling
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "docs"
+
   # npm dependencies
   - package-ecosystem: "npm"
     directory: "/"

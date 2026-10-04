@@ -174,7 +174,7 @@ dist
 # Finder (MacOS) folder config
 .DS_Store
 
-reference
+/reference/
 bun.lockb
 result
 
@@ -185,3 +185,11 @@ result
 
 # Local reference screenshots
 /Screenshot_*
+
+# Documentation build and Python environment
+/site/
+/.venv-docs/
+__pycache__/
+
+# Local development database directory
+/.local-data/
