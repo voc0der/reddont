@@ -1,0 +1,27 @@
+{
+	"name": "reddont",
+	"version": "0.1.0",
+	"module": "index.ts",
+	"type": "module",
+	"scripts": {
+		"test": "bun test"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"pug-cli": "^1.0.0-alpha6"
+	},
+	"peerDependencies": {
+		"typescript": "^5.6.3"
+	},
+	"dependencies": {
+		"cookie-parser": "^1.4.7",
+		"dashjs": "^5.2.0",
+		"express": "^5.2.1",
+		"express-rate-limit": "^8.2.1",
+		"he": "^1.2.0",
+		"jsonwebtoken": "^9.0.2",
+		"openid-client": "^6.0.0",
+		"pug": "^3.0.3",
+		"timeago.js": "^4.0.2"
+	}
+}

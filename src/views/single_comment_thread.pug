@@ -1,0 +1,26 @@
+include ../mixins/comment
+include ../mixins/header
+include ../mixins/head
+include ../utils
+
+doctype html
+html
+  +head("more comments")
+  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+    main#content
+      +header()
+      div.comments-container
+        a(href=`/comments/${parent_id}`)
+          | ← back to parent thread
+        if comments.length == 0
+          div
+            p nothing to see here, this thread was shadow-banned?
+        else
+          each comment, index in comments
+            - var next_idx = index + 1
+            - var prev_idx = index - 1
+            - var next_com = next_idx < total ? comments[next_idx] : null
+            - var prev_com = prev_idx >= 0 ? comments[prev_idx] : null
+            - var next_id = next_com ? next_com.data.id : null
+            - var prev_id = prev_com ? prev_com.data.id : null
+            +comment(comment, true, parent_id, next_idx, prev_idx)

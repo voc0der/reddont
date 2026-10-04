@@ -1,0 +1,43 @@
+include ../mixins/head
+
+doctype html
+html
+  +head("login")
+  body
+    main#content
+      h1 login
+      if message
+        div.register-error-message
+          | #{message}
+      else
+        div.register-message
+          | reddont is a read-only reddit client
+
+      if oidcEnabled
+        - var ssoUrl = redirect ? `/auth/oidc/login?redirect=${encodeURIComponent(redirect)}` : '/auth/oidc/login'
+        form(action=ssoUrl method="get")
+          div.submit-button
+            button(type="submit") login with SSO
+
+        if !bypassOidc
+          p
+            a(href=redirect ? `/login?bypass_oidc=true&redirect=${encodeURIComponent(redirect)}` : '/login?bypass_oidc=true') use manual login
+        else
+          p
+            a(href=redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login') back to SSO login
+
+      - var url = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'
+      form(action=url method="post")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        div.input-text
+          label(for="username") username
+          input(type="text" name="username" required)
+        div.input-text
+          label(for="password") password
+          input(type="password" name="password" required)
+        div.submit-button
+          button(type="submit") login
+        div
+          p
+            | don't have an account?&nbsp;
+            a(href="/register") register

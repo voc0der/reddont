@@ -1,0 +1,167 @@
+include ../utils
+include postUtils
+include mobile
+mixin post(p, currentUrl)
+  - var from = encodeURIComponent(currentUrl)
+  - var viewQuery = query && query.view ? query.view : 'compact'
+  - var sortQuery = query && query.sort ? query.sort + (query.t ? '&t=' + query.t : '') : 'hot'
+  - var showNsfwThumbnails = user && user.showNsfwThumbnails === 1
+  - var useHighRes = !user || user.highResThumbnails === undefined || user.highResThumbnails === 1
+  - var commentsHref = `/comments/${p.id}?from=${from}&sort=${sortQuery}&view=${viewQuery}`
+  - var subHref = `/r/${p.subreddit}?view=${viewQuery}`
+  - var textPost = isPostText(p)
+  - var linkPost = isPostLink(p)
+  - var contentPost = getPostData(p)
+  - var selfTextHtml = postSelfText(p)
+  - var contentIsOver18 = contentPost.over_18 === true || p.over_18 === true
+  - var contentIsSpoiler = contentPost.spoiler === true || p.spoiler === true
+  - var contentIsSensitive = contentIsOver18 || contentIsSpoiler
+  //- Single-subreddit feeds credit the author, every other feed the community.
+  - var feedSub = typeof subreddit === 'string' && subreddit.indexOf('+') === -1 ? subreddit.toLowerCase() : ''
+  - var creditCommunity = !feedSub || feedSub === 'all' || feedSub === 'popular' || String(p.subreddit).toLowerCase() !== feedSub
+  - var joinedSubs = typeof subscribedSubs !== 'undefined' && Array.isArray(subscribedSubs) ? subscribedSubs : null
+  - var showJoin = creditCommunity && joinedSubs && !joinedSubs.includes(String(p.subreddit).toLowerCase())
+  - var linkThumb = linkPost && hasPostThumbnail(p)
+  - var mediaFrame = postMediaFrame(p, !contentIsSensitive)
+  article(class=`post`)
+    div.post-container(class=`${query.view} ${p.stickied?"sticky":""}`)
+      div.post-info
+        div.post-text(class=`${query.view}`)
+          div.m-post-meta.m-only
+            if creditCommunity
+              +communityAvatar(p.sr_detail, p.subreddit, subHref)
+              a.m-meta-name(href=subHref) r/#{p.subreddit}
+            else
+              span.m-meta-avatar(aria-hidden="true")
+                img(src=defaultAvatar(p.author) alt="" loading="lazy" onerror="this.style.visibility='hidden'")
+              span.m-meta-name u/#{p.author}
+            span.m-meta-sep(aria-hidden="true") •
+            span.m-meta-time #{timeAgo(p.created)}
+            if p.stickied
+              span.m-meta-pin(title="Pinned")
+                +icon("pin")
+            span.m-meta-end
+              if showJoin
+                +joinButton(p.subreddit, false, 'small')
+              +overflowMenu("Post options", true)
+                a.m-menu-item(href=`https://www.reddit.com${p.permalink}`)
+                  +icon("external")
+                  span Open on Reddit
+                if linkPost
+                  a.m-menu-item(href=p.url)
+                    +icon("link")
+                    span Open link
+                if creditCommunity
+                  a.m-menu-item(href=subHref)
+                    +icon("communities")
+                    span Go to r/#{p.subreddit}
+          div.info-container.post-meta
+            p
+              span.post-author u/#{p.author}
+              | &nbsp;·&nbsp;
+              | #{timeDifference(Date.now(), p.created * 1000)}
+              | &nbsp;·&nbsp;
+              a(href=`/r/${p.subreddit}?view=${viewQuery}`) r/#{p.subreddit}
+          div.title-container(class=`${query.view}`)
+            a(class=`${query.view}`, href=commentsHref)
+              != p.title
+            span.domain #{p.domain}
+          +flair(p)
+          if linkPost
+            a.m-post-url.m-only(href=p.url) #{p.url}
+          if (query.view == "card" && !isPostMedia(p) && selfTextHtml)
+            div.self-text-overflow.card
+              if contentIsSensitive
+                button.self-text-spoiler.card(type="button" onclick="toggleSensitiveText(this)" aria-controls=`card_text_${p.id}` aria-expanded="false" data-reveal-label=(contentIsOver18 ? "Reveal NSFW text" : "Reveal spoiler text") data-hide-label=(contentIsOver18 ? "Hide NSFW text" : "Hide spoiler text"))
+                  span.sensitive-text-label
+                    != contentIsOver18 ? 'Reveal NSFW text' : 'Reveal spoiler text'
+              div.self-text.card(id=(contentIsSensitive ? `card_text_${p.id}` : false) hidden=contentIsSensitive)
+                != convertInlineImageLinks(selfTextHtml)
+          div.post-actions
+            span.action-chip.vote-score(aria-label=`${fmtnum(p.ups)} votes`)
+              span.action-icon(aria-hidden="true") ↑
+              strong #{fmtnum(p.ups)}
+            +votePill(p.ups, `${fmtnum(p.ups)} votes`)
+            a.action-chip(href=commentsHref aria-label=`${fmtnum(p.num_comments)} comments`)
+              span.action-icon(aria-hidden="true") ↩
+              span.d-only #{fmtnum(p.num_comments)}
+              span.m-pill-icon.m-only
+                +icon("comment")
+              span.m-only #{fmtcount(p.num_comments)}
+            if p.gilded > 0
+              span.action-chip.gilded(aria-label=`${p.gilded} awards`)
+                | #{p.gilded} ☆
+            if linkPost
+              a.action-chip.external-action(href=p.url aria-label=`Open ${p.domain}`)
+                span(aria-hidden="true") ↗
+            +sharePill(`https://www.reddit.com${p.permalink}`, decodeEntities(p.title))
+        if query.view != "card" || linkThumb
+          div.media-preview(class=[textPost ? "self-post-preview" : "", linkPost && !linkThumb ? "no-thumb" : "", query.view == "card" ? "m-only" : ""])
+            - var onclick = `toggleDetails('${p.id}')`
+            - var onkeydown = `if(event.key === 'Enter' || event.key === ' '){event.preventDefault();toggleDetails('${p.id}')}`
+            if isPostGallery(p)
+              - var item = (p.over_18 && !showNsfwThumbnails ? `/nsfw.svg` : p.spoiler ? `/spoiler.svg` : postGalleryItems(p)[0].url)
+              img(src=item onclick=onclick onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand gallery")
+            else if isPostImage(p)
+              - var url = postThumbnail(p, useHighRes, showNsfwThumbnails)
+              img(src=url onclick=onclick onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand image")
+            else if isPostVideo(p)
+              - var decodedVideos = decodePostVideoUrls(p)
+              - var videoSrc = useHighRes ? (decodedVideos[2] || decodedVideos[3]) : (decodedVideos[3] || decodedVideos[2])
+              - var alternateVideoSrc = videoSrc == decodedVideos[2] ? decodedVideos[3] : decodedVideos[2]
+              video.preview-video(playsinline="" webkit-playsinline="" muted="" loop="" preload="none" onclick=onclick onkeydown=onkeydown src=(videoSrc || false) data-preview-src=(videoSrc || false) data-preview-fallback-src=(alternateVideoSrc || false) poster=decodedVideos[4] tabindex="0" role="button" aria-label="Expand video")
+            else if linkPost
+              if linkThumb
+                a(href=p.url aria-label=`Open ${p.domain}`)
+                  img(src=postThumbnail(p, useHighRes, showNsfwThumbnails) loading="lazy")
+                  span.m-thumb-badge.m-only(aria-hidden="true")
+                    +icon("external")
+              else
+                a.link-preview(href=p.url aria-label=`Open ${p.domain}`)
+                  | ↗
+            else if textPost
+              a.self-post-link(href=commentsHref aria-label="Open discussion")
+                svg.self-post-icon(viewBox="0 0 24 24" aria-hidden="true")
+                  path(d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.75 3v-3A2.5 2.5 0 0 1 4 15V8a2.5 2.5 0 0 1 2.5-2.5Z")
+                  path.self-post-icon-lines(d="M8 9h8M8 12h8M8 15h5")
+              if selfTextHtml
+                button.self-post-expando(type="button" onclick=onclick aria-controls=p.id aria-expanded="false" aria-label="Preview text post")
+                  span.expando-icon(aria-hidden="true") +
+
+      details(id=`${p.id}` open=(query.view == "card" && (isPostMedia(p) || linkPost)) class=`${query.view} ${textPost ? "self-post-details" : ""} ${linkPost ? "link-details" : ""}`)
+        summary.expand-post expand media
+        if textPost && selfTextHtml
+          div.self-post-body.self-text
+            if contentIsSensitive
+              button.self-text-spoiler(type="button" onclick="toggleSensitiveText(this)" aria-controls=`preview_text_${p.id}` aria-expanded="false" data-reveal-label=(contentIsOver18 ? "Reveal NSFW text" : "Reveal spoiler text") data-hide-label=(contentIsOver18 ? "Hide NSFW text" : "Hide spoiler text"))
+                span.sensitive-text-label
+                  != contentIsOver18 ? 'Reveal NSFW text' : 'Reveal spoiler text'
+            div.self-post-content(id=(contentIsSensitive ? `preview_text_${p.id}` : false) hidden=contentIsSensitive)
+              != convertInlineImageLinks(selfTextHtml)
+        else
+          div.image-viewer(style=mediaFrame || false)
+            if query.view == "card" && (p.spoiler || (p.over_18 && !showNsfwThumbnails)) && isPostMedia(p)
+              div.spoiler(id=`spoiler_${p.id}`, onclick=`javascript:document.getElementById('spoiler_${p.id}').style.display = 'none';`)
+                h2
+                  != p.over_18 ? 'nsfw' : 'spoiler'
+            if isPostGallery(p)
+              div.gallery
+                each item in postGalleryItems(p)
+                  div.gallery-item
+                    a(href=`/media/${item.url}`)
+                      img(src=item.url loading="lazy")
+                    div.gallery-item-idx
+                      | #{`${item.idx}/${item.total}`}
+            else if isPostImage(p)
+              a(href=`/media/${p.url}`)
+                img(src=p.url loading="lazy")
+            else if isPostVideo(p)
+              - var decodedVideos = decodePostVideoUrls(p)
+              - var fallbackVideo = decodedVideos[2] || decodedVideos[3]
+              video.expanded-video(playsinline="" webkit-playsinline="" controls="" muted="" preload="none" onpointerdown=`initVideoPlayer(this, false)` onkeydown=`initVideoPlayer(this, false)` onplay=`initVideoPlayer(this, true)` src=(fallbackVideo || false) data-fallback-url=(fallbackVideo || false) data-hls-url=decodedVideos[0] data-dash-url=decodedVideos[1] poster=decodedVideos[4])
+            else if linkPost
+              a.expanded-link(href=p.url)
+                | Open #{p.domain} ↗
+        if (query.view == "compact" && !textPost)
+          button.close-media(type="button" onclick=`toggleDetails('${p.id}')`)
+              | close

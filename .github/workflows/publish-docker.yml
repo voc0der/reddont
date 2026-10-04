@@ -1,0 +1,121 @@
+name: publish docker image
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Run every Sunday at 2 AM UTC to catch dependency updates
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # Allow manual triggers from GitHub UI
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          # Ensure line endings aren't modified during checkout
+          autocrlf: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Attempt to Build Docker Image
+        id: build
+        run: |
+          set -e
+          docker buildx build --platform linux/amd64 -t reddont:latest --load . || echo "BUILD_FAILED=true" >> $GITHUB_ENV
+
+      - name: Extract new hash from the error logs and update flake.nix
+        run: |
+          if [ "$BUILD_FAILED" == "true" ]; then
+            echo "Build failed. Attempting to extract new hash and update flake.nix..."
+
+            # Capture build log
+            BUILD_LOG=$(mktemp)
+            nix build .#dockerImage > "$BUILD_LOG" 2>&1 || true
+
+            # Display build log for debugging
+            echo "Build log:"
+            cat "$BUILD_LOG"
+
+            # Extract the new hash from the "got:" line in the log
+            NEW_HASH=$(grep -oP "got:\s+sha256-[a-zA-Z0-9+/=]+" "$BUILD_LOG" | awk '{print $2}' | head -n 1)
+
+            if [ -z "$NEW_HASH" ]; then
+              echo "Failed to retrieve new hash from logs."
+              exit 1
+            fi
+
+            echo "New hash extracted: $NEW_HASH"
+
+            # Use an alternative delimiter to avoid conflicts
+            sed -i "s|outputHash = \".*\";|outputHash = \"$NEW_HASH\";|" flake.nix
+
+            # Verify the change
+            echo "Updated flake.nix:"
+            grep outputHash flake.nix
+
+            # Commit the updated flake.nix
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            git add flake.nix
+            git commit -m "Update outputHash in flake.nix"
+            git push
+
+            # Mark that the flake was updated
+            echo "FLAKE_UPDATED=true" >> $GITHUB_ENV
+          else
+            echo "Build succeeded. Skipping flake update."
+          fi
+
+      - name: Retry Build
+        run: |
+          if [ "$FLAKE_UPDATED" == "true" ]; then
+            echo "Retrying build after flake update..."
+            docker buildx build --platform linux/amd64 -t reddont:latest --load . || exit 1
+          else
+            echo "No flake update detected. Skipping retry."
+          fi
+
+      - name: Log in to Docker Hub
+        if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+        run: |
+          echo "Attempting to log in to Docker Hub..."
+          printf '%s' "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "Attempting to log in to GitHub Container Registry..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Publish Multi-Platform Docker Images
+        run: |
+          echo "Building and publishing multi-platform Docker images..."
+          VERSION=$(jq -r .version package.json)
+          IMAGE="ghcr.io/${{ github.repository }}"
+          TAGS=(-t "$IMAGE:latest" -t "$IMAGE:$VERSION")
+          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+            TAGS+=(-t "$DOCKER_USERNAME/reddont:latest" -t "$DOCKER_USERNAME/reddont:$VERSION")
+          fi
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            "${TAGS[@]}" \
+            --push \
+            .

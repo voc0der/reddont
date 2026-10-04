@@ -1,0 +1,154 @@
+{
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+  };
+
+  outputs = {
+    self,
+    nixpkgs,
+  }: let
+    supportedSystems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin"];
+    forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    nixpkgsFor = forAllSystems (system:
+      import nixpkgs {
+        inherit system;
+        overlays = [
+          self.overlays.default
+        ];
+      });
+  in {
+    overlays.default = final: prev: let
+      pname = "reddont";
+      version = "0.1.0";
+    in {
+      node_modules = with final;
+        stdenv.mkDerivation {
+          pname = "reddont-node-modules";
+          version = "0.0.1";
+          impureEnvVars =
+            lib.fetchers.proxyImpureEnvVars
+            ++ ["GIT_PROXY_COMMAND" "SOCKS_SERVER"];
+          src = ./.;
+          nativeBuildInputs = [bun];
+          buildInputs = [nodejs-slim_latest];
+          dontConfigure = true;
+          dontFixup = true;
+          buildPhase = ''
+            bun install --no-progress --frozen-lockfile
+          '';
+          installPhase = ''
+            mkdir -p $out/node_modules
+            cp -R ./node_modules/* $out/node_modules
+            ls -la $out/node_modules
+          '';
+          outputHash = "sha256-IHLrUqSzU7v18U+qkm42tUrQMJIcX55vY4cjIeyEcFw=";
+          outputHashAlgo = "sha256";
+          outputHashMode = "recursive";
+        };
+      reddont = with final;
+        stdenv.mkDerivation {
+          inherit pname version;
+          src = ./.;
+          nativeBuildInputs = [makeBinaryWrapper];
+          buildInputs = [bun];
+
+          buildPhase = ''
+            runHook preBuild
+            runHook postBuild
+          '';
+
+          dontFixup = true;
+
+          installPhase = ''
+            runHook preInstall
+
+            mkdir -p $out/bin
+
+            ln -s ${node_modules}/node_modules $out
+            cp -R ./* $out
+
+            makeBinaryWrapper ${bun}/bin/bun $out/bin/$pname \
+            --prefix PATH : ${lib.makeBinPath [bun]} \
+            --add-flags "run --prefer-offline --no-install $out/src/index.js"
+
+          '';
+        };
+    };
+
+    devShells = forAllSystems (system: let
+      pkgs = nixpkgsFor."${system}";
+    in
+      {
+        default = pkgs.mkShell {
+          nativeBuildInputs = [
+            pkgs.bun
+            pkgs.biome
+            pkgs.typescript-language-server
+          ];
+        };
+      });
+
+    packages = forAllSystems (system: let
+      pkgs = nixpkgsFor."${system}";
+    in {
+      inherit (pkgs) reddont node_modules;
+      default = pkgs.reddont;
+    });
+
+    apps = forAllSystems (system: let
+      pkgs = nixpkgsFor.${system};
+    in {
+      default = {
+        type = "app";
+        program = "${pkgs.reddont}/bin/reddont";
+        meta = {
+          description = "Launch the Reddont app";
+        };
+      };
+    });
+
+    formatter = forAllSystems (system: nixpkgsFor."${system}".alejandra);
+
+    nixosModules.default = {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+      with lib; {
+        options = {
+          services.reddont = {
+            enable = mkOption {
+              type = types.bool;
+              default = false;
+              description = "Enable reddont";
+            };
+            port = mkOption {
+              type = types.int;
+              default = 3000;
+              description = "Port to run reddont on";
+            };
+          };
+        };
+
+        config = mkIf config.services.reddont.enable {
+          nixpkgs.overlays = [self.overlays.default];
+          systemd.services.reddont = {
+            description = "reddont service";
+            wantedBy = ["multi-user.target"];
+
+            serviceConfig = {
+              ListenStream = "0.0.0.0:${toString config.services.reddont.port}";
+              ExecStart = "${pkgs.reddont}/bin/reddont";
+              Restart = "always";
+            };
+
+            # If the binary needs specific environment variables, set them here
+            environment = {
+              REDDONT_PORT = "${toString config.services.reddont.port}";
+            };
+          };
+        };
+      };
+  };
+}

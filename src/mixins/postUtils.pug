@@ -1,0 +1,176 @@
+-
+  function getPostData(p) {
+    if (p.crosspost_parent_list && p.crosspost_parent_list.length > 0) {
+      return p.crosspost_parent_list[0];
+    }
+    return p;
+  }
+-
+  function isPostMedia(p) {
+    p = getPostData(p);
+    return isPostImage(p) || isPostGallery(p) || isPostVideo(p);
+  }
+-
+  function isPostText(p) {
+    p = getPostData(p);
+    return p.is_self === true || p.post_hint == "self";
+  }
+-
+  function postSelfText(p) {
+    p = getPostData(p);
+    return p.selftext_html || '';
+  }
+-
+  function isPostGallery(p) {
+    p = getPostData(p);
+    return (p.is_gallery && p.is_gallery == true);
+  }
+-
+  function isPostImage(p) {
+    p = getPostData(p);
+    const imgRe = /\.(png|jpg|jpeg|gif|webp|bmp|tiff|svg)$/i;
+    return (p.post_hint == "image" && p.thumbnail && p.thumbnail != "self" && p.thumbnail != "default")
+      || imgRe.test(p.url);
+  }
+-
+  function postThumbnail(p, useHighRes, showNsfwThumbnails) {
+    p = getPostData(p);
+    const hideNsfwThumbnails = showNsfwThumbnails !== true;
+    if (p.over_18 && hideNsfwThumbnails) {
+      return "/nsfw.svg";
+    } else if (p.thumbnail == "spoiler") {
+      return "/spoiler.svg";
+    } else if (p.thumbnail == "image" || p.thumbnail == "") {
+      return p.url;
+    } else {
+      // Use higher quality preview images when available (like RES does)
+      // This provides much better quality than the low-res p.thumbnail (70x70 or 140x140)
+      // Only use high-res if user preference is enabled (default: true)
+      if (useHighRes && p.preview && p.preview.images && p.preview.images.length > 0) {
+        const preview = p.preview.images[0];
+        // Try to get a medium-high resolution preview (640x640 is usually index 3-4)
+        // Falls back to source if resolutions not available
+        if (preview.resolutions && preview.resolutions.length > 0) {
+          // Get the highest resolution available, typically 640x640 or 1080x1080
+          const bestRes = preview.resolutions[preview.resolutions.length - 1];
+          return bestRes.url.replace(/&amp;/g, '&');
+        } else if (preview.source && preview.source.url) {
+          return preview.source.url.replace(/&amp;/g, '&');
+        }
+      }
+      // Fallback to original thumbnail if no preview available or high-res disabled
+      return p.thumbnail;
+    }
+  }
+-
+  function isPostVideo(p) {
+    p = getPostData(p);
+    return (p.post_hint == "hosted:video");
+  }
+-
+  function isPostLink(p) {
+    p = getPostData(p);
+    if (p.post_hint == "link") {
+      return true;
+    }
+    // Reddit often omits post_hint entirely, commonly on the link posts that
+    // have no thumbnail. Fall back to treating any off-site url as a link so
+    // those posts still get a preview and an external-link action.
+    if (isPostText(p) || isPostMedia(p)) {
+      return false;
+    }
+    const url = p.url || "";
+    return /^https?:\/\//i.test(url)
+      && !/^https?:\/\/([a-z0-9-]+\.)*reddit\.com\//i.test(url);
+  }
+-
+  function hasPostThumbnail(p) {
+    p = getPostData(p);
+    return Boolean(
+      p.thumbnail
+      && !["self", "default", "image", "spoiler", "nsfw"].includes(p.thumbnail)
+      && /^https?:\/\//i.test(p.thumbnail)
+    );
+  }
+-
+  function imgExt(p, id) {
+    p = getPostData(p);
+    var metadata = p.media_metadata;
+    if (metadata[id].status == 'valid') {
+      return stripPrefix(metadata[id].m, "image/");
+    } else {
+      // dosent matter
+      return 'jpg';
+    }
+  }
+-
+  function postGalleryItems(p) {
+    p = getPostData(p);
+    if (p.gallery_data && p.gallery_data.items) {
+      return p.gallery_data.items.map((item, idx) => ({
+        id: item.media_id,
+        url: `https://i.redd.it/${item.media_id}.${imgExt(p, item.media_id)}`,
+        total: p.gallery_data.items.length,
+        idx: idx+1,
+      }));
+    } else {
+      return null;
+    }
+  }
+-
+  function convertInlineImageLinks(html) {
+    // Find all anchors that href to preview.redd.it, i.redd.it, i.imgur.com
+    // and contain just a link to the same href
+    const expression = /<a href="(http[s]?:\/\/(?:preview\.redd\.it|i\.redd\.it|i\.imgur\.com).*?)">\1?<\/a>/g;
+    const matches = Array.from(html.matchAll(expression));
+    var result = html;
+    matches.forEach((match) => {
+      // Replace each occurrence with an actual img tag
+      result = result.replace(match[0], '<a href="' + match[1] + '"><img class="inline" src="' + match[1] + '" loading="lazy" decoding="async"></a>');
+    })
+
+    return result;
+  }
+-
+  function decodePostVideoUrls(p) {
+    p = getPostData(p);
+    // Video URLs have querystring separators that are HTML-encoded, so replace them.
+    const expression = /&amp;/g;
+
+    var hls_url = p.secure_media && p.secure_media.reddit_video && p.secure_media.reddit_video.hls_url ? p.secure_media.reddit_video.hls_url.replace(expression, '&') : '';
+
+    var dash_url = p.secure_media && p.secure_media.reddit_video && p.secure_media.reddit_video.dash_url ? p.secure_media.reddit_video.dash_url.replace(expression, '&') : '';
+
+    var fallback_url = p.secure_media && p.secure_media.reddit_video && p.secure_media.reddit_video.fallback_url ? p.secure_media.reddit_video.fallback_url.replace(expression, '&') : '';
+
+    var scrubber_url = p.secure_media && p.secure_media.reddit_video && p.secure_media.reddit_video.scrubber_media_url ? p.secure_media.reddit_video.scrubber_media_url.replace(expression, '&') : '';
+
+    var poster_url = p.preview && p.preview.images ? p.preview.images[0].source.url.replace(expression, '&') : '';
+
+    return [hls_url, dash_url, fallback_url, scrubber_url, poster_url];
+  }
+-
+  // Inline custom properties for the mobile media frame. Like reddit, portrait
+  // media is letterboxed into a square over a blurred copy of itself.
+  function postMediaFrame(p, allowBackdrop) {
+    p = getPostData(p);
+    var w = 0, h = 0, backdrop = '';
+    var video = p.secure_media && p.secure_media.reddit_video;
+    if (video && video.width && video.height) { w = video.width; h = video.height; }
+    var image = p.preview && p.preview.images && p.preview.images[0];
+    if (image && image.source) {
+      if (!w) { w = image.source.width; h = image.source.height; }
+      var small = image.resolutions && image.resolutions.length ? image.resolutions[0] : image.source;
+      backdrop = safeImageUrl(small.url);
+    }
+    var items = p.gallery_data && p.gallery_data.items;
+    if (!w && p.media_metadata && items && items.length) {
+      var first = p.media_metadata[items[0].media_id];
+      if (first && first.s) { w = first.s.x; h = first.s.y; }
+      if (first && first.p && first.p.length) backdrop = safeImageUrl(first.p[0].u);
+    }
+    var style = '';
+    if (w > 0 && h > 0) style += `--media-ratio:${Math.max(w / h, 1).toFixed(4)};`;
+    if (backdrop && allowBackdrop) style += `--media-backdrop:url("${backdrop}");`;
+    return style;
+  }

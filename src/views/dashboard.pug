@@ -1,0 +1,125 @@
+include ../mixins/header
+include ../mixins/head
+include ../utils
+
+doctype html
+html
+  +head("dashboard")
+  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+    main#content
+      +header(user)
+      div.hero
+        h1 dashboard
+
+        if message
+          div.dashboard-error-message
+            | #{message}
+
+        h2 preferences
+        form(action="/update-preferences" method="POST" autocomplete="off")
+          input(type="hidden" name="_csrf" value=csrfToken)
+          div
+            label(for="pref-infinite-scroll")
+              input(type="checkbox" id="pref-infinite-scroll" name="infiniteScroll" value="1" checked=(user.infiniteScroll === 1))
+              | &nbsp;Enable Never Ending Reddit (infinite scroll)
+
+          div(style="margin-top: 15px;")
+            label(for="pref-classic-layout")
+              input(type="checkbox" id="pref-classic-layout" name="useClassicLayout" value="1" checked=(user.useClassicLayout === 1))
+              | &nbsp;Use Classic RES-style Layout (desktop)
+
+          div(style="margin-top: 15px;")
+            label(for="pref-high-res-thumbnails")
+              input(type="checkbox" id="pref-high-res-thumbnails" name="highResThumbnails" value="1" checked=(user.highResThumbnails === 1))
+              | &nbsp;Use High Resolution Thumbnails (disable for low bandwidth)
+
+          div(style="margin-top: 15px;")
+            label(for="pref-show-nsfw-thumbnails")
+              input(type="checkbox" id="pref-show-nsfw-thumbnails" name="showNsfwThumbnails" value="1" checked=(user.showNsfwThumbnails === 1))
+              | &nbsp;Don't hide thumbnails for 18+ content
+
+          div(style="margin-top: 15px;")
+            label(for="pref-theme" style="display: block; margin-bottom: 5px;") Theme Preference:
+            select(id="pref-theme" name="themePreference" style="padding: 5px; background-color: var(--bg-color-muted); color: var(--text-color); border: 1px solid var(--text-color-muted); border-radius: 4px;")
+              option(value="auto" selected=(user.themePreference === 'auto')) Auto (system preference)
+              option(value="light" selected=(user.themePreference === 'light')) Light
+              option(value="dark" selected=(user.themePreference === 'dark')) Dark
+              option(value="res" selected=(user.themePreference === 'res')) RES Night Mode
+
+          fieldset.dashboard-fieldset
+            legend reddit authentication - burner account only
+            p.dashboard-help
+              | Current: #{redditAuthStatus.description}
+
+            label(for="reddit-auth-type") Credential Type
+            select(id="reddit-auth-type" name="redditAuthType")
+              option(value="auto" selected) Auto-detect
+              option(value="cookie") Cookie header
+              option(value="reddit_session") reddit_session cookie
+              option(value="bearer") Bearer token
+
+            label(for="reddit-auth-credential") Reddit Credential
+            textarea#reddit-auth-credential.dashboard-textarea(name="redditAuthCredential" rows="6" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Cookie: reddit_session=...; token_v2=...\nAuthorization: Bearer ...")
+
+            if redditAuthStatus.configured
+              label(for="clear-reddit-auth")
+                input(type="checkbox" id="clear-reddit-auth" name="clearRedditAuth" value="1")
+                | &nbsp;Clear saved Reddit credential
+
+          button(type="submit" style="margin-top: 20px;") Save Preferences
+
+        h2 api key
+        fieldset.dashboard-fieldset
+          legend personal api key
+          p.dashboard-help
+            | Use this key to read feeds without logging in, e.g. from scripts.
+            | Access is additionally restricted by the #[code API_WHITELIST]
+            | environment variable.
+          p.dashboard-help
+            | Allowed source addresses: #[strong #{apiWhitelist.description}]
+            if !apiWhitelist.configured
+              |  (default)
+
+          if apiKey
+            label(for="api-key") Your key
+            input#api-key.api-key-input(type="text" value=apiKey readonly onclick="this.select()")
+            p.dashboard-help
+              | Example: #[code curl -k -H "X-API-Key: #{apiKey}" https://reddont.local:3000/api/v1/r/buildapcsales/new.rss]
+          else
+            p.dashboard-help no api key generated yet
+
+          div.api-key-actions
+            form(action="/api-key/regenerate" method="POST")
+              input(type="hidden" name="_csrf" value=csrfToken)
+              button(type="submit")= apiKey ? "Regenerate key" : "Generate key"
+            if apiKey
+              form(action="/api-key/revoke" method="POST")
+                input(type="hidden" name="_csrf" value=csrfToken)
+                button(type="submit") Revoke key
+
+        if isAdmin
+          h2 invites
+
+          if invites
+            table.invite-table
+              tr
+                th.invite-table-header link
+                th.invite-table-header created
+                th.invite-table-header claimed
+                th.invite-table-header delete
+              each invite in invites
+                tr
+                  td.invite-link
+                    a(href=`/register?token=${invite.token}`) #{invite.token}
+                  td #{timeDifference(Date.now(), invite.createdAt)} ago
+                  if invite.usedAt
+                    td #{timeDifference(Date.now(), invite.usedAt)} ago
+                  else
+                    td unclaimed
+                  td
+                    a(href=`/delete-invite/${invite.id}`) delete
+
+          a(href="/create-invite") create invite
+
+        else
+          p you aren't an admin and therefore there is nothing to see here yet

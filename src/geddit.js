@@ -1,0 +1,648 @@
+class Geddit {
+	constructor() {
+		this.host = "https://www.reddit.com";
+		this.parameters = {
+			limit: 25,
+			include_over_18: true,
+		};
+		this.search_params = {
+			limit: 25,
+			include_over_18: true,
+			type: "sr,link,user",
+		};
+		this.headers = {
+			"User-Agent":
+				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+			Accept: "application/json",
+		};
+	}
+
+	sanitizeSort(sort) {
+		const allowedSorts = new Set([
+			"best",
+			"hot",
+			"new",
+			"top",
+			"rising",
+			"controversial",
+		]);
+		return allowedSorts.has(sort) ? sort : "hot";
+	}
+
+	sanitizeSubredditPath(subreddit) {
+		if (!subreddit || typeof subreddit !== "string") return "";
+		const cleaned = subreddit
+			.split("+")
+			.map((part) => part.trim().replace(/^r\//i, ""))
+			.filter((part) => /^[A-Za-z0-9_]{1,21}$/.test(part));
+		return cleaned.join("+");
+	}
+
+	encodeSubredditPath(subredditPath) {
+		if (!subredditPath) return "";
+		return subredditPath
+			.split("+")
+			.map((segment) => encodeURIComponent(segment))
+			.join("+");
+	}
+
+	sanitizeThingId(id) {
+		if (!id || typeof id !== "string") return "";
+		const trimmed = id.trim();
+		return /^[A-Za-z0-9_]+$/.test(trimmed) ? trimmed : "";
+	}
+
+	buildRedditUrl(pathname, options = {}) {
+		const url = new URL(pathname, this.host);
+		url.search = new URLSearchParams(options).toString();
+		return url;
+	}
+
+	isSafeHeaderValue(value) {
+		return typeof value === "string" && !/[\0-\x1F\x7F]/.test(value);
+	}
+
+	getRequestHeaders(requestOptions = {}) {
+		const headers = { ...this.headers };
+		const authHeaders = requestOptions?.authHeaders || {};
+		const authorization =
+			authHeaders.authorization || authHeaders.Authorization;
+		const cookie = authHeaders.cookie || authHeaders.Cookie;
+
+		if (this.isSafeHeaderValue(authorization)) {
+			headers.Authorization = authorization;
+		}
+		if (this.isSafeHeaderValue(cookie)) {
+			headers.Cookie = cookie;
+		}
+
+		return headers;
+	}
+
+	getFetchOptions(requestOptions = {}) {
+		return {
+			headers: this.getRequestHeaders(requestOptions),
+		};
+	}
+
+	async getSubmissions(
+		sort = "hot",
+		subreddit = null,
+		options = {},
+		requestOptions = {},
+	) {
+		const params = {
+			limit: 20,
+			include_over_18: true,
+		};
+
+		const safeSort = this.sanitizeSort(sort);
+		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
+		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
+		const subredditStr = encodedSubreddit ? `/r/${encodedSubreddit}` : "";
+		const url = this.buildRedditUrl(
+			`${subredditStr}/${encodeURIComponent(safeSort)}.json`,
+			Object.assign({}, params, options),
+		);
+
+		return await fetch(url, this.getFetchOptions(requestOptions))
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDomainHot(domain, options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/domain/${domain}/hot.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDomainBest(domain, options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/domain/${domain}/best.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDomainTop(domain, options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/domain/${domain}/top.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((_) => null);
+	}
+
+	async getDomainNew(domain, options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/domain/${domain}/new.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDomainRising(
+		domain,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/domain/${domain}/rising.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDomainControversial(
+		domain,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/domain/${domain}/controversial.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				posts: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getSubreddit(subreddit, requestOptions = {}) {
+		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
+		if (!safeSubreddit) return null;
+		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
+
+		return await fetch(
+			`${this.host}/r/${encodedSubreddit}/about.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getSubredditRules(subreddit, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/about/rules.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getSubredditModerators(subreddit, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/about/moderators.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				users: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getSubredditWikiPages(subreddit, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/wiki/pages.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getSubredditWikiPage(subreddit, page, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/wiki/${page}.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getSubredditWikiPageRevisions(subreddit, page, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/wiki/revisions${page}.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+
+	async getPopularSubreddits(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/subreddits/popular.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				subreddits: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getNewSubreddits(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/subreddits/new.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				subreddits: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getPremiumSubreddits(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/subreddits/premium.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				subreddits: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getDefaultSubreddits(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/subreddits/default.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				subreddits: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getPopularUsers(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/users/popular.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				users: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getNewUsers(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/users/new.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				users: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async searchSubmissions(query, options = {}, requestOptions = {}) {
+		options.q = query;
+		options.type = "link";
+
+		return await fetch(
+			`${this.host}/search.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async searchSubreddits(query, options = {}, requestOptions = {}) {
+		options.q = query;
+
+		const params = {
+			limit: 25,
+			include_over_18: false,
+		};
+
+		return await fetch(
+			`${this.host}/subreddits/search.json?${new URLSearchParams(Object.assign(params, options))}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async searchUsers(query, options = {}, requestOptions = {}) {
+		options.q = query;
+
+		const params = {
+			limit: 25,
+			include_over_18: true,
+		};
+
+		return await fetch(
+			`${this.host}/users/search.json?${new URLSearchParams(Object.assign(params, options))}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async searchAll(query, subreddit = null, options = {}, requestOptions = {}) {
+		options.q = query;
+		const subredditStr = subreddit ? `/r/${subreddit}` : "";
+
+		const params = {
+			limit: 25,
+			include_over_18: true,
+			type: "sr,link,user",
+		};
+
+		return await fetch(
+			`${this.host + subredditStr}/search.json?${new URLSearchParams(Object.assign(params, options))}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) =>
+				Array.isArray(json)
+					? {
+							after: json[1].data.after,
+							items: json[0].data.children.concat(json[1].data.children),
+						}
+					: {
+							after: json.data.after,
+							items: json.data.children,
+						},
+			)
+			.catch((err) => null);
+	}
+
+	async getSubmission(id, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/by_id/${id}.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children[0].data)
+			.catch((err) => null);
+	}
+
+	async getSubmissionComments(
+		id,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		const safeId = this.sanitizeThingId(id);
+		if (!safeId) return null;
+
+		return await fetch(
+			this.buildRedditUrl(
+				`/comments/${encodeURIComponent(safeId)}.json`,
+				options,
+			),
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => ({
+				submission: json[0].data.children[0],
+				comments: json[1].data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getSingleCommentThread(
+		parent_id,
+		child_id,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		const safeParentId = this.sanitizeThingId(parent_id);
+		const safeChildId = this.sanitizeThingId(child_id);
+		if (!safeParentId || !safeChildId) return null;
+
+		return await fetch(
+			this.buildRedditUrl(
+				`/comments/${encodeURIComponent(safeParentId)}/comment/${encodeURIComponent(safeChildId)}.json`,
+				options,
+			),
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => ({
+				submission: json[0].data.children[0],
+				comments: json[1].data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getSubredditComments(
+		subreddit,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/r/${subreddit}/comments.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+
+	async getUser(username, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/user/${username}/about.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getUserOverview(
+		username,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/user/${username}/overview.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getUserComments(
+		username,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/user/${username}/comments.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getUserSubmissions(
+		username,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/user/${username}/submitted.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.then((data) => ({
+				after: data.after,
+				items: data.children,
+			}))
+			.catch((err) => null);
+	}
+
+	async getLiveThread(id, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/live/${id}/about.json`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data)
+			.catch((err) => null);
+	}
+
+	async getLiveThreadUpdates(
+		id,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/live/${id}.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+
+	async getLiveThreadContributors(
+		id,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/live/${id}/contributors.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+
+	async getLiveThreadDiscussions(
+		id,
+		options = this.parameters,
+		requestOptions = {},
+	) {
+		return await fetch(
+			`${this.host}/live/${id}/discussions.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+
+	async getLiveThreadsNow(options = this.parameters, requestOptions = {}) {
+		return await fetch(
+			`${this.host}/live/happening_now.json?${new URLSearchParams(options)}`,
+			this.getFetchOptions(requestOptions),
+		)
+			.then((res) => res.json())
+			.then((json) => json.data.children)
+			.catch((err) => null);
+	}
+}
+
+export { Geddit };

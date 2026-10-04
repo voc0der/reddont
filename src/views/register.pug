@@ -1,0 +1,35 @@
+include ../mixins/head
+
+- var action = "/register" + (token?`?token=${token}`:'')
+doctype html
+html
+  +head("register")
+  body
+    main#content
+      h1 register
+      if message
+        div.register-error-message
+          | #{message}
+      else
+        div.register-message
+          | reddont is a read-only reddit client
+      form(action=`${action}` method="post")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        div.input-text
+          label(for="username") username
+          input(type="text" name="username" required)
+        div.input-text
+          label(for="password") password
+          input(type="password" name="password" required)
+        div.input-text
+          label(for="confirm_password") confirm password
+          input(type="password" name="confirm_password" required)
+        div.submit-button
+          if isDisabled
+            button(type="submit" disabled) register'nt :(
+          else
+            button(type="submit") register
+        div
+          p
+            | already have an account?&nbsp;
+            a(href="/login") login

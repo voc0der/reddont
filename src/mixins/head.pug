@@ -1,0 +1,314 @@
+mixin head(title)
+  head
+    meta(name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover")
+    meta(charset='UTF-8')
+    if csrfToken
+      meta(name="csrf-token" content=csrfToken)
+    title #{`${title} · reddont `}
+
+    //- PWA Support
+    link(rel="manifest" href="/manifest.json")
+    meta(name="theme-color" content="#0e1113")
+    meta(name="color-scheme" content="light dark")
+    meta(name="mobile-web-app-capable" content="yes")
+    meta(name="application-name" content="Reddont")
+
+    //- Apple iOS PWA Support
+    meta(name="apple-mobile-web-app-capable" content="yes")
+    meta(name="apple-mobile-web-app-status-bar-style" content="black-translucent")
+    meta(name="apple-mobile-web-app-title" content="Reddont")
+    link(rel="apple-touch-icon" href="/icon-180.png")
+    link(rel="apple-touch-icon" sizes="152x152" href="/icon-152.png")
+    link(rel="apple-touch-icon" sizes="180x180" href="/icon-180.png")
+
+    //- Service Worker Registration
+    script.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+              console.log('Service Worker registered:', registration.scope);
+            })
+            .catch((error) => {
+              console.error('Service Worker registration failed:', error);
+            });
+        });
+      }
+
+    //- Styles
+    link(rel="stylesheet", href="/styles.css")
+    //- Phones get reddit's mobile web layout, set in the system font like reddit.
+    link(rel="stylesheet", href="/mobile.css" media="(max-width: 767px)")
+    if theme
+      link(rel="stylesheet", href=`/${theme}.css`)
+    link(rel="preconnect" href="https://rsms.me/" media="(min-width: 768px)")
+    link(rel="stylesheet" href="https://rsms.me/inter/inter.css" media="(min-width: 768px)")
+    script(src="/vendor/dash.all.min.js" defer)
+    script.
+      //- Initialize DASH before interaction so Reddit's separate audio and
+      //- video streams are attached before a mobile browser enters native
+      //- fullscreen. DASH/HLS errors restore the same proven MP4 used by
+      //- the thumbnail.
+      function isMobileVideoContext() {
+        return window.matchMedia('(pointer: coarse)').matches
+          || window.matchMedia('(max-width: 767px)').matches;
+      }
+
+      function playVideo(video) {
+        var playPromise = video.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch(function () {
+            if (video.classList.contains('preview-video')) {
+              video.dataset.previewPlayback = 'blocked';
+            }
+          });
+        }
+      }
+
+      function destroyDashPlayer(video) {
+        if (!video || !video.reddontDashPlayer) return;
+        try {
+          video.reddontDashPlayer.destroy();
+        } catch (_error) {
+          //- The media element is still reset below if dash.js has already
+          //- released the player.
+        }
+        delete video.reddontDashPlayer;
+      }
+
+      function useFallbackVideo(video, fallbackUrl, resume) {
+        destroyDashPlayer(video);
+        video.dataset.playerInitialized = 'fallback';
+        if (video.getAttribute('src') !== fallbackUrl) {
+          video.src = fallbackUrl;
+          video.load();
+        }
+        if (resume) playVideo(video);
+      }
+
+      function initVideoPlayer(video, resume) {
+        if (!video) return;
+        var hlsUrl = video.dataset.hlsUrl;
+        var dashUrl = video.dataset.dashUrl;
+        var fallbackUrl = video.dataset.fallbackUrl;
+
+        if (video.dataset.playerInitialized) {
+          if (resume) playVideo(video);
+          return;
+        }
+
+        if (dashUrl && window.dashjs) {
+          video.dataset.playerInitialized = 'dash';
+          var player = dashjs.MediaPlayer().create();
+          var fallbackActivated = false;
+          var activateFallback = function () {
+            if (!fallbackUrl || fallbackActivated) return;
+            fallbackActivated = true;
+            var shouldResume = resume || !video.paused;
+            useFallbackVideo(video, fallbackUrl, shouldResume);
+          };
+          if (fallbackUrl && dashjs.MediaPlayer.events && dashjs.MediaPlayer.events.ERROR) {
+            player.on(dashjs.MediaPlayer.events.ERROR, function () {
+              if (fallbackActivated) return;
+              activateFallback();
+            });
+          }
+          try {
+            video.reddontDashPlayer = player;
+            player.initialize(video, dashUrl, !!resume);
+          } catch (_error) {
+            activateFallback();
+          }
+        } else if (hlsUrl && video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.dataset.playerInitialized = 'hls';
+          if (fallbackUrl) {
+            video.addEventListener('error', function () {
+              var shouldResume = resume || !video.paused;
+              useFallbackVideo(video, fallbackUrl, shouldResume);
+            }, { once: true });
+          }
+          video.src = hlsUrl;
+          video.load();
+          if (resume) playVideo(video);
+        } else if (fallbackUrl) {
+          useFallbackVideo(video, fallbackUrl, resume);
+        }
+      }
+
+      function releaseVideoPlayer(video) {
+        if (!video) return;
+        video.pause();
+        if (!isMobileVideoContext()) return;
+
+        destroyDashPlayer(video);
+        video.removeAttribute('src');
+        video.load();
+        delete video.dataset.playerInitialized;
+      }
+
+      var previewVideoObserver;
+
+      function isVideoInViewport(video) {
+        var bounds = video.getBoundingClientRect();
+        return bounds.bottom > 0
+          && bounds.right > 0
+          && bounds.top < window.innerHeight
+          && bounds.left < window.innerWidth;
+      }
+
+      function playVideoPreview(video) {
+        if (!video || video.dataset.previewSuspended) return;
+        var previewUrl = video.dataset.previewSrc;
+        video.muted = true;
+        video.defaultMuted = true;
+        if (!video.getAttribute('src') && previewUrl) {
+          video.src = previewUrl;
+          video.load();
+        }
+        delete video.dataset.previewPlayback;
+        playVideo(video);
+      }
+
+      function pauseVideoPreview(video) {
+        if (video) video.pause();
+      }
+
+      function initVideoPreviews(root) {
+        if (!root || !root.querySelectorAll) return;
+        var videos = root.querySelectorAll('video.preview-video');
+
+        if ('IntersectionObserver' in window && !previewVideoObserver) {
+          previewVideoObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                playVideoPreview(entry.target);
+              } else {
+                pauseVideoPreview(entry.target);
+              }
+            });
+          }, {
+            rootMargin: '96px 0px',
+            threshold: 0.15
+          });
+        }
+
+        videos.forEach(function (video) {
+          if (video.dataset.previewObserved) return;
+          video.dataset.previewObserved = '1';
+          video.muted = true;
+          video.defaultMuted = true;
+          video.addEventListener('error', function () {
+            var alternateUrl = video.dataset.previewFallbackSrc;
+            if (
+              !alternateUrl ||
+              video.dataset.previewFallbackUsed ||
+              video.dataset.previewSuspended
+            ) {
+              return;
+            }
+            video.dataset.previewFallbackUsed = '1';
+            video.dataset.previewSrc = alternateUrl;
+            video.src = alternateUrl;
+            video.load();
+            if (isVideoInViewport(video)) playVideoPreview(video);
+          });
+          if (previewVideoObserver) {
+            previewVideoObserver.observe(video);
+          } else {
+            playVideoPreview(video);
+          }
+        });
+      }
+
+      function findPostVideoPreview(detailsElement) {
+        var post = detailsElement && detailsElement.closest('article.post');
+        return post ? post.querySelector('.media-preview video.preview-video') : null;
+      }
+
+      function suspendPostVideoPreview(detailsElement) {
+        var preview = findPostVideoPreview(detailsElement);
+        if (!preview) return;
+        preview.dataset.previewSuspended = '1';
+        preview.pause();
+
+        //- Android browsers can fail to allocate the expanded player while
+        //- the thumbnail still owns a decoder for the same clip.
+        if (isMobileVideoContext()) {
+          preview.removeAttribute('src');
+          preview.load();
+        }
+      }
+
+      function resumePostVideoPreview(detailsElement) {
+        var preview = findPostVideoPreview(detailsElement);
+        if (!preview) return;
+        delete preview.dataset.previewSuspended;
+        if (isVideoInViewport(preview)) playVideoPreview(preview);
+      }
+
+      function sharePost(button) {
+        var url = button.dataset.url;
+        if (navigator.share) {
+          navigator.share({ title: button.dataset.title, url: url }).catch(function () {});
+          return;
+        }
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(function () {
+            button.classList.add('is-copied');
+            setTimeout(function () { button.classList.remove('is-copied'); }, 1500);
+          });
+        }
+      }
+
+      async function toggleJoin(button) {
+        var sub = button.dataset.joinSub;
+        var thing = button.dataset.joined === '1' ? 'unsubscribe' : 'subscribe';
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        button.disabled = true;
+        try {
+          var response = await fetch('/' + thing, {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': csrf ? csrf.getAttribute('content') : '',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ subreddit: sub }),
+          });
+          if (!response.ok) throw new Error('Failed to ' + thing);
+          var joined = thing === 'subscribe';
+          document.querySelectorAll('[data-join-sub]').forEach(function (other) {
+            if (other.dataset.joinSub.toLowerCase() !== sub.toLowerCase()) return;
+            other.dataset.joined = joined ? '1' : '0';
+            other.classList.toggle('is-joined', joined);
+            other.textContent = joined ? 'Joined' : 'Join';
+          });
+          var legacy = document.getElementById('thinger_' + sub);
+          if (legacy) legacy.innerText = joined ? 'unsubscribe' : 'subscribe';
+        } catch (error) {
+          console.error(error);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      //- Mobile menus are <details>; close them on outside taps like reddit's.
+      document.addEventListener('click', function (event) {
+        if (!window.matchMedia('(max-width: 767px)').matches) return;
+        document.querySelectorAll('details.m-overflow[open], details.sort-details[open], details.view-details[open]').forEach(function (menu) {
+          if (!menu.contains(event.target)) menu.open = false;
+        });
+      });
+
+      document.addEventListener('DOMContentLoaded', function () {
+        initVideoPreviews(document);
+
+        document.addEventListener('visibilitychange', function () {
+          document.querySelectorAll('video.preview-video').forEach(function (video) {
+            if (document.hidden || !isVideoInViewport(video)) {
+              pauseVideoPreview(video);
+            } else {
+              playVideoPreview(video);
+            }
+          });
+        });
+      });

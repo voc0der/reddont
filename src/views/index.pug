@@ -1,0 +1,208 @@
+include ../mixins/post
+include ../mixins/header
+include ../mixins/head
+include ../utils
+  - var viewQuery = query && query.view ? query.view : 'compact'
+  - var sortQuery = query && query.sort ? query.sort + (query.t ? '&t=' + query.t : '') : 'hot'
+  - var baseUrl = isHomePage ? '' : `/r/${subreddit}`
+doctype html
+html
+  +head("home")
+  include ../mixins/subUtils
+
+  //- Mobile-only community chrome; desktop keeps the plain hero below.
+  - var communityName = about && about.display_name ? about.display_name : subreddit
+  - var hasCommunityHeader = !isMulti && about && about.display_name && !['all', 'popular'].includes(String(subreddit).toLowerCase())
+  - var bannerImage = hasCommunityHeader ? (safeImageUrl(about.mobile_banner_image) || safeImageUrl(about.banner_background_image) || safeImageUrl(about.banner_img)) : ''
+  - var bannerColor = hasCommunityHeader ? (safeColor(about.banner_background_color) || safeColor(about.primary_color) || safeColor(about.key_color) || '#33464c') : ''
+  - var sortLabel = query.sort + (query.t ? ' ' + query.t : '')
+  body(class=(isHomePage ? 'home-page' : false) data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+    main#content
+      +header(user)
+      if hasCommunityHeader
+        input#m-tab-feed.m-tab-input.m-only(type="radio" name="m-community-tab" checked)
+        input#m-tab-about.m-tab-input.m-only(type="radio" name="m-community-tab")
+      div.hero
+        if hasCommunityHeader
+          div.m-banner.m-only(style=(bannerImage ? `background-image:url("${bannerImage}")` : `background-color:${bannerColor}`))
+          div.m-community.m-only
+            span.m-community-avatar.m-community-avatar-lg(aria-hidden="true")
+              if communityIcon(about)
+                img(src=communityIcon(about) alt="")
+              else
+                span.m-community-fallback(style=`background-color:${communityColor(about)}`) r/
+            div.m-community-text
+              div.m-community-name r/#{communityName}
+              div.m-community-stats
+                | #{fmtcount(about.subscribers).replace('K', 'k')} members
+                if about.accounts_active || about.active_user_count
+                  |  and #{fmtcount(about.accounts_active || about.active_user_count).replace('K', 'k')} online
+          div.m-community-actions.m-only
+            +joinButton(subreddit, isSubbed)
+        else if !isHomePage
+          div.m-feed-title.m-only r/#{communityName}
+        if isHomePage
+          form.m-home-search.m-only(action="/post-search" method="get" role="search")
+            span.m-home-search-mark(aria-hidden="true") L
+            input(type="search" name="q" placeholder="Find anything" aria-label="Search posts" autocomplete="off")
+            input(type="hidden" name="view" value=viewQuery)
+        div.sub-title
+          h1
+            if isMulti
+              a(href=`/?sort=${sortQuery}&view=${viewQuery}`) home
+            else
+              a(href=`/r/${subreddit}?sort=${sortQuery}&view=${viewQuery}`)
+                | r/#{subreddit}
+          if !isMulti
+            div#button-container
+              if isSubbed
+                button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) unsubscribe
+              else
+                button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) subscribe
+        if about && !isMulti
+          div.about #{about.public_description}
+        if about && !isMulti
+          div.info-container
+            p
+              | #{fmtnum(about.accounts_active)} active
+              | &nbsp;·&nbsp;
+              | #{fmtnum(about.subscribers)} subscribers
+        div.feed-controls
+          if hasCommunityHeader
+            div.m-tabs.m-only(role="tablist")
+              label.m-tab.m-tab-feed(for="m-tab-feed") Feed
+              label.m-tab.m-tab-about(for="m-tab-about") About
+          details.sort-details
+            summary.sorting(aria-label=`Sort: ${sortLabel}`)
+              | #{sortLabel}
+              span.d-only  ▾
+              span.m-chevron.m-only
+                +icon("chevron-down")
+            div.sort-opts
+              div
+                a(href=`${baseUrl}?sort=hot&view=${viewQuery}`) hot
+              div
+                a(href=`${baseUrl}?sort=new&view=${viewQuery}`) new
+              div
+                a(href=`${baseUrl}?sort=rising&view=${viewQuery}`) rising
+              div
+                a(href=`${baseUrl}?sort=top&view=${viewQuery}`) top
+              div
+                a(href=`${baseUrl}?sort=top&t=day&view=${viewQuery}`) top day
+              div
+                a(href=`${baseUrl}?sort=top&t=week&view=${viewQuery}`) top week
+              div
+                a(href=`${baseUrl}?sort=top&t=month&view=${viewQuery}`) top month
+              div
+                a(href=`${baseUrl}?sort=top&t=year&view=${viewQuery}`) top year
+              div
+                a(href=`${baseUrl}?sort=top&t=all&view=${viewQuery}`) top all
+          details.view-details
+            summary.viewing(aria-label=`View: ${viewQuery}`)
+              span.d-only #{viewQuery} ▾
+              span.m-chevron.m-only
+                +icon("chevron-down")
+            div.view-opts
+              div
+                a(href=`${baseUrl}?sort=${sortQuery}&view=compact`) compact
+              div
+                a(href=`${baseUrl}?sort=${sortQuery}&view=card`) card
+
+      if hasCommunityHeader
+        section.m-about.m-only(aria-label=`About r/${communityName}`)
+          h2.m-about-title r/#{communityName}
+          if about.public_description
+            p.m-about-description #{about.public_description}
+          dl.m-about-stats
+            div
+              dt #{fmtcount(about.subscribers)}
+              dd Members
+            if about.accounts_active || about.active_user_count
+              div
+                dt #{fmtcount(about.accounts_active || about.active_user_count)}
+                dd Online
+          if about.created_utc
+            p.m-about-created Created #{new Date(about.created_utc * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+
+      div#posts-container
+        if posts
+          each child in posts.posts
+            +post(child.data, currentUrl)
+
+      if posts && posts.after
+        if user.infiniteScroll
+          div.page-divider ─────
+          div#infinite-scroll-sentinel
+          div#loading-indicator Loading more posts...
+        else
+          div.footer
+            div.footer-item
+              - var newQuery = {...query, after: posts.after}
+              a(href=`/r/${subreddit}?${encodeQueryParams(newQuery)}`) next ⟶
+
+      if user.infiniteScroll && posts && posts.after
+        script.
+          (function() {
+            let isLoading = false;
+            let afterCursor = '#{posts.after}';
+            const subreddit = '#{subreddit}';
+            const sort = '#{query.sort}';
+            const view = '#{query.view}';
+            const currentUrl = '#{currentUrl}';
+
+            const sentinel = document.getElementById('infinite-scroll-sentinel');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const postsContainer = document.getElementById('posts-container');
+
+            const observer = new IntersectionObserver(async (entries) => {
+              if (entries[0].isIntersecting && !isLoading && afterCursor) {
+                isLoading = true;
+                loadingIndicator.style.display = 'block';
+
+                try {
+                  const params = new URLSearchParams({
+                    sort: sort,
+                    view: view,
+                    after: afterCursor,
+                    currentUrl: currentUrl
+                  });
+
+                  const response = await fetch(`/api/r/${subreddit}/posts?${params}`);
+                  const data = await response.json();
+
+                  if (data.html) {
+                    // Add divider before new content
+                    const divider = document.createElement('div');
+                    divider.className = 'page-divider';
+                    divider.textContent = '─────';
+                    postsContainer.insertAdjacentElement('beforeend', divider);
+
+                    // Add new posts
+                    postsContainer.insertAdjacentHTML('beforeend', data.html);
+                    if (window.initVideoPreviews) {
+                      initVideoPreviews(postsContainer);
+                    }
+                  }
+
+                  afterCursor = data.after;
+
+                  if (!afterCursor) {
+                    observer.disconnect();
+                    sentinel.remove();
+                    loadingIndicator.textContent = 'No more posts';
+                    loadingIndicator.style.display = 'block';
+                  }
+                } catch (error) {
+                  console.error('Error loading more posts:', error);
+                  loadingIndicator.textContent = 'Error loading posts';
+                } finally {
+                  loadingIndicator.style.display = 'none';
+                  isLoading = false;
+                }
+              }
+            }, { threshold: 0.1 });
+
+            if (sentinel) {
+              observer.observe(sentinel);
+            }
+          })();
