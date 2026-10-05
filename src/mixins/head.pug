@@ -6,7 +6,12 @@ mixin head(title)
       meta(name="csrf-token" content=csrfToken)
     title #{`${title} · reddont `}
 
-    //- PWA Support
+    //- Icons. Their sources and the other logo versions are in branding/.
+    //- sizes="32x32" rather than "any" lets Chrome pick the SVG.
+    link(rel="icon" href="/favicon.ico" sizes="32x32")
+    link(rel="icon" href="/favicon.svg" type="image/svg+xml")
+
+    //- PWA Support. public/manifest.json uses the same theme color.
     link(rel="manifest" href="/manifest.json")
     meta(name="theme-color" content="#0e1113")
     meta(name="color-scheme" content="light dark")
@@ -17,9 +22,7 @@ mixin head(title)
     meta(name="apple-mobile-web-app-capable" content="yes")
     meta(name="apple-mobile-web-app-status-bar-style" content="black-translucent")
     meta(name="apple-mobile-web-app-title" content="Reddont")
-    link(rel="apple-touch-icon" href="/icon-180.png")
-    link(rel="apple-touch-icon" sizes="152x152" href="/icon-152.png")
-    link(rel="apple-touch-icon" sizes="180x180" href="/icon-180.png")
+    link(rel="apple-touch-icon" href="/apple-touch-icon.png")
 
     //- Service Worker Registration
     script.

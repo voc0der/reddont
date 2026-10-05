@@ -1,4 +1,7 @@
-# reddont
+<h1>
+  <img src="./branding/reddont-64.png" alt="reddont logo" width="32" />
+  reddont
+</h1>
 
 A self-hosted, read-only Reddit client with personal subscriptions, desktop and
 mobile layouts, single sign-on, and an API for JSON and Atom feeds.

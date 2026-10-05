@@ -31,9 +31,9 @@ bun test
 ```
 
 The suite covers Reddit credential parsing, API access controls and routes,
-Atom feeds, self-text decoding, and post rendering. API integration tests
-open a temporary localhost server and use a temporary SQLite database.
-Run in an environment that permits binding a local port.
+Atom feeds, self-text decoding, post rendering, and the app icons. API
+integration tests open a temporary localhost server and use a temporary SQLite
+database. Run in an environment that permits binding a local port.
 
 ## Source map
 
@@ -46,8 +46,9 @@ Run in an environment that permits binding a local port.
 | `src/auth.js`, `src/oidc.js`, `src/apiAuth.js` | Browser sessions, OIDC, and API authorization. |
 | `src/geddit.js`, `src/redditAuth.js` | Upstream requests and per-user Reddit credentials. |
 | `src/views/`, `src/mixins/` | Pug pages and reusable UI. |
-| `src/public/` | Shared `styles.css`, phone `mobile.css`, desktop `desktop.css`, and the service worker. |
-| `src/utils/` | Feed serialization, HTML decoding, and generated app icon. |
+| `src/public/` | Shared `styles.css`, phone `mobile.css`, desktop `desktop.css`, the service worker, the web app manifest, and icons. |
+| `src/utils/` | Feed serialization and HTML decoding. |
+| `branding/` | The logo's vector sources, wordmarks, and PNG sizes. |
 
 ## Nix
 

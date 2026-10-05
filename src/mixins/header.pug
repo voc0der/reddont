@@ -57,7 +57,7 @@ mixin header(user, page)
             +icon("logout")
             span Log out
     a.brand(href=`/?${viewQuery}` aria-label="Reddont home")
-      span.brand-mark(aria-hidden="true") R
+      img.brand-mark(src="/favicon.svg" alt="" width="32" height="32")
       span.brand-name reddont
     if headerPage.name
       span.pagename.d-only
