@@ -7,9 +7,12 @@ repo_name = "voc0der/reddont"
 edit_uri = "edit/main/docs/"
 docs_dir = "docs"
 site_dir = "site"
+extra_css = ["stylesheets/gallery.css"]
+extra_javascript = ["javascripts/gallery.js"]
 
 nav = [
   { "Home" = "index.md" },
+  { "Gallery" = "gallery.md" },
   { "Get started" = [
     { "Quick start" = "getting-started/quick-start.md" },
     { "Features" = "features.md" },

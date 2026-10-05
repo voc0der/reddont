@@ -40,6 +40,23 @@ heading anchors. Generated output, the Python environment, and build caches
 are ignored by Git and excluded from the app's Docker context. See
 [Zensical's build options](https://zensical.org/docs/usage/build/).
 
+## Regenerating screenshots
+
+The README cover and [gallery](../gallery.md) are captured from the real app with fictional content. From the repository root, run:
+
+```sh
+bun install --frozen-lockfile
+./dev/screenshots/gallery.sh
+```
+
+The harness needs Bun, Node.js 20 or newer, and npm. On its first run it installs the pinned Playwright dependency in `dev/screenshots/` and downloads Chromium. On Linux, install browser system dependencies if needed with `cd dev/screenshots && npx playwright install --with-deps chromium`. Set `CHROMIUM_PATH` to use an existing Chromium executable instead.
+
+Each run starts the current app on a random loopback port with a temporary SQLite database, fictional accounts, and fixed dates. Upstream responses and browser media requests use checked-in fixtures; unexpected requests fail the capture. No upstream account or existing application database is used. The server and temporary files are cleaned up when the run finishes.
+
+All 11 images are written to `docs/assets/screenshots/` after the captures pass checks for missing images, browser errors, and horizontal overflow. Review and commit them alongside interface changes. The capture is a manual development tool and does not run in CI.
+
+Edit the sample posts and comments in `dev/screenshots/fixtures/content.cjs`; the SVG illustrations alongside it are original fixture artwork. Capture routes, themes, and viewport sizes live in `dev/screenshots/gallery.mjs`. Keep the filenames and image dimensions in [gallery.md](../gallery.md) aligned with the harness.
+
 ## Authoring
 
 - Add each page to `nav` in `zensical.toml`.

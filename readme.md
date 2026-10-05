@@ -16,6 +16,12 @@ reddont is read-only: it does not post, vote, or comment on Reddit.
 
 **[Documentation](https://voc0der.github.io/reddont/)** · [Quick start](https://voc0der.github.io/reddont/getting-started/quick-start/) · [Configuration](https://voc0der.github.io/reddont/reference/environment/) · [API reference](https://voc0der.github.io/reddont/reference/api/)
 
+<hr>
+
+<img src="./docs/assets/screenshots/readme-home.png" width="1000" alt="reddont in its night theme, with a community feed and an expanded landscape illustration">
+<br>
+<sub>More screenshots in the <a href="https://voc0der.github.io/reddont/gallery/">gallery</a>. Shown with fictional content.</sub>
+
 ## Setup
 
 ### Docker Compose

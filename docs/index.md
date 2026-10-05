@@ -3,12 +3,13 @@
 **reddont is a self-hosted, read-only Reddit client.** Follow communities,
 read discussions, and send feeds to your own tools from one instance.
 
-Your subscriptions and preferences belong to your reddont account. You can
-browse without connecting a Reddit account, or supply a separate Reddit
-credential when upstream requests need it.
+Your subscriptions and preferences belong to your reddont account.
 
 [Get started](getting-started/quick-start.md){ .md-button .md-button--primary }
 [Explore the features](features.md){ .md-button }
+[Gallery](gallery.md){ .md-button }
+
+[![reddont in its night theme, with fictional posts and an expanded landscape illustration](assets/screenshots/readme-home.png)](gallery.md)
 
 ## Find your guide
 
