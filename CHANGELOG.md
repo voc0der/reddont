@@ -28,11 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - RES keyboard navigation on desktop: j and k select posts and comments, x or
   Enter expands or collapses the selection, and c opens a post's comments
-- Desktop comment buttons for permalink, parent, and hiding child comments,
-  plus "hide all child comments" on the post
 - RES's subreddit list under "my subreddits": filter your subscriptions, press
   Enter to open the first match, and sort by name or by when you last visited
   each one in this browser
+- Desktop comment buttons for permalink, parent, and hiding child comments,
+  plus "hide all child comments" on the post
 
 ### Removed
 
