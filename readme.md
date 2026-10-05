@@ -12,8 +12,6 @@
 
 Read-only reddit from a web app you host yourself. The compact desktop layout draws inspiration from classic Reddit and RES, with a separate layout for phones. Follow communities, expand media inline, and browse threaded discussions with your own themes and reading preferences. Each person gets their own subscriptions, with invite-only accounts and optional single sign-on. JSON and Atom feeds connect your reading to other tools. See the [full feature list](https://voc0der.github.io/reddont/features/).
 
-reddont is read-only: it does not post, vote, or comment on Reddit.
-
 **[Documentation](https://voc0der.github.io/reddont/)** · [Quick start](https://voc0der.github.io/reddont/getting-started/quick-start/) · [Configuration](https://voc0der.github.io/reddont/reference/environment/) · [API reference](https://voc0der.github.io/reddont/reference/api/)
 
 <hr>
