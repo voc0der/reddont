@@ -6,10 +6,13 @@ reddont account keeps these settings independently of any Reddit account.
 ## Get around
 
 On desktop, the bar across the top links to **home**, **popular**, **all**,
-**subs**, and **search**, followed by your subscriptions; **my subreddits**
-opens the full list. Select the reddont logo to return home, or your username
-or **preferences** to open the dashboard. On a phone, the navigation drawer
-contains the same main destinations.
+**subs**, and **search**, followed by your subscriptions. **my subreddits**
+lists them all, as Reddit Enhancement Suite does: type to filter the list and
+press Enter to open the first match, or sort it by name or by when you last
+visited each community. Visit times stay in the browser you visited from.
+Select the reddont logo to return home, or your username or **preferences** to
+open the dashboard. On a phone, the navigation drawer contains the same main
+destinations.
 
 Home combines your subscribed communities. If your subscription list is
 empty, it shows the all feed. Open a community directly at `/r/community`.

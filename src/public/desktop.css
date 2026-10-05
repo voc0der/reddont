@@ -41,6 +41,8 @@ body {
   --o-drop-bg: #ffffff;
   --o-drop-border: #808080;
   --o-drop-hover: #c7def7;
+  --o-drop-rule: #cccccc;
+  --o-drop-scheme: light;
   --o-flair-bg: #f5f5f5;
   --o-flair-text: #545454;
   --o-flair-border: #dedede;
@@ -122,8 +124,10 @@ body[data-theme="res"] {
   --o-userbar-bg: #333333;
   --o-userbar-sep: #909090;
   --o-drop-bg: #333333;
-  --o-drop-border: #555555;
+  --o-drop-border: #000000;
   --o-drop-hover: #444444;
+  --o-drop-rule: #646464;
+  --o-drop-scheme: dark;
   --o-flair-bg: #404040;
   --o-flair-text: #c8c8c8;
   --o-flair-border: #4d4d4d;
@@ -203,8 +207,10 @@ body[data-theme="res"] {
     --o-userbar-bg: #333333;
     --o-userbar-sep: #909090;
     --o-drop-bg: #333333;
-    --o-drop-border: #555555;
+    --o-drop-border: #000000;
     --o-drop-hover: #444444;
+    --o-drop-rule: #646464;
+    --o-drop-scheme: dark;
     --o-flair-bg: #404040;
     --o-flair-text: #c8c8c8;
     --o-flair-border: #4d4d4d;
@@ -461,6 +467,7 @@ main#content > .side {
   padding: 0.2rem 0.6rem 0.1rem;
   color: var(--o-link);
   font-size: 1.2rem;
+  white-space: nowrap;
 }
 
 .drop-choices a.choice:hover {
@@ -472,10 +479,103 @@ main#content > .side {
   font-weight: bold;
 }
 
-.drop-choices .bottom-option {
-  margin-top: 0.2rem;
-  border-top: 1px solid var(--o-drop-border);
-  font-weight: bold;
+/* RES's subreddit list under "my subreddits", measured from RES night mode:
+   a filter box and "View all", then a row per subscription. */
+.drop-choices.sr-list {
+  width: 26rem;
+  padding: 0;
+  color: var(--o-text);
+  color-scheme: var(--o-drop-scheme);
+  font-size: 1.2rem;
+}
+
+.sr-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+/* Two classes outrank the generic input[type="search"] rule below. */
+.sr-list .sr-list-filter {
+  width: 17.2rem;
+  height: 2rem;
+  margin: 0.1rem;
+  padding: 0 0.3rem;
+  border: 1px solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+  color: #222222;
+  font: inherit;
+}
+
+.sr-list .sr-list-filter::placeholder {
+  color: #757575;
+  opacity: 1;
+}
+
+/* The bar's own link color is for its light background. */
+#sr-header-area .sr-list a,
+#sr-header-area .sr-list a:visited {
+  color: var(--o-link);
+}
+
+.sr-list-all {
+  margin: 0.5rem 0.4rem 0 0;
+  white-space: nowrap;
+}
+
+.sr-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  line-height: 1.4rem;
+}
+
+.sr-list-table th {
+  padding: 0.1rem 0 0;
+  font-size: 1rem;
+  font-weight: normal;
+  text-align: left;
+}
+
+.sr-list-table th:first-child {
+  width: 14.6rem;
+}
+
+.sr-list-table th button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sr-list-table th[aria-sort] button::after {
+  margin-left: 0.3em;
+  font-size: 0.7em;
+  vertical-align: 0.15em;
+}
+
+.sr-list-table th[aria-sort="ascending"] button::after {
+  content: "\25B2";
+}
+
+.sr-list-table th[aria-sort="descending"] button::after {
+  content: "\25BC";
+}
+
+.sr-list-table td {
+  padding: 0.2rem 0.7rem;
+  border-bottom: 1px solid var(--o-drop-rule);
+}
+
+.sr-list-table tbody tr:hover {
+  background: var(--o-drop-hover);
+}
+
+.sr-visited.is-never,
+.sr-list-empty {
+  color: var(--o-muted);
 }
 
 /* The logo, old reddit's 40px-tall header image. */

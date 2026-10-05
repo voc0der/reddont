@@ -42,7 +42,7 @@ html
     - var linkPreview = linkPost && !mediaPost && postMedia.preview && postMedia.preview.images && postMedia.preview.images.length ? postThumbnail(postMedia, useHighRes, showNsfwThumbnails) : ''
     - var thumbUrl = isPostGallery(post) ? (post.over_18 && !showNsfwThumbnails ? '/nsfw.svg' : post.spoiler ? '/spoiler.svg' : postGalleryItems(post)[0].url) : (mediaPost || hasPostThumbnail(post)) ? postThumbnail(postMedia, useHighRes, showNsfwThumbnails) : ''
     - var flairLeft = post.sr_detail && post.sr_detail.link_flair_position === 'left'
-    - var headerPage = { name: post.subreddit, href: subHref, current: String(post.subreddit).toLowerCase(), tabs: [{ label: 'comments', href: `/comments/${post.id}?${sortQuery}&${viewQuery}`, selected: true }] }
+    - var headerPage = { name: post.subreddit, href: subHref, current: String(post.subreddit).toLowerCase(), subreddit: post.subreddit, tabs: [{ label: 'comments', href: `/comments/${post.id}?${sortQuery}&${viewQuery}`, selected: true }] }
     main#content
       +header(user, headerPage)
       div.page-content

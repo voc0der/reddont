@@ -19,7 +19,7 @@ html
   //- Desktop header: old reddit's page name, sort tabs, and RES's image toggle.
   - var sortTabs = ['hot', 'new', 'rising', 'controversial', 'top'].map((sort) => ({ label: sort, href: `${baseUrl}?sort=${sort}&view=${viewQuery}`, selected: query.sort === sort }))
   - var imagesTab = viewQuery === 'card' ? { label: 'hide images', href: `${baseUrl}?sort=${sortQuery}&view=compact` } : { label: 'show images', href: `${baseUrl}?sort=${sortQuery}&view=card` }
-  - var headerPage = { name: isHomePage ? '' : communityName, href: `${baseUrl}?view=${viewQuery}`, current: isHomePage ? 'home' : String(subreddit).toLowerCase(), tabs: sortTabs.concat([imagesTab]) }
+  - var headerPage = { name: isHomePage ? '' : communityName, href: `${baseUrl}?view=${viewQuery}`, current: isHomePage ? 'home' : String(subreddit).toLowerCase(), subreddit: isMulti ? undefined : subreddit, tabs: sortTabs.concat([imagesTab]) }
   - var timeRanges = [['hour', 'past hour'], ['day', 'past 24 hours'], ['week', 'past week'], ['month', 'past month'], ['year', 'past year'], ['all', 'all time']]
   - var timeLabel = (timeRanges.find((range) => range[0] === query.t) || timeRanges[1])[1]
   //- old reddit numbers posts across pages through the count parameter.
