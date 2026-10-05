@@ -1,0 +1,11 @@
+{
+  "name": "reddont-screenshots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node gallery.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

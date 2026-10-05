@@ -8,6 +8,7 @@ node_modules
 site
 branding
 docs
+dev
 zensical.toml
 requirements-docs.txt
 Screenshot_*
