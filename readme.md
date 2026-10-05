@@ -3,52 +3,35 @@
   reddont
 </h1>
 
-A self-hosted, read-only Reddit client with personal subscriptions, desktop and
-mobile layouts, single sign-on, and an API for JSON and Atom feeds.
+[![License badge](https://img.shields.io/github/license/voc0der/reddont)](LICENSE)
+[![Version badge](https://img.shields.io/docker/v/voc0der/reddont?sort=semver)](https://hub.docker.com/r/voc0der/reddont/tags)
+[![Build status badge](https://img.shields.io/github/actions/workflow/status/voc0der/reddont/publish-docker.yml?branch=main&label=build)](https://github.com/voc0der/reddont/actions/workflows/publish-docker.yml)
+[![GitHub issues badge](https://img.shields.io/github/issues/voc0der/reddont)](https://github.com/voc0der/reddont/issues)
+[![Docker pulls badge](https://img.shields.io/docker/pulls/voc0der/reddont)](https://hub.docker.com/r/voc0der/reddont)
+[![Docker image size badge](https://img.shields.io/docker/image-size/voc0der/reddont?sort=date)](https://hub.docker.com/r/voc0der/reddont)
 
-**[Documentation](https://voc0der.github.io/reddont/)** ·
-[Quick start](https://voc0der.github.io/reddont/getting-started/quick-start/) ·
-[API reference](https://voc0der.github.io/reddont/reference/api/) ·
-[Changelog](CHANGELOG.md)
+Read-only reddit from a web app you host yourself. The compact desktop layout draws inspiration from classic Reddit and RES, with a separate layout for phones. Follow communities, expand media inline, and browse threaded discussions with your own themes and reading preferences. Each person gets their own subscriptions, with invite-only accounts and optional single sign-on. JSON and Atom feeds connect your reading to other tools. See the [full feature list](https://voc0der.github.io/reddont/features/).
 
-## Features
+reddont is read-only: it does not post, vote, or comment on Reddit.
 
-- Old reddit and RES on desktop, reddit's mobile layout on phones, threaded
-  comments, inline previews, and optional infinite scrolling.
-- Per-user subscriptions, themes, thumbnail settings, and optional Reddit credentials.
-- Invite-only accounts after initial administrator setup, plus OIDC and trusted proxy SSO.
-- Installable Progressive Web App.
-- Personal API keys, JSON responses, and Atom feeds with source-address access controls.
-- SQLite storage and Docker images for Linux amd64 and arm64.
+**[Documentation](https://voc0der.github.io/reddont/)** · [Quick start](https://voc0der.github.io/reddont/getting-started/quick-start/) · [Configuration](https://voc0der.github.io/reddont/reference/environment/) · [API reference](https://voc0der.github.io/reddont/reference/api/)
 
-Browsing requires a reddont account. A Reddit account is optional. reddont does
-not post, vote, or comment on Reddit.
+## Setup
 
-## Run it
-
-The container image is `ghcr.io/voc0der/reddont:latest`; the initial version is
-`0.1.0`. Follow the [Docker quick start](docs/getting-started/quick-start.md) to
-create a persistent data mount, set a session secret, and register the first
-administrator. The full environment example is in [docker-compose.yaml](docker-compose.yaml).
-
-For local development with [Bun](https://bun.sh/):
+### Docker Compose
 
 ```sh
-bun install --frozen-lockfile
-REDDONT_DATA_DIR="$PWD/.local-data" REDDONT_DISABLE_SSL=true HTTP_BINDING=127.0.0.1 bun run src/index.js
+curl -fL https://raw.githubusercontent.com/voc0der/reddont/main/docker-compose.yaml -o docker-compose.yaml
+docker compose up -d
 ```
 
-Open `http://localhost:3000/register`. See the
-[development guide](docs/development/index.md) for the source layout and tests.
+> [!NOTE]
+> Follow the [quick start](https://voc0der.github.io/reddont/getting-started/quick-start/) for configuration and first-time setup.
 
-## Documentation
+## Contributing
 
-The [Zensical documentation](https://voc0der.github.io/reddont/) covers setup,
-usage, SSO, configuration, the API, and maintenance. Its source lives in
-[docs/](docs/index.md). For local preview and strict build commands, see
-[working on the documentation](docs/development/documentation.md).
+Issues and pull requests for bugs or improvements are welcome. Review the [development guide](https://voc0der.github.io/reddont/development/) before making changes. Release history is in the [changelog](CHANGELOG.md).
 
 ## License
 
-[MIT](LICENSE). Based on [Akshay Oppiliappan](https://github.com/oppiliappan)'s
-Reddit client, with thanks for their work.
+[MIT](LICENSE). Based on [Akshay Oppiliappan](https://github.com/oppiliappan)'s Reddit client, with thanks for their work.
