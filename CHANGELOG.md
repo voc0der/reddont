@@ -23,6 +23,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Desktop pages use old reddit's Verdana and Arial fonts, so the Inter web font
   is no longer loaded from rsms.me
 - Feeds number posts across pages, and the home feed's next page stays on home
+- reddont has a logo, a speech bubble holding a slashed R. It is the browser
+  tab icon, the desktop header logo, and the icon of the installed app and the
+  documentation site, replacing the generated letter icons
 
 ### Added
 
@@ -30,16 +33,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Enter expands or collapses the selection, and c opens a post's comments
 - Desktop comment buttons for permalink, parent, and hiding child comments,
   plus "hide all child comments" on the post
+- `branding/` holds the logo's SVG sources, wordmarks, one-color versions, and
+  PNGs from 64 to 1024px
 
 ### Removed
 
 - The "Classic RES-style Layout" preference; old reddit is now the desktop
   layout for everyone
+- The generated `/icon-<size>.png` images; app icons are static files under
+  `/icons/`
 
 ### Fixed
 
 - Next and previous links in the single comment thread pointed at list
   positions instead of comments, and its header showed you as logged out
+- App icons were SVG files served under .png names, which iOS does not accept
+  for home screen icons; they are now PNGs, with maskable versions for Android
+  launchers
 
 ### Security
 

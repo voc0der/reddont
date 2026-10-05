@@ -6,6 +6,7 @@ node_modules
 .cache
 .venv-docs
 site
+branding
 docs
 zensical.toml
 requirements-docs.txt

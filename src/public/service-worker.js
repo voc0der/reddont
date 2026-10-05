@@ -10,8 +10,9 @@ const STATIC_ASSETS = [
   '/mobile.css',
   '/desktop.css',
   '/offline',
-  '/icon-192.png',
-  '/icon-512.png'
+  '/favicon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 // Install event - cache static assets
@@ -95,8 +96,8 @@ self.addEventListener('fetch', (event) => {
 
 // Helper: Check if request is for a static asset
 function isStaticAsset(url) {
-  const staticExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.gif', '.woff', '.woff2'];
-  return staticExtensions.some(ext => url.pathname.endsWith(ext)) || url.pathname.startsWith('/icon-');
+  const staticExtensions = ['.png', '.jpg', '.jpeg', '.svg', '.gif', '.ico', '.woff', '.woff2'];
+  return staticExtensions.some(ext => url.pathname.endsWith(ext));
 }
 
 function isStylesheetOrScript(url) {
