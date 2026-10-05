@@ -259,6 +259,30 @@ function getSubscribedSubs(userId) {
 		.map((s) => s.subreddit.toLowerCase());
 }
 
+// The desktop header lists the signed-in user's subscriptions on every page.
+// Views call this while rendering, after authenticateToken has set req.user.
+router.use((req, res, next) => {
+	res.locals.navSubscriptions = () =>
+		req.user
+			? db
+					.query(
+						"SELECT subreddit FROM subscriptions WHERE user_id = $id ORDER BY LOWER(subreddit)",
+					)
+					.all({ id: req.user.id })
+					.map((s) => s.subreddit)
+			: [];
+	next();
+});
+
+// about.json escapes the subreddit's sidebar HTML the way listings escape
+// self-text; the desktop sidebar renders it.
+function decodeSidebar(about) {
+	if (about?.description_html) {
+		about.description_html = he.decode(about.description_html);
+	}
+	return about;
+}
+
 // GET /
 router.get("/", authenticateToken, async (req, res) => {
 	const subs = db
@@ -301,7 +325,7 @@ router.get("/", authenticateToken, async (req, res) => {
 	res.render("index", {
 		subreddit,
 		posts,
-		about,
+		about: decodeSidebar(about),
 		query,
 		isMulti,
 		isHomePage,
@@ -355,7 +379,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 	res.render("index", {
 		subreddit,
 		posts,
-		about,
+		about: decodeSidebar(about),
 		query,
 		isMulti,
 		user: req.user,

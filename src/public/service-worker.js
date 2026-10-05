@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   '/',
   '/styles.css',
   '/mobile.css',
+  '/desktop.css',
   '/offline',
   '/icon-192.png',
   '/icon-512.png'

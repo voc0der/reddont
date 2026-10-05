@@ -8,14 +8,14 @@ so other people on the same instance can use different settings.
 | Setting | Default | Effect |
 | --- | --- | --- |
 | Never Ending Reddit | Off | Load more feed posts as you scroll. |
-| Classic RES-style Layout | Off | Use the classic compact desktop presentation. |
 | High Resolution Thumbnails | On | Request higher-quality preview images and video thumbnails. |
 | Don't hide thumbnails for 18+ content | Off | Reveal adult-content thumbnails by default. |
 | Theme Preference | Auto | Follow the system theme, or choose Light, Dark, or RES Night Mode. |
 
 Choose **Save Preferences** after editing. Disabling high-resolution
-thumbnails can help on limited connections. The phone layout adapts
-separately from the optional classic desktop layout.
+thumbnails can help on limited connections. On desktop, Dark and RES Night
+Mode both use RES's night mode colors and Light uses old reddit's; on a phone,
+Dark follows reddit's own dark theme.
 
 ## Reddit credentials
 

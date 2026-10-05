@@ -1,5 +1,6 @@
 include ../mixins/post
 include ../utils
 
-each child in posts
-  +post(child.data, currentUrl)
+- var rankStart = Math.max(0, parseInt(query && query.count, 10) || 0)
+each child, index in posts
+  +post(child.data, currentUrl, rankStart + index + 1)

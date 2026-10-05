@@ -6,9 +6,9 @@ include ../utils
 doctype html
 html
   +head("more comments")
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header()
+      +header(user, { name: 'comments', href: `/comments/${parent_id}` })
       div.comments-container
         a(href=`/comments/${parent_id}`)
           | ← back to parent thread
@@ -16,6 +16,7 @@ html
           div
             p nothing to see here, this thread was shadow-banned?
         else
+          - var total = comments.length
           each comment, index in comments
             - var next_idx = index + 1
             - var prev_idx = index - 1
@@ -23,4 +24,4 @@ html
             - var prev_com = prev_idx >= 0 ? comments[prev_idx] : null
             - var next_id = next_com ? next_com.data.id : null
             - var prev_id = prev_com ? prev_com.data.id : null
-            +comment(comment, true, parent_id, next_idx, prev_idx)
+            +comment(comment, true, parent_id, next_id, prev_id)

@@ -56,6 +56,10 @@ script(defer).
         var icon = toggle.querySelector('.expando-icon');
         if (icon) icon.textContent = detailsElement.open ? '−' : '+';
       });
+      document.querySelectorAll('.expando-button[aria-controls]').forEach(function (toggle) {
+        if (toggle.getAttribute('aria-controls') !== details_id) return;
+        toggle.setAttribute('aria-expanded', String(detailsElement.open));
+      });
       if (detailsElement.open) {
         if (window.suspendPostVideoPreview) {
           suspendPostVideoPreview(detailsElement);

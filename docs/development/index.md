@@ -46,7 +46,7 @@ Run in an environment that permits binding a local port.
 | `src/auth.js`, `src/oidc.js`, `src/apiAuth.js` | Browser sessions, OIDC, and API authorization. |
 | `src/geddit.js`, `src/redditAuth.js` | Upstream requests and per-user Reddit credentials. |
 | `src/views/`, `src/mixins/` | Pug pages and reusable UI. |
-| `src/public/` | Styles and service worker. |
+| `src/public/` | Shared `styles.css`, phone `mobile.css`, desktop `desktop.css`, and the service worker. |
 | `src/utils/` | Feed serialization, HTML decoding, and generated app icon. |
 
 ## Nix

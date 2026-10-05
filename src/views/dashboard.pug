@@ -5,9 +5,9 @@ include ../utils
 doctype html
 html
   +head("dashboard")
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header(user)
+      +header(user, { name: 'preferences', href: '/dashboard' })
       div.hero
         h1 dashboard
 
@@ -22,11 +22,6 @@ html
             label(for="pref-infinite-scroll")
               input(type="checkbox" id="pref-infinite-scroll" name="infiniteScroll" value="1" checked=(user.infiniteScroll === 1))
               | &nbsp;Enable Never Ending Reddit (infinite scroll)
-
-          div(style="margin-top: 15px;")
-            label(for="pref-classic-layout")
-              input(type="checkbox" id="pref-classic-layout" name="useClassicLayout" value="1" checked=(user.useClassicLayout === 1))
-              | &nbsp;Use Classic RES-style Layout (desktop)
 
           div(style="margin-top: 15px;")
             label(for="pref-high-res-thumbnails")

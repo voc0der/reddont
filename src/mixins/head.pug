@@ -39,10 +39,12 @@ mixin head(title)
     link(rel="stylesheet", href="/styles.css")
     //- Phones get reddit's mobile web layout, set in the system font like reddit.
     link(rel="stylesheet", href="/mobile.css" media="(max-width: 767px)")
+    //- Everything wider gets old reddit as Reddit Enhancement Suite shows it.
+    //- The query is the exact complement of mobile.css's, so no width
+    //- (fractional zoom included) falls between the two.
+    link(rel="stylesheet", href="/desktop.css" media="not all and (max-width: 767px)")
     if theme
       link(rel="stylesheet", href=`/${theme}.css`)
-    link(rel="preconnect" href="https://rsms.me/" media="(min-width: 768px)")
-    link(rel="stylesheet" href="https://rsms.me/inter/inter.css" media="(min-width: 768px)")
     script(src="/vendor/dash.all.min.js" defer)
     script.
       //- Initialize DASH before interaction so Reddit's separate audio and
@@ -280,7 +282,9 @@ mixin head(title)
             if (other.dataset.joinSub.toLowerCase() !== sub.toLowerCase()) return;
             other.dataset.joined = joined ? '1' : '0';
             other.classList.toggle('is-joined', joined);
-            other.textContent = joined ? 'Joined' : 'Join';
+            other.textContent = joined
+              ? (other.dataset.joinedLabel || 'Joined')
+              : (other.dataset.joinLabel || 'Join');
           });
           var legacy = document.getElementById('thinger_' + sub);
           if (legacy) legacy.innerText = joined ? 'unsubscribe' : 'subscribe';
@@ -291,13 +295,127 @@ mixin head(title)
         }
       }
 
-      //- Mobile menus are <details>; close them on outside taps like reddit's.
+      //- Menus are <details>; close them on outside clicks like reddit's.
       document.addEventListener('click', function (event) {
-        if (!window.matchMedia('(max-width: 767px)').matches) return;
-        document.querySelectorAll('details.m-overflow[open], details.sort-details[open], details.view-details[open]').forEach(function (menu) {
+        var menus = window.matchMedia('(max-width: 767px)').matches
+          ? 'details.m-overflow[open], details.sort-details[open], details.view-details[open]'
+          : 'details.dropdown[open]';
+        document.querySelectorAll(menus).forEach(function (menu) {
           if (!menu.contains(event.target)) menu.open = false;
         });
       });
+
+      //- Desktop comment buttons. old reddit's "hide child comments" folds
+      //- each direct reply; the post's version folds every top-level comment.
+      function setCommentsOpen(detailsList, button, open) {
+        detailsList.forEach(function (details) { details.open = open; });
+        button.textContent = button.textContent.replace(open ? 'show' : 'hide', open ? 'hide' : 'show');
+      }
+
+      function toggleChildComments(button) {
+        var replies = button.closest('.comment-content').querySelectorAll(':scope > .replies > .comment > details');
+        setCommentsOpen(replies, button, button.textContent.indexOf('show') === 0);
+      }
+
+      function toggleAllComments(button) {
+        var comments = document.querySelectorAll('.comments-container > .comment > details');
+        setCommentsOpen(comments, button, button.textContent.indexOf('show') === 0);
+      }
+
+      //- The comment page's expando button hides and shows the post's media.
+      function togglePostMedia(button) {
+        var media = document.getElementById(button.getAttribute('aria-controls'));
+        if (!media) return;
+        var open = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(open));
+        button.setAttribute('aria-label', open ? 'Collapse media' : 'Expand media');
+        media.hidden = !open;
+        if (!open) media.querySelectorAll('video').forEach(function (video) { video.pause(); });
+      }
+
+      //- RES-style gallery: one image at a time behind prev/next controls.
+      function galleryStep(button, step) {
+        var viewer = button.closest('.image-viewer');
+        var items = viewer.querySelectorAll('.gallery-item');
+        if (!items.length) return;
+        var current = Array.prototype.findIndex.call(items, function (item) {
+          return item.classList.contains('is-current');
+        });
+        var next = (Math.max(current, 0) + step + items.length) % items.length;
+        items.forEach(function (item, index) {
+          item.classList.toggle('is-current', index === next);
+        });
+        viewer.querySelector('.gallery-count').textContent = (next + 1) + ' of ' + items.length;
+      }
+
+      //- RES keyboard navigation on desktop: j/k select the next or previous
+      //- post or comment, x or Enter toggles it, and c opens a post's comments.
+      (function () {
+        var phone = window.matchMedia('(max-width: 767px)');
+        var thingSelector = '.post-container, .post-hero, .comment';
+
+        function visibleThings() {
+          return Array.prototype.filter.call(document.querySelectorAll(thingSelector), function (thing) {
+            return thing.offsetParent !== null;
+          });
+        }
+
+        function select(thing, scroll) {
+          var current = document.querySelector('.res-selected');
+          if (current === thing || !thing) return;
+          if (current) current.classList.remove('res-selected');
+          thing.classList.add('res-selected');
+          if (!scroll) return;
+          var bounds = thing.getBoundingClientRect();
+          if (bounds.top < 0 || bounds.top > window.innerHeight * 0.8) {
+            window.scrollBy({ top: bounds.top - window.innerHeight * 0.15, behavior: 'smooth' });
+          }
+        }
+
+        function toggle(thing) {
+          var expando = thing.querySelector(':scope > .expando-button');
+          if (expando) return expando.click();
+          if (thing.classList.contains('comment')) {
+            var details = thing.querySelector(':scope > details');
+            if (details) details.open = !details.open;
+          }
+        }
+
+        document.addEventListener('keydown', function (event) {
+          if (phone.matches || event.defaultPrevented) return;
+          if (event.ctrlKey || event.metaKey || event.altKey) return;
+          var target = event.target;
+          if (!target.closest || target.closest('input, textarea, select, [contenteditable="true"]')) return;
+          var things = visibleThings();
+          if (!things.length) return;
+          var current = document.querySelector('.res-selected');
+          var index = things.indexOf(current);
+          if (event.key === 'j' || event.key === 'k') {
+            var next = event.key === 'j' ? index + 1 : index - 1;
+            select(things[Math.min(Math.max(next, 0), things.length - 1)], true);
+          } else if ((event.key === 'x' || event.key === 'Enter') && current) {
+            //- Enter on a focused link or button keeps its own meaning.
+            if (event.key === 'Enter' && target.closest('a, button, summary, [role="button"]')) return;
+            toggle(current);
+          } else if (event.key === 'c' && current) {
+            var comments = current.querySelector('.buttons a.comments');
+            if (comments) window.location.href = comments.href;
+          } else {
+            return;
+          }
+          event.preventDefault();
+        });
+
+        document.addEventListener('click', function (event) {
+          if (phone.matches) return;
+          var thing = event.target.closest && event.target.closest(thingSelector);
+          if (thing) select(thing, false);
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+          if (!phone.matches) select(visibleThings()[0], false);
+        });
+      })();
 
       document.addEventListener('DOMContentLoaded', function () {
         initVideoPreviews(document);

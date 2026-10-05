@@ -1,0 +1,72 @@
+include icons
+
+//- Building blocks of the old reddit desktop layout. They render on every
+//- page but stay hidden (.d-only) on phones, where mobile.css applies.
+
+-
+  // Scores the way old reddit prints them: 8742, 12.4k, 123k.
+  function fmtscore(n) {
+    n = Number(n) || 0;
+    if (Math.abs(n) >= 100000) return Math.round(n / 1000) + 'k';
+    if (Math.abs(n) >= 10000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
+  }
+
+//- Link flair beside the title. Coloured flair keeps its colour as a border
+//- in night mode and as a fill in light mode, as RES and old reddit show it.
+mixin linkFlair(p)
+  - var richtext = p.link_flair_type === 'richtext' && Array.isArray(p.link_flair_richtext) ? p.link_flair_richtext : []
+  - var flairText = decodeEntities(richtext.length ? richtext.filter((part) => part.e === 'text').map((part) => part.t).join('') : p.link_flair_text).trim()
+  if flairText
+    - var flairColor = safeColor(p.link_flair_background_color)
+    - var flairTone = !flairColor ? 'is-plain' : (p.link_flair_text_color === 'light' ? 'is-light' : 'is-dark')
+    span.linkflairlabel.d-only(class=flairTone title=flairText style=(flairColor ? `--flair-color:${flairColor}` : false)) #{flairText}
+
+//- The vote column. reddont is read-only, so the arrows are decoration.
+mixin midcol(score, hidden)
+  div.midcol.d-only(aria-hidden="true")
+    span.arrow.up
+    if score !== undefined
+      span.score #{hidden ? '•' : fmtscore(score)}
+    span.arrow.down
+
+mixin searchBox()
+  form.search-box(action="/post-search" method="get" role="search")
+    input(type="search" name="q" placeholder="search" aria-label="Search posts" autocomplete="off")
+    input(type="hidden" name="view" value=(query && query.view ? query.view : 'compact'))
+    button(type="submit" aria-label="Search")
+      +icon("search")
+
+//- old reddit's join/leave toggle, wired to the same toggleJoin() as the
+//- mobile Join button.
+mixin subscribeButton(sub, joined)
+  button.subscribe-button(type="button" class=(joined ? 'is-joined' : false) data-join-sub=sub data-joined=(joined ? '1' : '0') data-join-label="join" data-joined-label="leave" onclick="toggleJoin(this)")
+    | #{joined ? 'leave' : 'join'}
+
+//- The sidebar's community box. descriptionHtml is the decoded sidebar
+//- markdown from about.json; without it the short public description shows.
+mixin titlebox(sr, sub, joined, descriptionHtml)
+  - var boxView = query && query.view ? query.view : 'compact'
+  - var boxName = sr && sr.display_name ? sr.display_name : sub
+  - var online = sr && (sr.accounts_active || sr.active_user_count)
+  div.titlebox
+    h1.titlebox-name
+      a(href=`/r/${boxName}?view=${boxView}`) #{boxName}
+    +subscribeButton(sub, joined)
+    if sr && sr.subscribers !== undefined
+      p.titlebox-counts
+        span.number #{fmtint(sr.subscribers)}
+        |  #[span.word readers]
+        if online
+          br
+          span.number #{fmtint(online)}
+          |  #[span.word users here now]
+    if descriptionHtml
+      div.usertext-body
+        != descriptionHtml
+    else if sr && sr.public_description
+      div.usertext-body
+        div.md
+          p #{sr.public_description}
+    if sr && sr.created_utc
+      p.titlebox-age a community for #{timeSpan(Date.now() / 1000 - sr.created_utc) || 'less than a day'}

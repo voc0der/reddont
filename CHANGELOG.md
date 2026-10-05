@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Desktop pages (768px and wider) now mirror old reddit as Reddit Enhancement
+  Suite shows it: the subreddit bar with a "my subreddits" menu and your
+  subscriptions, sort tabs beside the logo, ranked listings with thumbnails,
+  taglines, and RES expando buttons, a sidebar with search and the
+  community's description, and boxed comments with [–] toggles and OP,
+  moderator, and admin badges
+- "show images" switches desktop feeds to card view, and galleries step
+  through their images one at a time
+- On desktop, the Dark and RES Night Mode themes use RES's night mode colors
+  and Light uses old reddit's
+- Desktop text follows old reddit's sizes and grows on viewports wider than
+  1920px; windows narrower than 900px move the sidebar below the listing
+- Desktop pages use old reddit's Verdana and Arial fonts, so the Inter web font
+  is no longer loaded from rsms.me
+- Feeds number posts across pages, and the home feed's next page stays on home
+
+### Added
+
+- RES keyboard navigation on desktop: j and k select posts and comments, x or
+  Enter expands or collapses the selection, and c opens a post's comments
+- Desktop comment buttons for permalink, parent, and hiding child comments,
+  plus "hide all child comments" on the post
+
+### Removed
+
+- The "Classic RES-style Layout" preference; old reddit is now the desktop
+  layout for everyone
+
+### Fixed
+
+- Next and previous links in the single comment thread pointed at list
+  positions instead of comments, and its header showed you as logged out
+
+### Security
+
+- The infinite-scroll script placed request values inside JavaScript strings,
+  so a crafted link could run script; it now reads them from data attributes
+
 ## [0.1.0] - 2026-10-04
 
 ### Added

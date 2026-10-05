@@ -1,38 +1,7 @@
 include ../utils
 include postUtils
 include mobile
-
-mixin infoContainer(data, next_id, prev_id)
-  - var hats = (data.is_submitter?['op']:[]).concat(data.distinguished=="moderator"?['mod']:[])
-  div.comment-info-container
-    p
-      | #{fmtnum(data.ups)} ↑
-      | ·&nbsp;
-      if next_id
-        a(href=`#${next_id}` title="scroll to next comment").nav-link next
-        | &nbsp;·&nbsp;
-      if prev_id
-        a(href=`#${prev_id}` title="scroll to previous comment").nav-link prev
-        | &nbsp;·&nbsp;
-      if data.gilded > 0
-        span.gilded
-          | #{data.gilded} ☆
-        | &nbsp;·&nbsp;
-      span(class=`${data.is_submitter ? 'op' : ''}`)
-        | u/#{data.author} #{hats.length==0?'':`(${hats.join('|')})`}
-      | &nbsp;·&nbsp;
-      if data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
-        a(href=`https://undelete.pullpush.io${data.permalink}`) search on undelete
-        | &nbsp;·&nbsp;
-      | #{timeDifference(Date.now(), data.created * 1000)}
-      | &nbsp;·&nbsp;
-      if data.edited !== false
-        | edited #{timeDifference(Date.now(), data.edited * 1000)} ago
-        | &nbsp;·&nbsp;
-      if data.stickied
-        | stickied
-        | &nbsp;·&nbsp;
-      a(href=`https://reddit.com${data.permalink}` title="view on reddit").nav-link open ↗
+include desktop
 
 -
   function hasReplies(data) {
@@ -44,6 +13,79 @@ mixin infoContainer(data, next_id, prev_id)
   function hasLoadedReplies(data) {
     return hasReplies(data) && data.replies.data.children.some((child) => child.kind === "t1");
   }
+-
+  // Every reply below a comment, counting the ones behind "load more" stubs.
+  function countReplies(data) {
+    if (!hasReplies(data)) return 0;
+    return data.replies.data.children.reduce((total, child) => {
+      if (child.kind === "more") return total + (child.data.count || 0);
+      return total + 1 + countReplies(child.data);
+    }, 0);
+  }
+
+//- old reddit's comment tagline. The [–] / [+] toggle and the "(N children)"
+//- note come from CSS, following the comment's open state.
+mixin infoContainer(data)
+  - var deleted = data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
+  - var children = countReplies(data)
+  - var role = data.distinguished == "moderator" ? 'moderator' : data.distinguished == "admin" ? 'admin' : ''
+  +midcol()
+  div.comment-info-container
+    p.tagline
+      span.expand(aria-hidden="true")
+      if deleted
+        em.author [deleted]
+      else
+        a.author(href=`https://www.reddit.com/user/${data.author}` class=[data.is_submitter ? 'submitter' : '', role]) #{data.author}
+      if data.author_flair_text
+        span.flair(title=decodeEntities(data.author_flair_text)) #{decodeEntities(data.author_flair_text)}
+      if data.is_submitter || role
+        span.userattrs
+          | [
+          if data.is_submitter
+            span.submitter(title="submitter") S
+          if data.is_submitter && role
+            | ,
+          if role
+            span(class=role title=role) #{role === 'admin' ? 'A' : 'M'}
+          | ]
+      if data.score_hidden
+        span.score.score-hidden [score hidden]
+      else
+        span.score #{data.score === undefined ? data.ups : data.score} #{fmttxt(data.score === undefined ? data.ups : data.score, 'point')}
+      time(datetime=isoTime(data.created) title=utcTime(data.created)) #{timeAgoLong(data.created)}
+      if data.edited !== false && data.edited
+        span.edited-timestamp(title=utcTime(data.edited)) * (last edited #{timeAgoLong(data.edited)})
+      if data.stickied
+        span.stickied-tagline - stickied comment
+      if data.gilded > 0
+        span.gilded-stamp(title=`gilded ${data.gilded} ${fmttxt(data.gilded, 'time')}`) ★#{data.gilded > 1 ? data.gilded : ''}
+      if children
+        span.numchildren (#{children} #{children == 1 ? 'child' : 'children'})
+
+mixin commentButtons(data, postId, next_id, prev_id)
+  - var deleted = data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
+  - var parentComment = typeof data.parent_id === 'string' && data.parent_id.startsWith('t1_') ? data.parent_id.slice(3) : ''
+  ul.flat-list.buttons.d-only
+    li
+      a(href=`/comments/${postId}/comment/${data.id}`) permalink
+    li
+      a(href=`https://www.reddit.com${data.permalink}`) reddit
+    if parentComment
+      li
+        a(href=`#${parentComment}`) parent
+    if next_id
+      li
+        a(href=`#${next_id}` title="scroll to next comment") next
+    if prev_id
+      li
+        a(href=`#${prev_id}` title="scroll to previous comment") prev
+    if deleted
+      li
+        a(href=`https://undelete.pullpush.io${data.permalink}`) undelete
+    if hasLoadedReplies(data)
+      li
+        button(type="button" onclick="toggleChildComments(this)") hide child comments
 
 mixin commentHead(data)
   - var isMod = data.distinguished == "moderator"
@@ -105,28 +147,32 @@ mixin commentActions(data, next_id, prev_id)
           +icon("undelete")
           span Search on undelete
 
-mixin comment(com, isfirst, parent_id, next_id, prev_id)
+//- depth counts from 0 at the top level; RES shades alternate levels.
+mixin comment(com, isfirst, parent_id, next_id, prev_id, depth)
   - var data = com.data
   - var hasReplyData = hasReplies(data)
+  - var level = depth || 0
 
   if com.kind == "more"
     div(class=`more ${isfirst ? 'first' : ''}`)
       a(href=`/comments/${parent_id}/comment/${data.id}`)
         span.m-more-icon.m-only(aria-hidden="true")
           +icon("plus-circle")
-        span.d-only #{data.count} more #{fmttxt(data.count, 'comment')}
+        span.d-only load more comments
+        span.d-only.more-count  (#{data.count} #{data.count == 1 ? 'reply' : 'replies'})
         span.m-only #{data.count} more #{data.count == 1 ? 'reply' : 'replies'}
   else
     //- reddit folds stickied moderator comments on mobile; see comments.pug
     - var foldOnMobile = data.stickied && data.distinguished == "moderator"
-    div(class=`comment ${isfirst ? 'first' : ''} ${data.stickied ? 'sticky' : ''} ${hasReplyData ? 'has-replies' : ''}` data-fold=(foldOnMobile ? '1' : false))
+    div(class=`comment ${isfirst ? 'first' : ''} ${data.stickied ? 'sticky' : ''} ${hasReplyData ? 'has-replies' : ''} ${level % 2 ? 'alt' : ''}` data-fold=(foldOnMobile ? '1' : false))
       details(id=`${data.id}` open="")
         summary.expand-comments
-          +infoContainer(data, next_id, prev_id)
+          +infoContainer(data)
           +commentHead(data)
         div.comment-content
           div.comment-body
             != convertInlineImageLinks(data.body_html)
+          +commentButtons(data, parent_id, next_id, prev_id)
           +commentActions(data, next_id, prev_id)
           if hasReplyData
             div.replies
@@ -138,4 +184,4 @@ mixin comment(com, isfirst, parent_id, next_id, prev_id)
                 - var prev_com = prev_idx >= 0 ? data.replies.data.children[prev_idx] : null
                 - var next_id = next_com ? next_com.data.id : null
                 - var prev_id = prev_com ? prev_com.data.id : null
-                +comment(reply, false, parent_id, next_id, prev_id)
+                +comment(reply, false, parent_id, next_id, prev_id, level + 1)
