@@ -58,8 +58,32 @@ with `nix develop`; the direct Bun workflow above is the simplest way to work
 on the app.
 
 The package's dependency derivation has a fixed output hash. Dependency or
-lockfile changes may require updating that hash and validating a full Nix
-build. A successful Bun test run alone does not verify Nix packaging.
+lockfile changes, including Renovate's, may require updating that hash and
+validating a full Nix build. A successful Bun test run alone does not verify
+Nix packaging.
+
+## Dependency updates
+
+[Renovate](https://docs.renovatebot.com/) runs from
+[`.github/workflows/renovate.yml`](https://github.com/voc0der/reddont/blob/main/.github/workflows/renovate.yml),
+configured in
+[`.github/renovate.json5`](https://github.com/voc0der/reddont/blob/main/.github/renovate.json5).
+It runs hourly, after every push to `main`, and when a pull request check
+finishes on a `renovate/*` branch. It keeps Bun packages, GitHub Actions, and
+the documentation dependency up to date.
+
+- Minor and patch updates share one pull request, which merges on its own
+  once its checks pass and the release is 3 days old.
+- Majors wait for approval on the Dependency Dashboard issue.
+- A daily lockfile refresh updates indirect dependencies and also merges on
+  its own.
+- Security fixes skip the wait. Renovate opens them from the repository's
+  Dependabot alerts and from osv.dev.
+
+Renovate signs in as a GitHub App through the `RENOVATE_APP_CLIENT_ID`
+variable and the `RENOVATE_APP_PRIVATE_KEY` secret. Dependabot alerts, secret
+scanning, and push protection are set under the repository's
+**Settings > Security**.
 
 ## Making changes
 

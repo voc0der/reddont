@@ -65,6 +65,11 @@ Actions**, then update `site_url`, repository links, and edit links in the
 configuration. This follows
 [Zensical's publishing setup](https://zensical.org/docs/publish-your-site/).
 
+Renovate picks up the Zensical pin in `requirements-docs.txt` and folds its
+updates into the usual minor and patch group. That pull request changes the
+requirements file, so the strict build runs on it, and a release that breaks
+the build can't merge on its own.
+
 Dependabot checks the Zensical pin in `requirements-docs.txt`. Its updates
 run through the same strict docs build. Pip downloads may be cached in CI;
 Zensical's generated output is rebuilt cleanly each time.
