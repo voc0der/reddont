@@ -6,7 +6,9 @@ a Reddit account is optional.
 
 ## Reading
 
-- Desktop compact and card views, plus a phone layout with a navigation drawer.
+- A desktop layout modeled on old reddit with Reddit Enhancement Suite,
+  including RES keyboard navigation, and reddit's mobile layout on phones.
+- Compact listings, or card view with every post's media opened in place.
 - Home feed built from your subscriptions, with shortcuts to popular and all.
 - Subreddit and post search, sorting, and pagination.
 - Optional infinite scrolling.
@@ -19,7 +21,6 @@ See [browsing and subscriptions](usage/browsing.md).
 ## Personal preferences
 
 - System, light, dark, and RES night themes.
-- Optional classic desktop layout.
 - High-resolution thumbnails that can be disabled to reduce bandwidth.
 - Installable Progressive Web App with an offline fallback page.
 - Per-user Reddit cookie or bearer-token settings for upstream requests.

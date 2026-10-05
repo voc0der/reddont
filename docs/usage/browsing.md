@@ -5,9 +5,11 @@ reddont account keeps these settings independently of any Reddit account.
 
 ## Get around
 
-The header links to **all**, **popular**, **search**, and **subs**. Select the
-reddont name to return home, or your username to open the dashboard. On a
-phone, the navigation drawer contains the same main destinations.
+On desktop, the bar across the top links to **home**, **popular**, **all**,
+**subs**, and **search**, followed by your subscriptions; **my subreddits**
+opens the full list. Select the reddont logo to return home, or your username
+or **preferences** to open the dashboard. On a phone, the navigation drawer
+contains the same main destinations.
 
 Home combines your subscribed communities. If your subscription list is
 empty, it shows the all feed. Open a community directly at `/r/community`.
@@ -15,7 +17,8 @@ Multiple communities can be combined as `/r/programming+technology`.
 
 ## Follow communities
 
-Subscribe from a community page or open **subs** to manage your list.
+Subscribe from a community page (**join** in the desktop sidebar) or open
+**subs** to manage your list.
 
 - Use **++** for bulk additions. Paste names separated by commas or newlines,
   review the names, and select **Add Subscriptions**.
@@ -27,14 +30,26 @@ or unsubscribe your account on Reddit.
 
 ## Choose how posts look
 
-Use **compact** for a dense listing or **card** for larger post previews.
-Feed controls also let you choose a sort; time ranges are available where
-the selected sort supports them.
+The desktop layout follows old reddit with Reddit Enhancement Suite. The tabs
+beside the logo choose the sort; for **top** and **controversial**, **links
+from** picks the time range. **show images** switches to card view, which
+opens every post's media in place, and **hide images** returns to the compact
+listing. On a phone, the same choices live in the sort and view menus above
+the feed.
 
-Select a post's thumbnail or expansion control to open its preview. Text
-posts can expand their formatted body without leaving the feed. Comments
-open the discussion page, where you can collapse threads and follow a
-single comment thread.
+Select a post's thumbnail or its expando button to open media or text in
+place. Galleries step through their images with the arrows above them.
+Comments open the discussion page, where `[–]` collapses a comment and its
+replies, **hide child comments** folds just the replies, and **permalink**
+opens a single comment thread.
+
+On desktop, the keyboard works as it does with RES:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Select the next or previous post or comment. |
+| `x` or `Enter` | Expand or collapse the selection. |
+| `c` | Open the selected post's comments. |
 
 Adult and spoiler previews start hidden. The dashboard can allow adult
 thumbnails while keeping the rest of your preferences. See

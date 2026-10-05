@@ -1,7 +1,32 @@
 include icons
-mixin header(user)
+//- page describes the current page to the desktop header:
+//- { name, href, current, tabs: [{ label, href, selected }] }. name and tabs
+//- become old reddit's page name and tab menu; current highlights the
+//- matching link in the subreddit bar.
+mixin header(user, page)
   - var viewQuery = 'view=' + (query && query.view ? query.view : 'compact')
+  - var headerPage = page || {}
+  - var navSubs = user && typeof navSubscriptions === 'function' ? navSubscriptions() : []
+  - var srLinks = [['home', '/'], ['popular', '/r/popular'], ['all', '/r/all'], ['subs', '/subs'], ['search', '/search']]
   header.header
+    if user
+      div#sr-header-area.d-only
+        details.dropdown.sr-dropdown
+          summary my subreddits
+          div.drop-choices
+            each sub in navSubs
+              a.choice(href=`/r/${sub}?${viewQuery}`) #{sub}
+            a.choice.bottom-option(href=`/subs?${viewQuery}`) edit subscriptions
+        ul.sr-bar
+          each link in srLinks
+            li
+              a(href=`${link[1]}?${viewQuery}` class=(headerPage.current === link[0] ? 'selected' : false)) #{link[0]}
+        if navSubs.length
+          ul.sr-bar.sr-bar-subs
+            each sub in navSubs
+              li
+                a(href=`/r/${sub}?${viewQuery}` class=(headerPage.current === sub.toLowerCase() ? 'selected' : false)) #{sub}
+        a#sr-more-link(href=`/subs?${viewQuery}`) edit »
     details.m-drawer.m-only
       summary.m-icon-btn(aria-label="Open navigation")
         +icon("menu")
@@ -34,18 +59,20 @@ mixin header(user)
     a.brand(href=`/?${viewQuery}` aria-label="Reddont home")
       span.brand-mark(aria-hidden="true") R
       span.brand-name reddont
-    nav.primary-nav(aria-label="Primary navigation")
-      div.header-item
-        a(href=`/r/all?${viewQuery}`) all
-      div.header-item
-        a(href=`/r/popular?${viewQuery}`) popular
-      div.header-item
-        a(href=`/search?${viewQuery}`) search
-      div.header-item
-        a(href=`/subs?${viewQuery}`) subs
+    if headerPage.name
+      span.pagename.d-only
+        a(href=headerPage.href) #{headerPage.name}
+    if headerPage.tabs && headerPage.tabs.length
+      ul.tabmenu.d-only
+        each tab in headerPage.tabs
+          li(class=(tab.selected ? 'selected' : false))
+            a(href=tab.href) #{tab.label}
     if user
       div.header-item.account-nav
         a.account-link(href=`/dashboard?${viewQuery}`) #{user.username}
+        span.separator.d-only(aria-hidden="true") |
+        a.d-only(href=`/dashboard?${viewQuery}`) preferences
+        span.separator.d-only(aria-hidden="true") |
         a.logout-link(href='/logout') logout
     else
       div.header-item.account-nav

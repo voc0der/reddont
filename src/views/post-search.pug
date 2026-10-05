@@ -8,9 +8,9 @@ doctype html
 html
   +head("search posts")
   include ../mixins/subUtils
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header(user)
+      +header(user, { name: 'search', href: '/search', current: 'search' })
       div.hero
         h1 search posts
         form(action="/post-search" method="get").search-bar

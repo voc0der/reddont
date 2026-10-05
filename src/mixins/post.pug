@@ -1,7 +1,9 @@
 include ../utils
 include postUtils
 include mobile
-mixin post(p, currentUrl)
+include desktop
+//- rank numbers the post in a listing, as old reddit does on desktop.
+mixin post(p, currentUrl, rank)
   - var from = encodeURIComponent(currentUrl)
   - var viewQuery = query && query.view ? query.view : 'compact'
   - var sortQuery = query && query.sort ? query.sort + (query.t ? '&t=' + query.t : '') : 'hot'
@@ -9,6 +11,7 @@ mixin post(p, currentUrl)
   - var useHighRes = !user || user.highResThumbnails === undefined || user.highResThumbnails === 1
   - var commentsHref = `/comments/${p.id}?from=${from}&sort=${sortQuery}&view=${viewQuery}`
   - var subHref = `/r/${p.subreddit}?view=${viewQuery}`
+  - var redditHref = `https://www.reddit.com${p.permalink}`
   - var textPost = isPostText(p)
   - var linkPost = isPostLink(p)
   - var contentPost = getPostData(p)
@@ -23,8 +26,17 @@ mixin post(p, currentUrl)
   - var showJoin = creditCommunity && joinedSubs && !joinedSubs.includes(String(p.subreddit).toLowerCase())
   - var linkThumb = linkPost && hasPostThumbnail(p)
   - var mediaFrame = postMediaFrame(p, !contentIsSensitive)
+  - var toggleCall = `toggleDetails('${p.id}')`
+  - var detailsOpen = query.view == "card" && (isPostMedia(p) || linkPost)
+  //- RES's expando button opens media and text posts in place.
+  - var expandoKind = isPostVideo(p) ? 'video' : isPostGallery(p) ? 'gallery' : isPostImage(p) ? 'image' : (textPost && selfTextHtml ? 'selftext' : '')
+  //- Within a subreddit, old reddit honours its flair-on-the-left setting.
+  - var flairLeft = !creditCommunity && p.sr_detail && p.sr_detail.link_flair_position === 'left'
   article(class=`post`)
     div.post-container(class=`${query.view} ${p.stickied?"sticky":""}`)
+      if rank
+        span.rank.d-only #{rank}
+      +midcol(p.score === undefined ? p.ups : p.score, p.hide_score)
       div.post-info
         div.post-text(class=`${query.view}`)
           div.m-post-meta.m-only
@@ -44,7 +56,7 @@ mixin post(p, currentUrl)
               if showJoin
                 +joinButton(p.subreddit, false, 'small')
               +overflowMenu("Post options", true)
-                a.m-menu-item(href=`https://www.reddit.com${p.permalink}`)
+                a.m-menu-item(href=redditHref)
                   +icon("external")
                   span Open on Reddit
                 if linkPost
@@ -55,17 +67,37 @@ mixin post(p, currentUrl)
                   a.m-menu-item(href=subHref)
                     +icon("communities")
                     span Go to r/#{p.subreddit}
-          div.info-container.post-meta
-            p
-              span.post-author u/#{p.author}
-              | &nbsp;·&nbsp;
-              | #{timeDifference(Date.now(), p.created * 1000)}
-              | &nbsp;·&nbsp;
-              a(href=`/r/${p.subreddit}?view=${viewQuery}`) r/#{p.subreddit}
+          p.tagline.post-meta
+            | submitted #[time(datetime=isoTime(p.created) title=utcTime(p.created)) #{timeAgoLong(p.created)}]
+            if p.edited
+              |  #[span.edited-timestamp(title=utcTime(p.edited)) * (last edited #{timeAgoLong(p.edited)})]
+            = ' by '
+            if p.author === '[deleted]'
+              span.author [deleted]
+            else
+              a.author(href=`https://www.reddit.com/user/${p.author}` class=(p.distinguished === 'moderator' ? 'moderator' : p.distinguished === 'admin' ? 'admin' : false)) #{p.author}
+            if p.distinguished === 'moderator'
+              span.userattrs  [#[span.moderator M]]
+            if creditCommunity
+              |  to #[a.subreddit(href=subHref) r/#{p.subreddit}]
+            if p.stickied
+              |  #[span.stickied-tagline(title="selected by this subreddit's moderators") announcement]
           div.title-container(class=`${query.view}`)
+            if flairLeft
+              +linkFlair(p)
             a(class=`${query.view}`, href=commentsHref)
               != p.title
-            span.domain #{p.domain}
+            if !flairLeft
+              +linkFlair(p)
+            span.domain
+              | (
+              if linkPost
+                a.external-action(href=p.url) #{p.domain}
+              else if textPost
+                a(href=subHref) #{p.domain}
+              else
+                a(href=p.url) #{p.domain}
+              | )
           +flair(p)
           if linkPost
             a.m-post-url.m-only(href=p.url) #{p.url}
@@ -77,58 +109,70 @@ mixin post(p, currentUrl)
                     != contentIsOver18 ? 'Reveal NSFW text' : 'Reveal spoiler text'
               div.self-text.card(id=(contentIsSensitive ? `card_text_${p.id}` : false) hidden=contentIsSensitive)
                 != convertInlineImageLinks(selfTextHtml)
+          ul.flat-list.buttons.d-only
+            if contentIsOver18
+              li
+                span.stamp.nsfw-stamp(title="Adult content: Not Safe For Work") nsfw
+            if contentIsSpoiler
+              li
+                span.stamp.spoiler-stamp spoiler
+            li
+              a.comments(href=commentsHref) #{p.num_comments > 0 ? `${p.num_comments} ${fmttxt(p.num_comments, 'comment')}` : 'comment'}
+            li
+              button(type="button" onclick="sharePost(this)" data-url=redditHref data-title=decodeEntities(p.title)) share
+            li
+              a(href=redditHref) reddit
+            if p.gilded > 0
+              li
+                span.gilded-stamp(title=`gilded ${p.gilded} ${fmttxt(p.gilded, 'time')}`) ★#{p.gilded > 1 ? p.gilded : ''}
           div.post-actions
-            span.action-chip.vote-score(aria-label=`${fmtnum(p.ups)} votes`)
-              span.action-icon(aria-hidden="true") ↑
-              strong #{fmtnum(p.ups)}
             +votePill(p.ups, `${fmtnum(p.ups)} votes`)
             a.action-chip(href=commentsHref aria-label=`${fmtnum(p.num_comments)} comments`)
-              span.action-icon(aria-hidden="true") ↩
-              span.d-only #{fmtnum(p.num_comments)}
               span.m-pill-icon.m-only
                 +icon("comment")
               span.m-only #{fmtcount(p.num_comments)}
             if p.gilded > 0
               span.action-chip.gilded(aria-label=`${p.gilded} awards`)
                 | #{p.gilded} ☆
-            if linkPost
-              a.action-chip.external-action(href=p.url aria-label=`Open ${p.domain}`)
-                span(aria-hidden="true") ↗
-            +sharePill(`https://www.reddit.com${p.permalink}`, decodeEntities(p.title))
-        if query.view != "card" || linkThumb
-          div.media-preview(class=[textPost ? "self-post-preview" : "", linkPost && !linkThumb ? "no-thumb" : "", query.view == "card" ? "m-only" : ""])
-            - var onclick = `toggleDetails('${p.id}')`
-            - var onkeydown = `if(event.key === 'Enter' || event.key === ' '){event.preventDefault();toggleDetails('${p.id}')}`
-            if isPostGallery(p)
-              - var item = (p.over_18 && !showNsfwThumbnails ? `/nsfw.svg` : p.spoiler ? `/spoiler.svg` : postGalleryItems(p)[0].url)
-              img(src=item onclick=onclick onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand gallery")
-            else if isPostImage(p)
-              - var url = postThumbnail(p, useHighRes, showNsfwThumbnails)
-              img(src=url onclick=onclick onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand image")
-            else if isPostVideo(p)
-              - var decodedVideos = decodePostVideoUrls(p)
-              - var videoSrc = useHighRes ? (decodedVideos[2] || decodedVideos[3]) : (decodedVideos[3] || decodedVideos[2])
-              - var alternateVideoSrc = videoSrc == decodedVideos[2] ? decodedVideos[3] : decodedVideos[2]
-              video.preview-video(playsinline="" webkit-playsinline="" muted="" loop="" preload="none" onclick=onclick onkeydown=onkeydown src=(videoSrc || false) data-preview-src=(videoSrc || false) data-preview-fallback-src=(alternateVideoSrc || false) poster=decodedVideos[4] tabindex="0" role="button" aria-label="Expand video")
-            else if linkPost
-              if linkThumb
-                a(href=p.url aria-label=`Open ${p.domain}`)
-                  img(src=postThumbnail(p, useHighRes, showNsfwThumbnails) loading="lazy")
-                  span.m-thumb-badge.m-only(aria-hidden="true")
-                    +icon("external")
-              else
-                a.link-preview(href=p.url aria-label=`Open ${p.domain}`)
-                  | ↗
-            else if textPost
-              a.self-post-link(href=commentsHref aria-label="Open discussion")
-                svg.self-post-icon(viewBox="0 0 24 24" aria-hidden="true")
-                  path(d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.75 3v-3A2.5 2.5 0 0 1 4 15V8a2.5 2.5 0 0 1 2.5-2.5Z")
-                  path.self-post-icon-lines(d="M8 9h8M8 12h8M8 15h5")
-              if selfTextHtml
-                button.self-post-expando(type="button" onclick=onclick aria-controls=p.id aria-expanded="false" aria-label="Preview text post")
-                  span.expando-icon(aria-hidden="true") +
+            +sharePill(redditHref, decodeEntities(p.title))
+        //- Phones in card view show media full width instead of a thumbnail,
+        //- except for link posts; desktop always keeps old reddit's thumbnail.
+        div.media-preview(class=[textPost ? "self-post-preview" : "", linkPost && !linkThumb ? "no-thumb" : "", query.view == "card" && !linkThumb ? "d-only" : ""])
+          - var onkeydown = `if(event.key === 'Enter' || event.key === ' '){event.preventDefault();${toggleCall}}`
+          //- Hidden thumbnails (card view on phones) must not download.
+          - var thumbLoading = query.view == "card" ? "lazy" : false
+          if isPostGallery(p)
+            - var item = (p.over_18 && !showNsfwThumbnails ? `/nsfw.svg` : p.spoiler ? `/spoiler.svg` : postGalleryItems(p)[0].url)
+            img(src=item loading=thumbLoading onclick=toggleCall onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand gallery")
+          else if isPostImage(p)
+            - var url = postThumbnail(p, useHighRes, showNsfwThumbnails)
+            img(src=url loading=thumbLoading onclick=toggleCall onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand image")
+          else if isPostVideo(p)
+            - var decodedVideos = decodePostVideoUrls(p)
+            - var videoSrc = useHighRes ? (decodedVideos[2] || decodedVideos[3]) : (decodedVideos[3] || decodedVideos[2])
+            - var alternateVideoSrc = videoSrc == decodedVideos[2] ? decodedVideos[3] : decodedVideos[2]
+            video.preview-video(playsinline="" webkit-playsinline="" muted="" loop="" preload="none" onclick=toggleCall onkeydown=onkeydown src=(videoSrc || false) data-preview-src=(videoSrc || false) data-preview-fallback-src=(alternateVideoSrc || false) poster=decodedVideos[4] tabindex="0" role="button" aria-label="Expand video")
+          else if linkPost
+            if linkThumb
+              a(href=p.url aria-label=`Open ${p.domain}`)
+                img(src=postThumbnail(p, useHighRes, showNsfwThumbnails) loading="lazy")
+                span.m-thumb-badge.m-only(aria-hidden="true")
+                  +icon("external")
+            else
+              a.link-preview(href=p.url aria-label=`Open ${p.domain}`)
+                +icon("link")
+          else if textPost
+            a.self-post-link(href=commentsHref aria-label="Open discussion")
+              svg.self-post-icon(viewBox="0 0 24 24" aria-hidden="true")
+                path(d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.75 3v-3A2.5 2.5 0 0 1 4 15V8a2.5 2.5 0 0 1 2.5-2.5Z")
+                path.self-post-icon-lines(d="M8 9h8M8 12h8M8 15h5")
+            if selfTextHtml
+              button.self-post-expando(type="button" onclick=toggleCall aria-controls=p.id aria-expanded="false" aria-label="Preview text post")
+                span.expando-icon(aria-hidden="true") +
 
-      details(id=`${p.id}` open=(query.view == "card" && (isPostMedia(p) || linkPost)) class=`${query.view} ${textPost ? "self-post-details" : ""} ${linkPost ? "link-details" : ""}`)
+      if expandoKind
+        button.expando-button.d-only(type="button" class=expandoKind onclick=toggleCall aria-controls=p.id aria-expanded=String(detailsOpen) aria-label=(expandoKind === 'selftext' ? 'Expand text' : `Expand ${expandoKind}`))
+      details(id=`${p.id}` open=detailsOpen class=`${query.view} ${textPost ? "self-post-details" : ""} ${linkPost ? "link-details" : ""}`)
         summary.expand-post expand media
         if textPost && selfTextHtml
           div.self-post-body.self-text
@@ -145,9 +189,14 @@ mixin post(p, currentUrl)
                 h2
                   != p.over_18 ? 'nsfw' : 'spoiler'
             if isPostGallery(p)
+              - var galleryItems = postGalleryItems(p)
+              div.gallery-controls.d-only
+                button.gallery-step(type="button" onclick="galleryStep(this, -1)" aria-label="Previous image") ‹
+                span.gallery-count 1 of #{galleryItems.length}
+                button.gallery-step(type="button" onclick="galleryStep(this, 1)" aria-label="Next image") ›
               div.gallery
-                each item in postGalleryItems(p)
-                  div.gallery-item
+                each item, index in galleryItems
+                  div.gallery-item(class=(index === 0 ? 'is-current' : false))
                     a(href=`/media/${item.url}`)
                       img(src=item.url loading="lazy")
                     div.gallery-item-idx
@@ -163,5 +212,5 @@ mixin post(p, currentUrl)
               a.expanded-link(href=p.url)
                 | Open #{p.domain} ↗
         if (query.view == "compact" && !textPost)
-          button.close-media(type="button" onclick=`toggleDetails('${p.id}')`)
+          button.close-media(type="button" onclick=toggleCall)
               | close

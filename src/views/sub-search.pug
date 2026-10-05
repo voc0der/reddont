@@ -7,9 +7,9 @@ doctype html
 html
   +head("search subreddits")
   include ../mixins/subUtils
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header(user)
+      +header(user, { name: 'search', href: '/search', current: 'search' })
       div.hero
         h1 search subreddits
         form(action="/sub-search" method="get").search-bar

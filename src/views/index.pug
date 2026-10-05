@@ -16,193 +16,222 @@ html
   - var bannerImage = hasCommunityHeader ? (safeImageUrl(about.mobile_banner_image) || safeImageUrl(about.banner_background_image) || safeImageUrl(about.banner_img)) : ''
   - var bannerColor = hasCommunityHeader ? (safeColor(about.banner_background_color) || safeColor(about.primary_color) || safeColor(about.key_color) || '#33464c') : ''
   - var sortLabel = query.sort + (query.t ? ' ' + query.t : '')
-  body(class=(isHomePage ? 'home-page' : false) data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  //- Desktop header: old reddit's page name, sort tabs, and RES's image toggle.
+  - var sortTabs = ['hot', 'new', 'rising', 'controversial', 'top'].map((sort) => ({ label: sort, href: `${baseUrl}?sort=${sort}&view=${viewQuery}`, selected: query.sort === sort }))
+  - var imagesTab = viewQuery === 'card' ? { label: 'hide images', href: `${baseUrl}?sort=${sortQuery}&view=compact` } : { label: 'show images', href: `${baseUrl}?sort=${sortQuery}&view=card` }
+  - var headerPage = { name: isHomePage ? '' : communityName, href: `${baseUrl}?view=${viewQuery}`, current: isHomePage ? 'home' : String(subreddit).toLowerCase(), tabs: sortTabs.concat([imagesTab]) }
+  - var timeRanges = [['hour', 'past hour'], ['day', 'past 24 hours'], ['week', 'past week'], ['month', 'past month'], ['year', 'past year'], ['all', 'all time']]
+  - var timeLabel = (timeRanges.find((range) => range[0] === query.t) || timeRanges[1])[1]
+  //- old reddit numbers posts across pages through the count parameter.
+  - var rankStart = Math.max(0, parseInt(query.count, 10) || 0)
+  - var postList = posts && posts.posts ? posts.posts : []
+  - var rankDigits = String(rankStart + postList.length).length
+  - var scoreChars = Math.max(3, ...postList.map((child) => fmtscore(child.data.score === undefined ? child.data.ups : child.data.score).length))
+  body(class=(isHomePage ? 'home-page' : false) data-theme=user.themePreference)
     main#content
-      +header(user)
-      if hasCommunityHeader
-        input#m-tab-feed.m-tab-input.m-only(type="radio" name="m-community-tab" checked)
-        input#m-tab-about.m-tab-input.m-only(type="radio" name="m-community-tab")
-      div.hero
+      +header(user, headerPage)
+      div.page-content
         if hasCommunityHeader
-          div.m-banner.m-only(style=(bannerImage ? `background-image:url("${bannerImage}")` : `background-color:${bannerColor}`))
-          div.m-community.m-only
-            span.m-community-avatar.m-community-avatar-lg(aria-hidden="true")
-              if communityIcon(about)
-                img(src=communityIcon(about) alt="")
-              else
-                span.m-community-fallback(style=`background-color:${communityColor(about)}`) r/
-            div.m-community-text
-              div.m-community-name r/#{communityName}
-              div.m-community-stats
-                | #{fmtcount(about.subscribers).replace('K', 'k')} members
-                if about.accounts_active || about.active_user_count
-                  |  and #{fmtcount(about.accounts_active || about.active_user_count).replace('K', 'k')} online
-          div.m-community-actions.m-only
-            +joinButton(subreddit, isSubbed)
-        else if !isHomePage
-          div.m-feed-title.m-only r/#{communityName}
-        if isHomePage
-          form.m-home-search.m-only(action="/post-search" method="get" role="search")
-            span.m-home-search-mark(aria-hidden="true") L
-            input(type="search" name="q" placeholder="Find anything" aria-label="Search posts" autocomplete="off")
-            input(type="hidden" name="view" value=viewQuery)
-        div.sub-title
-          h1
-            if isMulti
-              a(href=`/?sort=${sortQuery}&view=${viewQuery}`) home
-            else
-              a(href=`/r/${subreddit}?sort=${sortQuery}&view=${viewQuery}`)
-                | r/#{subreddit}
-          if !isMulti
-            div#button-container
-              if isSubbed
-                button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) unsubscribe
-              else
-                button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) subscribe
-        if about && !isMulti
-          div.about #{about.public_description}
-        if about && !isMulti
-          div.info-container
-            p
-              | #{fmtnum(about.accounts_active)} active
-              | &nbsp;·&nbsp;
-              | #{fmtnum(about.subscribers)} subscribers
-        div.feed-controls
+          input#m-tab-feed.m-tab-input.m-only(type="radio" name="m-community-tab" checked)
+          input#m-tab-about.m-tab-input.m-only(type="radio" name="m-community-tab")
+        div.hero.feed-hero
           if hasCommunityHeader
-            div.m-tabs.m-only(role="tablist")
-              label.m-tab.m-tab-feed(for="m-tab-feed") Feed
-              label.m-tab.m-tab-about(for="m-tab-about") About
-          details.sort-details
-            summary.sorting(aria-label=`Sort: ${sortLabel}`)
-              | #{sortLabel}
-              span.d-only  ▾
-              span.m-chevron.m-only
-                +icon("chevron-down")
-            div.sort-opts
-              div
-                a(href=`${baseUrl}?sort=hot&view=${viewQuery}`) hot
-              div
-                a(href=`${baseUrl}?sort=new&view=${viewQuery}`) new
-              div
-                a(href=`${baseUrl}?sort=rising&view=${viewQuery}`) rising
-              div
-                a(href=`${baseUrl}?sort=top&view=${viewQuery}`) top
-              div
-                a(href=`${baseUrl}?sort=top&t=day&view=${viewQuery}`) top day
-              div
-                a(href=`${baseUrl}?sort=top&t=week&view=${viewQuery}`) top week
-              div
-                a(href=`${baseUrl}?sort=top&t=month&view=${viewQuery}`) top month
-              div
-                a(href=`${baseUrl}?sort=top&t=year&view=${viewQuery}`) top year
-              div
-                a(href=`${baseUrl}?sort=top&t=all&view=${viewQuery}`) top all
-          details.view-details
-            summary.viewing(aria-label=`View: ${viewQuery}`)
-              span.d-only #{viewQuery} ▾
-              span.m-chevron.m-only
-                +icon("chevron-down")
-            div.view-opts
-              div
-                a(href=`${baseUrl}?sort=${sortQuery}&view=compact`) compact
-              div
-                a(href=`${baseUrl}?sort=${sortQuery}&view=card`) card
+            div.m-banner.m-only(style=(bannerImage ? `background-image:url("${bannerImage}")` : `background-color:${bannerColor}`))
+            div.m-community.m-only
+              span.m-community-avatar.m-community-avatar-lg(aria-hidden="true")
+                if communityIcon(about)
+                  img(src=communityIcon(about) alt="")
+                else
+                  span.m-community-fallback(style=`background-color:${communityColor(about)}`) r/
+              div.m-community-text
+                div.m-community-name r/#{communityName}
+                div.m-community-stats
+                  | #{fmtcount(about.subscribers).replace('K', 'k')} members
+                  if about.accounts_active || about.active_user_count
+                    |  and #{fmtcount(about.accounts_active || about.active_user_count).replace('K', 'k')} online
+            div.m-community-actions.m-only
+              +joinButton(subreddit, isSubbed)
+          else if !isHomePage
+            div.m-feed-title.m-only r/#{communityName}
+          if isHomePage
+            form.m-home-search.m-only(action="/post-search" method="get" role="search")
+              span.m-home-search-mark(aria-hidden="true") L
+              input(type="search" name="q" placeholder="Find anything" aria-label="Search posts" autocomplete="off")
+              input(type="hidden" name="view" value=viewQuery)
+          div.sub-title
+            h1
+              if isMulti
+                a(href=`/?sort=${sortQuery}&view=${viewQuery}`) home
+              else
+                a(href=`/r/${subreddit}?sort=${sortQuery}&view=${viewQuery}`)
+                  | r/#{subreddit}
+            if !isMulti
+              div#button-container
+                if isSubbed
+                  button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) unsubscribe
+                else
+                  button(onclick=`toggleSub('${subreddit}')` id=`thinger_${subreddit}`) subscribe
+          if about && !isMulti
+            div.about #{about.public_description}
+          if about && !isMulti
+            div.info-container
+              p
+                | #{fmtnum(about.accounts_active)} active
+                | &nbsp;·&nbsp;
+                | #{fmtnum(about.subscribers)} subscribers
+          div.feed-controls
+            if hasCommunityHeader
+              div.m-tabs.m-only(role="tablist")
+                label.m-tab.m-tab-feed(for="m-tab-feed") Feed
+                label.m-tab.m-tab-about(for="m-tab-about") About
+            details.sort-details
+              summary.sorting(aria-label=`Sort: ${sortLabel}`)
+                | #{sortLabel}
+                span.d-only  ▾
+                span.m-chevron.m-only
+                  +icon("chevron-down")
+              div.sort-opts
+                div
+                  a(href=`${baseUrl}?sort=hot&view=${viewQuery}`) hot
+                div
+                  a(href=`${baseUrl}?sort=new&view=${viewQuery}`) new
+                div
+                  a(href=`${baseUrl}?sort=rising&view=${viewQuery}`) rising
+                div
+                  a(href=`${baseUrl}?sort=top&view=${viewQuery}`) top
+                div
+                  a(href=`${baseUrl}?sort=top&t=day&view=${viewQuery}`) top day
+                div
+                  a(href=`${baseUrl}?sort=top&t=week&view=${viewQuery}`) top week
+                div
+                  a(href=`${baseUrl}?sort=top&t=month&view=${viewQuery}`) top month
+                div
+                  a(href=`${baseUrl}?sort=top&t=year&view=${viewQuery}`) top year
+                div
+                  a(href=`${baseUrl}?sort=top&t=all&view=${viewQuery}`) top all
+            details.view-details
+              summary.viewing(aria-label=`View: ${viewQuery}`)
+                span.d-only #{viewQuery} ▾
+                span.m-chevron.m-only
+                  +icon("chevron-down")
+              div.view-opts
+                div
+                  a(href=`${baseUrl}?sort=${sortQuery}&view=compact`) compact
+                div
+                  a(href=`${baseUrl}?sort=${sortQuery}&view=card`) card
 
-      if hasCommunityHeader
-        section.m-about.m-only(aria-label=`About r/${communityName}`)
-          h2.m-about-title r/#{communityName}
-          if about.public_description
-            p.m-about-description #{about.public_description}
-          dl.m-about-stats
-            div
-              dt #{fmtcount(about.subscribers)}
-              dd Members
-            if about.accounts_active || about.active_user_count
+        if hasCommunityHeader
+          section.m-about.m-only(aria-label=`About r/${communityName}`)
+            h2.m-about-title r/#{communityName}
+            if about.public_description
+              p.m-about-description #{about.public_description}
+            dl.m-about-stats
               div
-                dt #{fmtcount(about.accounts_active || about.active_user_count)}
-                dd Online
-          if about.created_utc
-            p.m-about-created Created #{new Date(about.created_utc * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                dt #{fmtcount(about.subscribers)}
+                dd Members
+              if about.accounts_active || about.active_user_count
+                div
+                  dt #{fmtcount(about.accounts_active || about.active_user_count)}
+                  dd Online
+            if about.created_utc
+              p.m-about-created Created #{new Date(about.created_utc * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
 
-      div#posts-container
-        if posts
-          each child in posts.posts
-            +post(child.data, currentUrl)
+        if query.sort === 'top' || query.sort === 'controversial'
+          div.menuarea.d-only
+            span.dropdown-title links from:
+            details.dropdown.lightdrop
+              summary #{timeLabel}
+              div.drop-choices
+                each range in timeRanges
+                  a.choice(href=`${baseUrl}?sort=${query.sort}&t=${range[0]}&view=${viewQuery}` class=(range[1] === timeLabel ? 'selected' : false)) #{range[1]}
 
-      if posts && posts.after
-        if user.infiniteScroll
-          div.page-divider ─────
-          div#infinite-scroll-sentinel
-          div#loading-indicator Loading more posts...
-        else
-          div.footer
-            div.footer-item
-              - var newQuery = {...query, after: posts.after}
-              a(href=`/r/${subreddit}?${encodeQueryParams(newQuery)}`) next ⟶
+        div#posts-container(style=`--rank-digits:${rankDigits};--score-chars:${scoreChars}`)
+          each child, index in postList
+            +post(child.data, currentUrl, rankStart + index + 1)
 
-      if user.infiniteScroll && posts && posts.after
-        script.
-          (function() {
-            let isLoading = false;
-            let afterCursor = '#{posts.after}';
-            const subreddit = '#{subreddit}';
-            const sort = '#{query.sort}';
-            const view = '#{query.view}';
-            const currentUrl = '#{currentUrl}';
+        if posts && posts.after
+          if user.infiniteScroll
+            div.page-divider ─────
+            div#infinite-scroll-sentinel(data-after=posts.after data-subreddit=subreddit data-sort=query.sort data-t=query.t data-view=query.view data-current-url=currentUrl)
+            div#loading-indicator Loading more posts...
+          else
+            div.footer
+              div.footer-item
+                - var newQuery = {...query, after: posts.after, count: rankStart + postList.length}
+                span.d-only view more:
+                a(href=`${isHomePage ? '/' : `/r/${subreddit}`}?${encodeQueryParams(newQuery)}`)
+                  span.m-only next ⟶
+                  span.d-only next ›
 
-            const sentinel = document.getElementById('infinite-scroll-sentinel');
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const postsContainer = document.getElementById('posts-container');
+        if user.infiniteScroll && posts && posts.after
+          script.
+            (function() {
+              let isLoading = false;
+              const sentinel = document.getElementById('infinite-scroll-sentinel');
+              const loadingIndicator = document.getElementById('loading-indicator');
+              const postsContainer = document.getElementById('posts-container');
+              const feed = sentinel.dataset;
+              let afterCursor = feed.after;
+              let page = 1;
 
-            const observer = new IntersectionObserver(async (entries) => {
-              if (entries[0].isIntersecting && !isLoading && afterCursor) {
-                isLoading = true;
-                loadingIndicator.style.display = 'block';
+              const observer = new IntersectionObserver(async (entries) => {
+                if (entries[0].isIntersecting && !isLoading && afterCursor) {
+                  isLoading = true;
+                  loadingIndicator.style.display = 'block';
 
-                try {
-                  const params = new URLSearchParams({
-                    sort: sort,
-                    view: view,
-                    after: afterCursor,
-                    currentUrl: currentUrl
-                  });
+                  try {
+                    const params = new URLSearchParams({
+                      sort: feed.sort || 'hot',
+                      view: feed.view || 'compact',
+                      after: afterCursor,
+                      count: postsContainer.querySelectorAll('article.post').length,
+                      currentUrl: feed.currentUrl
+                    });
+                    if (feed.t) params.set('t', feed.t);
 
-                  const response = await fetch(`/api/r/${subreddit}/posts?${params}`);
-                  const data = await response.json();
+                    const response = await fetch(`/api/r/${encodeURIComponent(feed.subreddit)}/posts?${params}`);
+                    const data = await response.json();
 
-                  if (data.html) {
-                    // Add divider before new content
-                    const divider = document.createElement('div');
-                    divider.className = 'page-divider';
-                    divider.textContent = '─────';
-                    postsContainer.insertAdjacentElement('beforeend', divider);
+                    if (data.html) {
+                      // Add divider before new content
+                      const divider = document.createElement('div');
+                      divider.className = 'page-divider';
+                      divider.textContent = '─────';
+                      divider.dataset.page = String(++page);
+                      postsContainer.insertAdjacentElement('beforeend', divider);
 
-                    // Add new posts
-                    postsContainer.insertAdjacentHTML('beforeend', data.html);
-                    if (window.initVideoPreviews) {
-                      initVideoPreviews(postsContainer);
+                      // Add new posts
+                      postsContainer.insertAdjacentHTML('beforeend', data.html);
+                      if (window.initVideoPreviews) {
+                        initVideoPreviews(postsContainer);
+                      }
                     }
-                  }
 
-                  afterCursor = data.after;
+                    afterCursor = data.after;
 
-                  if (!afterCursor) {
-                    observer.disconnect();
-                    sentinel.remove();
-                    loadingIndicator.textContent = 'No more posts';
-                    loadingIndicator.style.display = 'block';
+                    if (!afterCursor) {
+                      observer.disconnect();
+                      sentinel.remove();
+                      loadingIndicator.textContent = 'No more posts';
+                      loadingIndicator.style.display = 'block';
+                    }
+                  } catch (error) {
+                    console.error('Error loading more posts:', error);
+                    loadingIndicator.textContent = 'Error loading posts';
+                  } finally {
+                    loadingIndicator.style.display = 'none';
+                    isLoading = false;
                   }
-                } catch (error) {
-                  console.error('Error loading more posts:', error);
-                  loadingIndicator.textContent = 'Error loading posts';
-                } finally {
-                  loadingIndicator.style.display = 'none';
-                  isLoading = false;
                 }
-              }
-            }, { threshold: 0.1 });
+              }, { threshold: 0.1 });
 
-            if (sentinel) {
               observer.observe(sentinel);
-            }
-          })();
+            })();
+
+      aside.side.d-only
+        +searchBox()
+        if hasCommunityHeader
+          +titlebox(about, subreddit, isSubbed, about.description_html)
+        else
+          a.morelink(href=`/subs?view=${viewQuery}`) Manage subscriptions
+          a.morelink(href=`/search?view=${viewQuery}`) Find communities

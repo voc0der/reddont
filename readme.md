@@ -10,7 +10,8 @@ mobile layouts, single sign-on, and an API for JSON and Atom feeds.
 
 ## Features
 
-- Compact and card views, threaded comments, inline previews, and optional infinite scrolling.
+- Old reddit and RES on desktop, reddit's mobile layout on phones, threaded
+  comments, inline previews, and optional infinite scrolling.
 - Per-user subscriptions, themes, thumbnail settings, and optional Reddit credentials.
 - Invite-only accounts after initial administrator setup, plus OIDC and trusted proxy SSO.
 - Installable Progressive Web App.

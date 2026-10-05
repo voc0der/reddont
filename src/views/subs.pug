@@ -7,9 +7,9 @@ doctype html
 html
   +head("subscriptions")
   include ../mixins/subUtils
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header(user)
+      +header(user, { name: 'subscriptions', href: '/subs', current: 'subs' })
       div.hero
         div.subs-header
           h1 subscriptions

@@ -4,9 +4,9 @@ include ../mixins/head
 doctype html
 html
   +head("offline")
-  body(data-theme=user.themePreference data-classic-layout=user.useClassicLayout)
+  body(data-theme=user.themePreference)
     main#content
-      +header(user)
+      +header(user, { name: 'offline', href: '/offline' })
       div.hero
         div.offline-container
           h1 You're Offline
