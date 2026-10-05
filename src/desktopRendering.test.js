@@ -53,7 +53,7 @@ function renderComments(comments) {
 	});
 }
 
-function renderFeed(query, currentUrl) {
+function renderFeed(query, currentUrl, extra = {}) {
 	return pug.renderFile("src/views/index.pug", {
 		subreddit: "test",
 		posts: {
@@ -84,6 +84,7 @@ function renderFeed(query, currentUrl) {
 		subscribedSubs: [],
 		currentUrl,
 		navSubscriptions: () => ["test", "Other"],
+		...extra,
 	});
 }
 
@@ -129,6 +130,36 @@ describe("desktop header", () => {
 		expect(html).toContain('<a class="selected" href="/r/test?view=compact">test</a>');
 		expect(html).toContain('<li class="selected"><a href="/r/test?sort=new&amp;view=compact">new</a></li>');
 		expect(html).toContain('<a href="/r/test?sort=new&amp;view=card">show images</a>');
+	});
+
+	test("list subscriptions in the my subreddits menu, as RES does", () => {
+		const html = renderFeed({ sort: "hot", view: "compact" }, "/r/test");
+
+		expect(html).toContain('placeholder="Filter subreddits..."');
+		expect(html).toContain('<a class="sr-list-all" href="/subs?view=compact">View all »</a>');
+		expect(html).toContain(
+			'<tr data-sub="other"><td><a href="/r/Other?view=compact">Other</a></td><td class="sr-visited">N/A</td></tr>',
+		);
+	});
+
+	test("say so when there are no subscriptions", () => {
+		const html = renderFeed({ sort: "hot", view: "compact" }, "/r/test", { navSubscriptions: () => [] });
+
+		expect(html).toContain('<td class="sr-list-empty" colspan="2">no subscriptions yet</td>');
+	});
+
+	test("count community and comment pages as visits, but not home", () => {
+		const home = renderFeed({ sort: "hot", view: "compact" }, "/", {
+			subreddit: "test+Other",
+			isMulti: true,
+			isHomePage: true,
+		});
+
+		expect(renderFeed({ sort: "hot", view: "compact" }, "/r/test")).toContain(
+			'<div class="d-only" id="sr-header-area" data-subreddit="test">',
+		);
+		expect(renderComments([])).toContain('<div class="d-only" id="sr-header-area" data-subreddit="test">');
+		expect(home).toContain('<div class="d-only" id="sr-header-area">');
 	});
 });
 

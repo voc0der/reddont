@@ -1,8 +1,9 @@
 include icons
 //- page describes the current page to the desktop header:
-//- { name, href, current, tabs: [{ label, href, selected }] }. name and tabs
-//- become old reddit's page name and tab menu; current highlights the
-//- matching link in the subreddit bar.
+//- { name, href, current, subreddit, tabs: [{ label, href, selected }] }.
+//- name and tabs become old reddit's page name and tab menu; current
+//- highlights the matching link in the subreddit bar. subreddit, set on a
+//- single community's pages, counts as a visit in the "my subreddits" list.
 mixin header(user, page)
   - var viewQuery = 'view=' + (query && query.view ? query.view : 'compact')
   - var headerPage = page || {}
@@ -10,13 +11,30 @@ mixin header(user, page)
   - var srLinks = [['home', '/'], ['popular', '/r/popular'], ['all', '/r/all'], ['subs', '/subs'], ['search', '/search']]
   header.header
     if user
-      div#sr-header-area.d-only
+      div#sr-header-area.d-only(data-subreddit=headerPage.subreddit)
+        //- RES's subreddit list; head.pug wires up the filter, sorting, and visit times.
         details.dropdown.sr-dropdown
           summary my subreddits
-          div.drop-choices
-            each sub in navSubs
-              a.choice(href=`/r/${sub}?${viewQuery}`) #{sub}
-            a.choice.bottom-option(href=`/subs?${viewQuery}`) edit subscriptions
+          div.drop-choices.sr-list
+            div.sr-list-head
+              input.sr-list-filter(type="search" placeholder="Filter subreddits..." aria-label="Filter subreddits" autocomplete="off" spellcheck="false")
+              a.sr-list-all(href=`/subs?${viewQuery}`) View all »
+            table.sr-list-table
+              thead
+                tr
+                  th(aria-sort="ascending")
+                    button(type="button" data-sort="name") subreddit
+                  th
+                    button(type="button" data-sort="visited") last visited
+              tbody
+                each sub in navSubs
+                  tr(data-sub=sub.toLowerCase())
+                    td
+                      a(href=`/r/${sub}?${viewQuery}`) #{sub}
+                    td.sr-visited N/A
+                else
+                  tr
+                    td.sr-list-empty(colspan="2") no subscriptions yet
         ul.sr-bar
           each link in srLinks
             li

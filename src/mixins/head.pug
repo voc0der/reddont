@@ -420,6 +420,117 @@ mixin head(title)
         });
       })();
 
+      //- RES's "my subreddits" list: a filter, columns sorted by name or last
+      //- visit, and visit times kept in this browser, as RES keeps them.
+      (function () {
+        var VISITS_KEY = 'reddont:lastVisited';
+        var SORT_KEY = 'reddont:srListSort';
+
+        function load(key, fallback) {
+          try {
+            return JSON.parse(localStorage.getItem(key)) || fallback;
+          } catch (error) {
+            return fallback;
+          }
+        }
+
+        function save(key, value) {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+          } catch (error) {}
+        }
+
+        function timeAgo(time) {
+          var seconds = Math.max(0, (Date.now() - time) / 1000);
+          var units = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
+          for (var i = 0; i < units.length; i++) {
+            var n = Math.floor(seconds / units[i][1]);
+            if (n >= 1) return n + ' ' + units[i][0] + (n === 1 ? '' : 's') + ' ago';
+          }
+          return 'just now';
+        }
+
+        //- Names sort A to Z first; visits sort most recent first.
+        function sortRows(table, sort) {
+          var body = table.tBodies[0];
+          var rows = Array.prototype.slice.call(body.querySelectorAll('tr[data-sub]'));
+          rows.sort(function (a, b) {
+            var byName = a.dataset.sub < b.dataset.sub ? -1 : a.dataset.sub > b.dataset.sub ? 1 : 0;
+            if (sort.key !== 'visited') return byName * sort.dir;
+            return ((Number(b.dataset.visited) || 0) - (Number(a.dataset.visited) || 0)) * sort.dir || byName;
+          });
+          rows.forEach(function (row) { body.appendChild(row); });
+          table.querySelectorAll('th').forEach(function (th) {
+            if (th.querySelector('button').dataset.sort !== sort.key) return th.removeAttribute('aria-sort');
+            var ascending = sort.key === 'visited' ? sort.dir < 0 : sort.dir > 0;
+            th.setAttribute('aria-sort', ascending ? 'ascending' : 'descending');
+          });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+          var area = document.getElementById('sr-header-area');
+          if (!area) return;
+          if (area.dataset.subreddit) {
+            var visits = load(VISITS_KEY, {});
+            visits[area.dataset.subreddit.toLowerCase()] = Date.now();
+            save(VISITS_KEY, visits);
+          }
+
+          var menu = area.querySelector('.sr-dropdown');
+          var table = menu.querySelector('.sr-list-table');
+          var filter = menu.querySelector('.sr-list-filter');
+          var sort = load(SORT_KEY, null);
+          if (!sort || (sort.key !== 'name' && sort.key !== 'visited') || Math.abs(sort.dir) !== 1) {
+            sort = { key: 'name', dir: 1 };
+          }
+
+          menu.addEventListener('toggle', function () {
+            if (!menu.open) return;
+            var visits = load(VISITS_KEY, {});
+            table.querySelectorAll('tr[data-sub]').forEach(function (row) {
+              var time = visits[row.dataset.sub];
+              var cell = row.querySelector('.sr-visited');
+              row.dataset.visited = time || '';
+              cell.textContent = time ? timeAgo(time) : 'N/A';
+              cell.classList.toggle('is-never', !time);
+            });
+            sortRows(table, sort);
+            filter.focus();
+          });
+
+          table.tHead.addEventListener('click', function (event) {
+            var button = event.target.closest('button[data-sort]');
+            if (!button) return;
+            var key = button.dataset.sort;
+            sort = { key: key, dir: sort.key === key ? -sort.dir : 1 };
+            save(SORT_KEY, sort);
+            sortRows(table, sort);
+          });
+
+          filter.addEventListener('input', function () {
+            var text = filter.value.trim().toLowerCase();
+            table.querySelectorAll('tr[data-sub]').forEach(function (row) {
+              row.hidden = row.dataset.sub.indexOf(text) === -1;
+            });
+          });
+
+          //- Enter opens the first match; Escape closes the menu.
+          filter.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') return;
+            var first = table.querySelector('tr[data-sub]:not([hidden]) a');
+            if (first) window.location.href = first.href;
+            event.preventDefault();
+          });
+
+          menu.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape') return;
+            menu.open = false;
+            menu.querySelector('summary').focus();
+            event.preventDefault();
+          });
+        });
+      })();
+
       document.addEventListener('DOMContentLoaded', function () {
         initVideoPreviews(document);
 
