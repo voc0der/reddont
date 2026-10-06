@@ -156,7 +156,7 @@ mixin comment(com, isfirst, parent_id, next_id, prev_id, depth)
   if com.kind == "more"
     - var moreChildren = data.children || []
     if moreChildren.length
-      form(class=`more ${isfirst ? 'first' : ''}` action=`/comments/${parent_id}/more` method="post" onsubmit="loadMoreComments(event, this)")
+      form(class=`more ${isfirst ? 'first' : ''}` action=`/comments/${parent_id}/more` method="post")
         input(type="hidden" name="_csrf" value=csrfToken)
         input(type="hidden" name="children" value=moreChildren.join(','))
         input(type="hidden" name="parent_id" value=(data.parent_id || `t3_${parent_id}`))

@@ -3,6 +3,12 @@
 let moreCommentsQueue = Promise.resolve();
 let moreCommentsObserver;
 
+// Delegation also covers forms inserted by subsequent comment batches.
+document.addEventListener("submit", (event) => {
+	const form = event.target;
+	if (form.matches("form.more")) loadMoreComments(event, form);
+});
+
 function observeMoreComments() {
 	if (!moreCommentsObserver) return;
 	moreCommentsObserver.disconnect();
