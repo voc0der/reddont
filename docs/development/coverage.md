@@ -1,6 +1,6 @@
 # Test coverage
 
-[![JavaScript line coverage](../assets/coverage.svg)](../assets/coverage-summary.json)
+[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-45.65%25-red)](../assets/coverage-summary.json)
 
 The README badge reports **JavaScript line coverage** from the Bun test suite.
 It is a checked-in measurement; it changes when a contributor recalculates it.
@@ -76,9 +76,10 @@ from `bun test --coverage`.
 bun run coverage --update-badge
 ```
 
-This reruns the calculation and updates `docs/assets/coverage.svg` and
-`docs/assets/coverage-summary.json`. Commit both files with the source or test
-change that affects coverage. The command refuses to publish a new measurement
+This reruns the calculation and updates the Shields.io badge URLs in `readme.md`
+and this guide, plus `docs/assets/coverage-summary.json`. Commit those changes
+with the source or test change that affects coverage. The command refuses to
+publish a new measurement
 if tests fail or are skipped, no tests run, a process report is missing, or
 fixture-server coverage is absent. It does not modify the badge on a failed run.
 

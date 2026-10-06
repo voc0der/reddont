@@ -27,18 +27,9 @@ async function sourceFiles(dir) {
 	return files.sort();
 }
 
-function badge(percent, covered, total) {
-	const color = percent >= 80 ? "#4c1" : percent >= 60 ? "#dfb317" : "#e05d44";
-	const value = `${percent.toFixed(2)}%`;
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="158" height="20" role="img" aria-label="Line coverage: ${value}">
-  <title>Line coverage: ${covered} of ${total} executable JavaScript lines (${value})</title>
-  <clipPath id="round"><rect width="158" height="20" rx="3"/></clipPath>
-  <g clip-path="url(#round)"><path fill="#555" d="M0 0h96v20H0z"/><path fill="${color}" d="M96 0h62v20H96z"/></g>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
-    <text x="48" y="14">line coverage</text><text x="127" y="14">${value}</text>
-  </g>
-</svg>
-`;
+function badgeUrl(percent) {
+	const color = percent >= 80 ? "brightgreen" : percent >= 60 ? "yellow" : "red";
+	return `https://img.shields.io/badge/line_coverage-${percent.toFixed(2)}%25-${color}`;
 }
 
 const workDir = await mkdtemp(join(tmpdir(), "reddont-coverage-"));
@@ -130,7 +121,13 @@ afterAll(flush);
 	console.log(`\nJavaScript line coverage: ${covered} / ${total} × 100 = ${percent.toFixed(2)}% (${files.length} files, ${snapshots.length} processes)`);
 	console.log(`Reports: ${relative(root, reportDir)}/`);
 	if (updateBadge) {
-		await writeFile(join(root, "docs/assets/coverage.svg"), badge(percent, covered, total));
+		for (const name of ["readme.md", "docs/development/coverage.md"]) {
+			const path = join(root, name);
+			const markdown = await readFile(path, "utf8");
+			const pattern = /(!\[JavaScript line coverage\]\()[^)]+(\))/;
+			assert(pattern.test(markdown), `Coverage badge not found in ${name}`);
+			await writeFile(path, markdown.replace(pattern, `$1${badgeUrl(percent)}$2`));
+		}
 		await writeFile(join(root, "docs/assets/coverage-summary.json"), JSON.stringify(summary, null, 2) + "\n");
 		console.log("Updated the README badge and published coverage summary.");
 	}
