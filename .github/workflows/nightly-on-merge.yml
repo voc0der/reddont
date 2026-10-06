@@ -1,0 +1,23 @@
+name: nightly-on-merge
+
+# Use trusted base-branch metadata so labeled merges from forks work too.
+# This workflow never checks out or executes pull request code.
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  dispatch:
+    if: github.event.pull_request.merged && contains(github.event.pull_request.labels.*.name, 'nightly')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Start the nightly build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run publish-docker.yml --repo "$GH_REPO" --ref main -f channel=nightly

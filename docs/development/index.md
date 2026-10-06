@@ -96,6 +96,9 @@ scanning, and push protection are set under the repository's
 
 ## Making changes
 
+See [publishing images](releases.md) for the `nightly` pull request label,
+manual releases, and container version tags.
+
 Keep database changes in the migration mechanism and preserve existing data.
 Run the relevant tests after changing routes, authentication, or rendering.
 For container changes, also validate `docker compose config` and build the

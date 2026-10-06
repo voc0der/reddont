@@ -1,9 +1,20 @@
 # Docker and storage
 
-The image is `ghcr.io/voc0der/reddont`. Use `:latest` for the current main
-build or `:0.1.0` for the release version. Images are built for Linux amd64
-and arm64. For an exact image pin, use its digest; a version tag can be
-rebuilt while the application version stays the same.
+The image is `ghcr.io/voc0der/reddont`. Images are built for Linux amd64 and
+arm64, with separate release and nightly channels:
+
+| Tag | Updated when |
+| --- | --- |
+| `latest` | A maintainer manually publishes a release. |
+| A release version, such as `0.1.0` | A maintainer publishes that version. |
+| `nightly` | A pull request labeled `nightly` merges into `main`, or a maintainer manually publishes a nightly build. |
+| `nightly-YYYY-MM-DD`, `sha-<short commit>` | The corresponding nightly build is published. |
+
+Pushing commits alone does not publish an image. To follow development builds,
+set your Compose image to `ghcr.io/voc0der/reddont:nightly`. The default
+`:latest` follows manual releases. For an exact image pin, use its digest;
+tags can be rebuilt. See [publishing images](../development/releases.md)
+for the maintainer workflow.
 
 Start with the working [quick-start compose file](../getting-started/quick-start.md).
 

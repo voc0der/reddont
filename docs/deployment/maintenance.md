@@ -43,8 +43,10 @@ docker compose logs --tail=100 reddont
 ```
 
 The database applies pending migrations at startup. Check that you can sign
-in and read your subscriptions after the update. Image tags follow the
-application version; change a version pin deliberately when upgrading.
+in and read your subscriptions after the update. `:latest` follows manual
+releases; `:nightly` follows selected development builds. Change a release
+version pin deliberately when upgrading. See [image tags](docker.md) for
+the available channels and exact digest pins.
 
 ## Restore or roll back
 

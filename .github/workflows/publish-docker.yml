@@ -1,34 +1,85 @@
 name: publish docker image
+run-name: Publish ${{ inputs.channel }}${{ inputs.version && format(' {0}', inputs.version) || '' }}
 
 on:
-  push:
-    branches:
-      - main
-  schedule:
-    # Run every Sunday at 2 AM UTC to catch dependency updates
-    - cron: '0 2 * * 0'
-  workflow_dispatch:  # Allow manual triggers from GitHub UI
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Image channel (release also updates latest)
+        type: choice
+        options: [nightly, release]
+        default: nightly
+        required: true
+      version:
+        description: Release version, for example 0.1.1 (leave empty for nightly)
+        type: string
+        required: false
 
 permissions:
-  contents: write
+  contents: read
   packages: write
+
+concurrency:
+  group: publish-docker-${{ inputs.channel }}
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
     steps:
-      - name: Checkout Repository
+      - name: Validate channel and version
+        id: version
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          case "$CHANNEL" in
+            nightly)
+              if [ -n "$RELEASE_VERSION" ]; then
+                echo '::error::Leave version empty for nightly builds.'
+                exit 1
+              fi
+              version=nightly
+              ;;
+            release)
+              if [[ ! "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+                echo '::error::Release version must be X.Y.Z, for example 0.1.1.'
+                exit 1
+              fi
+              version="$RELEASE_VERSION"
+              ;;
+            *)
+              echo '::error::Choose the nightly or release channel.'
+              exit 1
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          # Ensure line endings aren't modified during checkout
-          autocrlf: false
+          persist-credentials: false
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v31
+      - name: Generate image tags and labels
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}
+            name=${{ env.DOCKER_USERNAME }}/reddont,enable=${{ env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '' }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=nightly,enable=${{ inputs.channel == 'nightly' }}
+            type=raw,value=nightly-{{date 'YYYY-MM-DD'}},enable=${{ inputs.channel == 'nightly' }}
+            type=sha,format=short,enable=${{ inputs.channel == 'nightly' }}
+            type=raw,value=${{ steps.version.outputs.version }},enable=${{ inputs.channel == 'release' }}
+            type=raw,value=latest,enable=${{ inputs.channel == 'release' }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -36,86 +87,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Attempt to Build Docker Image
-        id: build
-        run: |
-          set -e
-          docker buildx build --platform linux/amd64 -t reddont:latest --load . || echo "BUILD_FAILED=true" >> $GITHUB_ENV
-
-      - name: Extract new hash from the error logs and update flake.nix
-        run: |
-          if [ "$BUILD_FAILED" == "true" ]; then
-            echo "Build failed. Attempting to extract new hash and update flake.nix..."
-
-            # Capture build log
-            BUILD_LOG=$(mktemp)
-            nix build .#dockerImage > "$BUILD_LOG" 2>&1 || true
-
-            # Display build log for debugging
-            echo "Build log:"
-            cat "$BUILD_LOG"
-
-            # Extract the new hash from the "got:" line in the log
-            NEW_HASH=$(grep -oP "got:\s+sha256-[a-zA-Z0-9+/=]+" "$BUILD_LOG" | awk '{print $2}' | head -n 1)
-
-            if [ -z "$NEW_HASH" ]; then
-              echo "Failed to retrieve new hash from logs."
-              exit 1
-            fi
-
-            echo "New hash extracted: $NEW_HASH"
-
-            # Use an alternative delimiter to avoid conflicts
-            sed -i "s|outputHash = \".*\";|outputHash = \"$NEW_HASH\";|" flake.nix
-
-            # Verify the change
-            echo "Updated flake.nix:"
-            grep outputHash flake.nix
-
-            # Commit the updated flake.nix
-            git config --global user.name "GitHub Actions"
-            git config --global user.email "actions@github.com"
-            git add flake.nix
-            git commit -m "Update outputHash in flake.nix"
-            git push
-
-            # Mark that the flake was updated
-            echo "FLAKE_UPDATED=true" >> $GITHUB_ENV
-          else
-            echo "Build succeeded. Skipping flake update."
-          fi
-
-      - name: Retry Build
-        run: |
-          if [ "$FLAKE_UPDATED" == "true" ]; then
-            echo "Retrying build after flake update..."
-            docker buildx build --platform linux/amd64 -t reddont:latest --load . || exit 1
-          else
-            echo "No flake update detected. Skipping retry."
-          fi
-
       - name: Log in to Docker Hub
         if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
-        run: |
-          echo "Attempting to log in to Docker Hub..."
-          printf '%s' "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Log in to GitHub Container Registry
-        run: |
-          echo "Attempting to log in to GitHub Container Registry..."
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Publish Multi-Platform Docker Images
-        run: |
-          echo "Building and publishing multi-platform Docker images..."
-          VERSION=$(jq -r .version package.json)
-          IMAGE="ghcr.io/${{ github.repository }}"
-          TAGS=(-t "$IMAGE:latest" -t "$IMAGE:$VERSION")
-          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
-            TAGS+=(-t "$DOCKER_USERNAME/reddont:latest" -t "$DOCKER_USERNAME/reddont:$VERSION")
-          fi
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            "${TAGS[@]}" \
-            --push \
-            .
+      - name: Build and publish images
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha,scope=docker-${{ inputs.channel }}
+          cache-to: type=gha,mode=max,scope=docker-${{ inputs.channel }}
