@@ -154,13 +154,28 @@ mixin comment(com, isfirst, parent_id, next_id, prev_id, depth)
   - var level = depth || 0
 
   if com.kind == "more"
-    div(class=`more ${isfirst ? 'first' : ''}`)
-      a(href=`/comments/${parent_id}/comment/${data.id}`)
-        span.m-more-icon.m-only(aria-hidden="true")
-          +icon("plus-circle")
-        span.d-only load more comments
-        span.d-only.more-count  (#{data.count} #{data.count == 1 ? 'reply' : 'replies'})
-        span.m-only #{data.count} more #{data.count == 1 ? 'reply' : 'replies'}
+    - var moreChildren = data.children || []
+    if moreChildren.length
+      form(class=`more ${isfirst ? 'first' : ''}` action=`/comments/${parent_id}/more` method="post" onsubmit="loadMoreComments(event, this)")
+        input(type="hidden" name="_csrf" value=csrfToken)
+        input(type="hidden" name="children" value=moreChildren.join(','))
+        input(type="hidden" name="parent_id" value=(data.parent_id || `t3_${parent_id}`))
+        input(type="hidden" name="count" value=data.count)
+        input(type="hidden" name="depth" value=level)
+        input(type="hidden" name="sort" value=(commentSort || 'confidence'))
+        button(type="submit")
+          span.m-more-icon.m-only(aria-hidden="true")
+            +icon("plus-circle")
+          span.d-only load more comments
+          span.d-only.more-count  (#{data.count} #{data.count == 1 ? 'reply' : 'replies'})
+          span.m-only #{data.count} more #{data.count == 1 ? 'reply' : 'replies'}
+        span.more-status(role="status")
+    else
+      //- Empty child lists mark the depth limit: continue from the parent,
+      //- not the placeholder's synthetic ID (usually "_").
+      - var continuationId = data.parent_id && data.parent_id.startsWith('t1_') ? data.parent_id.slice(3) : data.id
+      div(class=`more ${isfirst ? 'first' : ''}`)
+        a(href=`/comments/${parent_id}/comment/${continuationId}?sort=${commentSort || 'confidence'}`) continue this thread
   else
     //- reddit folds stickied moderator comments on mobile; see comments.pug
     - var foldOnMobile = data.stickied && data.distinguished == "moderator"

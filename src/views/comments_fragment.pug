@@ -1,0 +1,6 @@
+include ../mixins/comment
+
+each child, index in comments
+  - var next_id = comments[index + 1] && comments[index + 1].data.id
+  - var prev_id = index > 0 ? comments[index - 1].data.id : null
+  +comment(child, !depth, parent_id, next_id, prev_id, depth || 0)

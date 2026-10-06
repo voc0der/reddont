@@ -529,6 +529,35 @@ form {
   color: var(--text-color-muted);
 }
 
+form.more {
+  display: block;
+}
+
+.more button {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--text-color-muted);
+  cursor: pointer;
+}
+
+.more button:hover {
+  text-decoration: underline;
+}
+
+.more button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.more-status {
+  color: var(--text-color-muted);
+}
+
 hr {
   border: none;
   border-top: 1px dashed var(--text-color-muted);

@@ -9,12 +9,12 @@ html
   body(data-theme=user.themePreference)
     main#content
       +header(user, { name: 'comments', href: `/comments/${parent_id}` })
-      div.comments-container
-        a(href=`/comments/${parent_id}`)
+      div.comments-container(data-infinite-scroll=(user.infiniteScroll ? '1' : false))
+        a(href=`/comments/${parent_id}?sort=${commentSort || 'confidence'}`)
           | ← back to parent thread
         if comments.length == 0
           div
-            p nothing to see here, this thread was shadow-banned?
+            p No more comments are available here.
         else
           - var total = comments.length
           each comment, index in comments

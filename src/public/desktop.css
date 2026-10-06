@@ -1877,7 +1877,12 @@ main#content > .comments-container > a {
 }
 
 .more a,
-.more a:visited {
+.more a:visited,
+.more button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   color: var(--o-more);
   font-size: 1rem;
   font-weight: bold;
@@ -1886,6 +1891,14 @@ main#content > .comments-container > a {
 .more .more-count {
   color: var(--o-muted);
   font-weight: normal;
+}
+
+.more button:disabled {
+  cursor: wait;
+}
+
+.more-status {
+  color: var(--o-muted);
 }
 
 /* ---------- sidebar ---------- */

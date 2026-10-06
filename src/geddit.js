@@ -1,3 +1,5 @@
+const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
+
 class Geddit {
 	constructor() {
 		this.host = "https://www.reddit.com";
@@ -477,6 +479,37 @@ class Geddit {
 				comments: json[1].data.children,
 			}))
 			.catch((err) => null);
+	}
+
+	async getMoreComments(id, children, sort, requestOptions = {}) {
+		if (
+			typeof id !== "string" || !/^[a-z0-9]+$/i.test(id) ||
+			!Array.isArray(children) || !children.length ||
+			children.length > MORE_COMMENTS_LIMIT ||
+			children.some((child) => typeof child !== "string" || !/^[a-z0-9]+$/i.test(child))
+		) return null;
+
+		try {
+			const response = await fetch(
+				this.buildRedditUrl("/api/morechildren.json", {
+					api_type: "json",
+					link_id: `t3_${id}`,
+					children: children.join(","),
+					sort: commentSort(sort),
+				}),
+				this.getFetchOptions(requestOptions),
+			);
+			if (!response.ok) return null;
+			const body = await response.json();
+			if (body.json?.errors?.length) return null;
+			const things = body.json?.data?.things;
+			if (!Array.isArray(things) || !things.every((thing) =>
+				["t1", "more"].includes(thing?.kind) && typeof thing.data?.id === "string",
+			)) return null;
+			return things;
+		} catch {
+			return null;
+		}
 	}
 
 	async getSingleCommentThread(

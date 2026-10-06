@@ -46,6 +46,12 @@ Comments open the discussion page, where `[–]` collapses a comment and its
 replies, **hide child comments** folds just the replies, and **permalink**
 opens a single comment thread.
 
+**load more comments** adds the next batch of comments and their replies in
+place. With **Never Ending Reddit** enabled, the next batch loads automatically
+as you reach the bottom of the discussion. Nested reply groups still open when
+you select them. If a load fails, select **load more comments** to retry.
+**continue this thread** opens deeper replies in a separate thread view.
+
 On desktop, the keyboard works as it does with RES:
 
 | Key | Action |
@@ -61,8 +67,8 @@ thumbnails while keeping the rest of your preferences. See
 ## Search and paging
 
 Use **search** to find communities or posts. Feeds normally offer pagination;
-the dashboard's **Never Ending Reddit** preference loads more posts while
-you scroll instead.
+the dashboard's **Never Ending Reddit** preference loads more posts and
+comments while you scroll instead.
 
 The app is read-only. Follow the original post link if you want to vote,
 submit a post, or comment on Reddit itself.
