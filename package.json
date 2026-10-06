@@ -4,7 +4,8 @@
 	"module": "index.ts",
 	"type": "module",
 	"scripts": {
-		"test": "bun test"
+		"test": "bun test",
+		"coverage": "bun run dev/test-coverage/run.mjs"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
