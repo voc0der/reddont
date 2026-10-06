@@ -34,6 +34,9 @@ Prefer tests that exercise observable behavior. For a bug fix, cover the failing
 
 ## Coverage
 
+Follow the [coverage guide](docs/development/coverage.md) to calculate coverage
+and refresh the README badge and its published summary.
+
 - When reporting a percentage, name the metric. Use line coverage for a README coverage badge.
 - Include untested application files in the total. Check for source files missing from the report; missing files can inflate the result.
 - Exclude tests, test helpers, and generated code. Document other exclusions and why they are needed.

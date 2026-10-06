@@ -1,0 +1,80 @@
+{
+  "metric": "JavaScript line coverage",
+  "covered": 935,
+  "total": 2048,
+  "percent": 45.65,
+  "bunVersion": "1.4.2",
+  "tests": {
+    "passed": 94,
+    "skipped": 0,
+    "failed": 0
+  },
+  "processes": 2,
+  "sourceSha256": "0fd9fa06a685152661789f00343ac244566c9cb40c7f835ab00e0a14311da2ba",
+  "files": {
+    "src/apiAuth.js": {
+      "covered": 106,
+      "total": 117
+    },
+    "src/auth.js": {
+      "covered": 45,
+      "total": 137
+    },
+    "src/db.js": {
+      "covered": 42,
+      "total": 48
+    },
+    "src/geddit.js": {
+      "covered": 84,
+      "total": 233
+    },
+    "src/index.js": {
+      "covered": 85,
+      "total": 115
+    },
+    "src/invite.js": {
+      "covered": 3,
+      "total": 18
+    },
+    "src/logger.js": {
+      "covered": 19,
+      "total": 28
+    },
+    "src/oidc.js": {
+      "covered": 23,
+      "total": 232
+    },
+    "src/public/comments.js": {
+      "covered": 0,
+      "total": 45
+    },
+    "src/public/service-worker.js": {
+      "covered": 0,
+      "total": 87
+    },
+    "src/redditAuth.js": {
+      "covered": 120,
+      "total": 142
+    },
+    "src/routes/api.js": {
+      "covered": 142,
+      "total": 165
+    },
+    "src/routes/index.js": {
+      "covered": 104,
+      "total": 514
+    },
+    "src/utils/redditComments.js": {
+      "covered": 38,
+      "total": 38
+    },
+    "src/utils/redditFeed.js": {
+      "covered": 116,
+      "total": 121
+    },
+    "src/utils/redditHtml.js": {
+      "covered": 8,
+      "total": 8
+    }
+  }
+}

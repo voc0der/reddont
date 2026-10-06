@@ -41,6 +41,9 @@ loading in Chromium. This covers manual and automatic loading at desktop and
 phone widths across all themes, retries, and navigation without JavaScript. It
 uses a temporary database and simulated upstream responses.
 
+See [test coverage](coverage.md) for the README badge's scope, calculation,
+and the commands to reproduce and refresh it.
+
 ## Source map
 
 | Path | Responsibility |
