@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "capture": "node gallery.mjs"
+    "capture": "node gallery.mjs",
+    "test:comments": "node comments.mjs"
   },
   "dependencies": {
     "playwright": "1.63.0"

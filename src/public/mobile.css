@@ -1950,15 +1950,25 @@ details.link-details,
 }
 
 .more a,
-.more a:visited {
+.more a:visited,
+.more button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   color: var(--r-text-weak);
   font-size: 12px;
   line-height: 16px;
   text-decoration: none;
+}
+
+.more-status {
+  color: var(--r-text-weak);
+  font-size: 12px;
 }
 
 .more .m-more-icon {
@@ -1982,7 +1992,8 @@ details.link-details,
   width: 20px;
 }
 
-.replies > .more > a {
+.replies > .more > a,
+.replies > .more > button {
   margin-left: 8px;
 }
 

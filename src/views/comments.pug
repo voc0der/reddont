@@ -171,7 +171,7 @@ html
 
           hr
 
-        div.comments-container#comments
+        div.comments-container#comments(data-infinite-scroll=(user.infiniteScroll ? '1' : false))
           div.panestack-title.d-only
             span.title all #{post.num_comments} #{fmttxt(post.num_comments, 'comment')}
           - var total = comments.length

@@ -20,6 +20,11 @@ const logger = require("../logger");
 const oidc = require("../oidc");
 const { unescapeSelfText } = require("../utils/redditHtml");
 const {
+	MORE_COMMENTS_LIMIT,
+	commentSort,
+	expandMoreComments,
+} = require("../utils/redditComments");
+const {
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
 	normalizeRedditAuthInput,
@@ -465,6 +470,7 @@ router.get("/comments/:id", authenticateToken, async (req, res) => {
 	const params = {
 		limit: 50,
 		sr_detail: true,
+		sort: commentSort(req.query.sort),
 	};
 	const response = await G.getSubmissionComments(
 		id,
@@ -481,7 +487,52 @@ router.get("/comments/:id", authenticateToken, async (req, res) => {
 		user: req.user,
 		from: req.query.from,
 		query: req.query,
+		commentSort: params.sort,
 		...commonRenderOptions,
+	});
+});
+
+// POST keeps large hidden-comment queues out of URLs and proxy header limits.
+router.post("/comments/:id/more", authenticateToken, async (req, res) => {
+	const id = req.params.id;
+	const { children: rawChildren, parent_id: parentId } = req.body || {};
+	if (
+		!/^[a-z0-9]+$/i.test(id) || typeof rawChildren !== "string" ||
+		!/^[a-z0-9]+(?:,[a-z0-9]+)*$/i.test(rawChildren) ||
+		typeof parentId !== "string" || !/^t[13]_[a-z0-9]+$/i.test(parentId) ||
+		(parentId.startsWith("t3_") && parentId !== `t3_${id}`)
+	) {
+		return res.status(400).send("Invalid comment identifiers");
+	}
+	const children = [...new Set(rawChildren.split(","))];
+	const sort = commentSort(req.body.sort);
+	const things = await G.getMoreComments(
+		id,
+		children.slice(0, MORE_COMMENTS_LIMIT),
+		sort,
+		getRedditRequestOptions(req),
+	);
+	if (!things) return res.status(502).send("Unable to load comments. Please try again.");
+	const comments = expandMoreComments(things, {
+		children,
+		parentId,
+		count: Math.max(children.length, Math.min(Number.MAX_SAFE_INTEGER, Number(req.body.count) || 0)),
+	});
+	comments.forEach(unescape_comment);
+	const inline = req.get("accept") === "application/json";
+	const options = {
+		comments,
+		parent_id: id,
+		commentSort: sort,
+		depth: inline ? Math.max(0, Math.min(1000, Math.floor(Number(req.body.depth)) || 0)) : 0,
+		user: req.user,
+		...commonRenderOptions,
+	};
+	res.set("Cache-Control", "no-store");
+	if (!inline) return res.render("single_comment_thread", options);
+	res.render("comments_fragment", options, (err, html) => {
+		if (err) return res.status(500).json({ error: "Unable to render comments" });
+		res.json({ html });
 	});
 });
 
@@ -498,6 +549,7 @@ router.get(
 
 		const params = {
 			limit: 50,
+			sort: commentSort(req.query.sort),
 		};
 		const response = await G.getSingleCommentThread(
 			parent_id,
@@ -510,6 +562,7 @@ router.get(
 		res.render("single_comment_thread", {
 			comments,
 			parent_id,
+			commentSort: params.sort,
 			user: req.user,
 			...commonRenderOptions,
 		});

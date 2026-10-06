@@ -49,6 +49,7 @@ mixin head(title)
     if theme
       link(rel="stylesheet", href=`/${theme}.css`)
     script(src="/vendor/dash.all.min.js" defer)
+    script(src="/comments.js" defer)
     script.
       //- Initialize DASH before interaction so Reddit's separate audio and
       //- video streams are attached before a mobile browser enters native

@@ -35,6 +35,12 @@ Atom feeds, self-text decoding, post rendering, and the app icons. API
 integration tests open a temporary localhost server and use a temporary SQLite
 database. Run in an environment that permits binding a local port.
 
+With the [screenshot harness dependencies](documentation.md#regenerating-screenshots)
+installed, run `npm --prefix dev/screenshots run test:comments` to check comment
+loading in Chromium. This covers manual and automatic loading at desktop and
+phone widths across all themes, retries, and navigation without JavaScript. It
+uses a temporary database and simulated upstream responses.
+
 ## Source map
 
 | Path | Responsibility |
