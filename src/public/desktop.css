@@ -578,7 +578,8 @@ main#content > .side {
   color: var(--o-muted);
 }
 
-/* The logo, old reddit's 40px-tall header image. */
+/* The logo, old reddit's 40px-tall header image. It sits low enough for
+   the wordmark to share a baseline with the page name and tabs. */
 .brand,
 .brand:visited,
 .brand:hover {
@@ -587,7 +588,7 @@ main#content > .side {
   align-items: center;
   gap: 0.5rem;
   height: 4rem;
-  margin: 0 1.2rem 0.3rem 0.4rem;
+  margin: 0.7rem 1.2rem -0.4rem 0.4rem;
   color: var(--o-logo);
   text-decoration: none;
 }
@@ -2173,7 +2174,7 @@ main#content > .hero .search-bar {
   align-items: stretch;
 }
 
-main#content > .hero form > button[type="submit"] {
+main#content > .hero form:not(.search-bar) > button[type="submit"] {
   align-self: flex-start;
 }
 
@@ -2238,8 +2239,10 @@ form input[type="submit"],
   flex: 1;
 }
 
+/* The input's vertical margin, so the button matches its height. */
 .search-button {
   flex: none;
+  margin: 0.4rem 0;
 }
 
 .search-results {
