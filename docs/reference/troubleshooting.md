@@ -58,6 +58,12 @@ Check whether the same community or post is available on Reddit. Review the
 upstream request logs. If you saved a Reddit credential, it may have expired;
 replace it or clear it from the dashboard and retry.
 
+When a failed feed has no authentication available, use **Add Reddit
+authentication** on the landing page to open the dashboard's Reddit settings.
+Save a cookie or bearer token from a signed-in burner account. A user can also
+share their cookie with other users on the instance who have no credential;
+see [preferences and credentials](../usage/preferences.md#reddit-credentials).
+
 The app's browser limit defaults to 100 requests per 15 minutes; the API
 defaults to 600. These are separate from upstream rate limits. Slower polling
 can help. A higher local limit does not remove an upstream restriction.

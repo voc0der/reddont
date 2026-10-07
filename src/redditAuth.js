@@ -263,6 +263,40 @@ function getRedditAuthHeaders(value) {
 	return normalizeStoredRedditAuthHeaders(value);
 }
 
+function readUserRedditAuthHeaders(user) {
+	try {
+		return getRedditAuthHeaders(user.redditAuthHeaders);
+	} catch {
+		require("./logger").warn("Ignoring invalid stored Reddit credential", {
+			userId: user.id,
+		});
+		return null;
+	}
+}
+
+function getRedditRequestOptions(user) {
+	// Only authenticated instance users may borrow an explicitly shared cookie.
+	if (!user?.id) return {};
+	if (user.redditAuthHeaders) {
+		const authHeaders = readUserRedditAuthHeaders(user);
+		return authHeaders ? { authHeaders } : {};
+	}
+
+	// A stable order keeps requests on the same account while it is shared.
+	const sharedUsers = require("./db").db
+		.query(
+			"SELECT id, redditAuthHeaders FROM users WHERE shareRedditCookie = 1 AND redditAuthHeaders IS NOT NULL ORDER BY id",
+		)
+		.all();
+	for (const sharedUser of sharedUsers) {
+		const headers = readUserRedditAuthHeaders(sharedUser);
+		if (headers?.cookie) {
+			return { authHeaders: { cookie: headers.cookie } };
+		}
+	}
+	return {};
+}
+
 function describeRedditAuthHeaders(value) {
 	const headers = normalizeStoredRedditAuthHeaders(value);
 	if (!headers) return "not configured";
@@ -296,6 +330,7 @@ module.exports = {
 	describeRedditAuthHeaders,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
+	getRedditRequestOptions,
 	normalizeRedditAuthInput,
 	serializeRedditAuthHeaders,
 };

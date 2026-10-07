@@ -192,6 +192,14 @@ html
                     const response = await fetch(`/api/r/${encodeURIComponent(feed.subreddit)}/posts?${params}`);
                     const data = await response.json();
 
+                    if (data.error) {
+                      if (data.html) postsContainer.insertAdjacentHTML('beforeend', data.html);
+                      afterCursor = null;
+                      observer.disconnect();
+                      sentinel.remove();
+                      return;
+                    }
+
                     if (data.html) {
                       // Add divider before new content
                       const divider = document.createElement('div');

@@ -9,7 +9,7 @@ const {
 	requireApiAccess,
 	requireApiKey,
 } = require("../apiAuth");
-const { getRedditAuthHeaders } = require("../redditAuth");
+const { getRedditRequestOptions } = require("../redditAuth");
 const { unescapeSelfText } = require("../utils/redditHtml");
 const {
 	buildCommentsFeed,
@@ -117,19 +117,6 @@ function listingOptions(query = {}) {
 	}
 
 	return options;
-}
-
-function getRedditRequestOptions(req) {
-	try {
-		const authHeaders = getRedditAuthHeaders(req.user?.redditAuthHeaders);
-		return authHeaders ? { authHeaders } : {};
-	} catch (err) {
-		logger.warn("Ignoring invalid stored Reddit credential", {
-			userId: req.user?.id,
-			error: err?.message || String(err),
-		});
-		return {};
-	}
 }
 
 // The self link is stored by feed readers, so never echo the key back into it.
@@ -261,7 +248,7 @@ function getSubscribedMulti(userId) {
 
 async function respondWithSubmissions(req, res, format, { subreddit, sort }) {
 	const options = listingOptions(req.query);
-	const requestOptions = getRedditRequestOptions(req);
+	const requestOptions = getRedditRequestOptions(req.user);
 
 	const needsAbout = format === "rss" && !subreddit.includes("+");
 	const [listing, about] = await Promise.all([
@@ -343,7 +330,7 @@ registerFormats("/comments/:id", async (req, res, format) => {
 	const response = await G.getSubmissionComments(
 		id,
 		{ limit: options.limit ?? DEFAULT_LIMIT },
-		getRedditRequestOptions(req),
+		getRedditRequestOptions(req.user),
 	);
 
 	if (!response?.submission) return upstreamFailure(res);
@@ -397,7 +384,7 @@ registerFormats("/search", async (req, res, format) => {
 		options.type = "link";
 	}
 
-	const requestOptions = getRedditRequestOptions(req);
+	const requestOptions = getRedditRequestOptions(req.user);
 	const results = subreddit
 		? await G.searchAll(q.trim(), subreddit, options, requestOptions)
 		: await G.searchSubmissions(q.trim(), options, requestOptions);
@@ -439,7 +426,7 @@ async function respondWithAbout(req, res) {
 	}
 
 	try {
-		const about = await G.getSubreddit(subreddit, getRedditRequestOptions(req));
+		const about = await G.getSubreddit(subreddit, getRedditRequestOptions(req.user));
 		if (!about) return upstreamFailure(res);
 
 		if (wantsRaw(req)) return res.json(about);

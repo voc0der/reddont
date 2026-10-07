@@ -32,6 +32,7 @@ const {
 const {
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
+	getRedditRequestOptions,
 	normalizeRedditAuthInput,
 	serializeRedditAuthHeaders,
 } = require("../redditAuth");
@@ -243,17 +244,17 @@ const commonRenderOptions = {
 	theme: process.env.REDDONT_THEME,
 };
 
-function getRedditRequestOptions(req) {
-	try {
-		const authHeaders = getRedditAuthHeaders(req.user?.redditAuthHeaders);
-		return authHeaders ? { authHeaders } : {};
-	} catch (err) {
-		logger.warn("Ignoring invalid stored Reddit credential", {
-			userId: req.user?.id,
-			error: err?.message || String(err),
-		});
-		return {};
-	}
+function feedErrorOptions(req, redditRequestOptions, fragment = false) {
+	return {
+		missingRedditAuth: !redditRequestOptions.authHeaders,
+		retryUrl: fragment
+			? getSafeRedirectTarget(req.query.currentUrl)
+			: getSafeRedirectTarget(req.originalUrl),
+		fragment,
+		user: req.user,
+		query: req.query,
+		...commonRenderOptions,
+	};
 }
 
 // Listing requests ask reddit to inline each post's subreddit (sr_detail) so
@@ -318,7 +319,7 @@ router.get("/", authenticateToken, async (req, res) => {
 	const isMulti = true;
 	const isHomePage = true; // Flag to indicate this is the home page
 
-	const redditRequestOptions = getRedditRequestOptions(req);
+	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const postsReq = G.getSubmissions(
 		query.sort,
 		subreddit,
@@ -327,6 +328,11 @@ router.get("/", authenticateToken, async (req, res) => {
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
 	const [posts, about] = await Promise.all([postsReq, aboutReq]);
+	if (!Array.isArray(posts?.posts)) {
+		return res
+			.status(502)
+			.render("feed-error", feedErrorOptions(req, redditRequestOptions));
+	}
 
 	if (posts?.posts) {
 		posts.posts.forEach(unescapeSelfText);
@@ -372,7 +378,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 				.get({ id: req.user.id, subreddit }) !== null;
 	}
 
-	const redditRequestOptions = getRedditRequestOptions(req);
+	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const postsReq = G.getSubmissions(
 		query.sort,
 		subreddit,
@@ -381,6 +387,11 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
 	const [posts, about] = await Promise.all([postsReq, aboutReq]);
+	if (!Array.isArray(posts?.posts)) {
+		return res
+			.status(502)
+			.render("feed-error", feedErrorOptions(req, redditRequestOptions));
+	}
 
 	if (posts?.posts) {
 		posts.posts.forEach(unescapeSelfText);
@@ -427,12 +438,26 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 		}
 	}
 
+	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const posts = await G.getSubmissions(
 		query.sort,
 		subreddit,
 		withSubredditDetail(query),
-		getRedditRequestOptions(req),
+		redditRequestOptions,
 	);
+	if (!Array.isArray(posts?.posts)) {
+		return res.render(
+			"feed-error",
+			feedErrorOptions(req, redditRequestOptions, true),
+			(err, html) => {
+				if (err) {
+					logger.error("Failed to render feed error", err);
+					return res.status(500).json({ error: "render_error" });
+				}
+				return res.status(502).json({ error: "upstream_error", html, after: null });
+			},
+		);
+	}
 
 	if (posts?.posts) {
 		posts.posts.forEach(unescapeSelfText);
@@ -480,7 +505,7 @@ router.get("/comments/:id", authenticateToken, async (req, res) => {
 	const response = await G.getSubmissionComments(
 		id,
 		params,
-		getRedditRequestOptions(req),
+		getRedditRequestOptions(req.user),
 	);
 	const data = unescape_submission(response);
 	const isSubbed = getSubscribedSubs(req.user.id).includes(
@@ -515,7 +540,7 @@ router.post("/comments/:id/more", authenticateToken, async (req, res) => {
 		id,
 		children.slice(0, MORE_COMMENTS_LIMIT),
 		sort,
-		getRedditRequestOptions(req),
+		getRedditRequestOptions(req.user),
 	);
 	if (!things) return res.status(502).send("Unable to load comments. Please try again.");
 	const comments = expandMoreComments(things, {
@@ -560,7 +585,7 @@ router.get(
 			parent_id,
 			child_id,
 			params,
-			getRedditRequestOptions(req),
+			getRedditRequestOptions(req.user),
 		);
 		const comments = response.comments;
 		comments.forEach(unescape_comment);
@@ -608,7 +633,7 @@ router.get("/sub-search", authenticateToken, async (req, res) => {
 		const { items, after } = await G.searchSubreddits(
 			req.query.q,
 			{},
-			getRedditRequestOptions(req),
+			getRedditRequestOptions(req.user),
 		);
 		const subs = db
 			.query("SELECT subreddit FROM subscriptions WHERE user_id = $id")
@@ -646,7 +671,7 @@ router.get("/post-search", authenticateToken, async (req, res) => {
 		return res.render("post-search", page);
 	}
 
-	const requestOptions = getRedditRequestOptions(req);
+	const requestOptions = getRedditRequestOptions(req.user);
 	const options = { sr_detail: true, ...searchRequestOptions(search) };
 	// Like old reddit, the first page of a site-wide search also lists the
 	// subreddits that match.
@@ -727,6 +752,9 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		isAdmin,
 		user: req.user,
 		redditAuthStatus,
+		usingSharedRedditCookie:
+			!req.user.redditAuthHeaders &&
+			Boolean(getRedditRequestOptions(req.user).authHeaders),
 		apiKey: req.user.apiKey || null,
 		apiWhitelist: describeApiWhitelist(),
 		message: req.query.message,
@@ -768,6 +796,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		redditAuthCredential,
 		redditAuthType,
 		clearRedditAuth,
+		shareRedditCookie,
 	} = req.body;
 	const infiniteScrollValue = infiniteScroll === "1" ? 1 : 0;
 	const useClassicLayoutValue = useClassicLayout === "1" ? 1 : 0;
@@ -778,6 +807,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		typeof redditAuthCredential === "string" &&
 		redditAuthCredential.trim().length > 0;
 	let redditAuthHeadersUpdate;
+	let shareRedditCookieValue = 0;
 
 	try {
 		if (clearRedditAuth === "1") {
@@ -786,6 +816,14 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			redditAuthHeadersUpdate = serializeRedditAuthHeaders(
 				normalizeRedditAuthInput(redditAuthCredential, redditAuthType),
 			);
+		}
+		if (shareRedditCookie === "1" && clearRedditAuth !== "1") {
+			const headers = getRedditAuthHeaders(
+				redditAuthHeadersUpdate !== undefined
+					? redditAuthHeadersUpdate
+					: req.user.redditAuthHeaders,
+			);
+			shareRedditCookieValue = headers?.cookie ? 1 : 0;
 		}
 	} catch (err) {
 		logger.warn("Rejected invalid Reddit credential input", {
@@ -824,6 +862,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			themePreference: themeValue,
 			highResThumbnails: highResThumbnailsValue,
 			showNsfwThumbnails: showNsfwThumbnailsValue,
+			shareRedditCookie: shareRedditCookieValue,
 			id: req.user.id,
 		};
 
@@ -833,7 +872,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 
 		const result = db
 			.query(
-				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails${redditAuthSql} WHERE id = $id`,
+				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, shareRedditCookie = $shareRedditCookie${redditAuthSql} WHERE id = $id`,
 			)
 			.run(updateParams);
 
