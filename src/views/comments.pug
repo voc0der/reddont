@@ -193,7 +193,7 @@ html
           }
 
       aside.side.d-only
-        +searchBox()
+        +searchBox(post.subreddit)
         div.linkinfo
           p.date this post was submitted on #{fmtDate(post.created)}
           p.score

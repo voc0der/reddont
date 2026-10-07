@@ -1,5 +1,6 @@
 include ../mixins/header
 include ../mixins/head
+include ../mixins/search
 
 - var viewQuery = query && query.view ? query.view : 'compact'
 - var sortQuery = query && query.sort ? query.sort + (query.t ? '&t=' + query.t : '') : 'hot'
@@ -24,12 +25,12 @@ html
 
         h1 search posts
 
-        form(action="/post-search" method="get").search-bar
-          - var prefill = original_query ?? "";
-          input(type="text" name="q" placeholder="type in a search term..." value=prefill required).search-input
-          input(type="hidden" name="sort" value=sortQuery)
+        form.search-form(action="/post-search" method="get" role="search")
+          div.search-bar
+            input(type="text" name="q" placeholder="type in a search term..." required).search-input
+            button(type="submit").search-button go
           input(type="hidden" name="view" value=viewQuery)
-          button(type="submit").search-button go
+          +searchOptions(search, null)
         p
           | you can narrow search results using filters:
           br

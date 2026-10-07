@@ -20,6 +20,11 @@ const logger = require("../logger");
 const oidc = require("../oidc");
 const { unescapeSelfText } = require("../utils/redditHtml");
 const {
+	parseSearchQuery,
+	searchHref,
+	searchRequestOptions,
+} = require("../utils/redditSearch");
+const {
 	MORE_COMMENTS_LIMIT,
 	commentSort,
 	expandMoreComments,
@@ -588,6 +593,7 @@ router.get("/subs", authenticateToken, async (req, res) => {
 // GET /search
 router.get("/search", authenticateToken, async (req, res) => {
 	res.render("search", {
+		search: parseSearchQuery(req.query),
 		user: req.user,
 		query: req.query,
 		...commonRenderOptions,
@@ -627,35 +633,50 @@ router.get("/sub-search", authenticateToken, async (req, res) => {
 
 // GET /post-search
 router.get("/post-search", authenticateToken, async (req, res) => {
-	if (!req.query || !req.query.q) {
-		res.render("post-search", { user: req.user, ...commonRenderOptions });
-	} else {
-		const { items, after } = await G.searchSubmissions(
-			req.query.q,
-			{ sr_detail: true },
-			getRedditRequestOptions(req),
-		);
-		const message =
-			items.length === 0
-				? "no results found"
-				: `showing ${items.length} results`;
-
-		if (items) {
-			items.forEach(unescapeSelfText);
-		}
-
-		res.render("post-search", {
-			items,
-			after,
-			message,
-			subscribedSubs: getSubscribedSubs(req.user.id),
-			user: req.user,
-			original_query: req.query.q,
-			currentUrl: req.url,
-			query: req.query,
-			...commonRenderOptions,
-		});
+	const search = parseSearchQuery(req.query);
+	const view = req.query.view === "card" ? "card" : "compact";
+	const page = {
+		search,
+		searchHref: (changes) => searchHref(search, changes, view),
+		user: req.user,
+		query: req.query,
+		...commonRenderOptions,
+	};
+	if (!search.q) {
+		return res.render("post-search", page);
 	}
+
+	const requestOptions = getRedditRequestOptions(req);
+	const options = { sr_detail: true, ...searchRequestOptions(search) };
+	// Like old reddit, the first page of a site-wide search also lists the
+	// subreddits that match.
+	const [results, communities] = await Promise.all([
+		search.restrict
+			? G.searchAll(search.q, search.subreddit, options, requestOptions)
+			: G.searchSubmissions(search.q, options, requestOptions),
+		search.restrict || search.after
+			? null
+			: G.searchSubreddits(
+					search.q,
+					{ limit: 3, include_over_18: search.nsfw },
+					requestOptions,
+				),
+	]);
+	const items = results?.items || [];
+	items.forEach(unescapeSelfText);
+	let message = `showing ${items.length} results`;
+	if (!results) message = "search failed, try again later";
+	else if (items.length === 0) message = "no results found";
+
+	res.render("post-search", {
+		...page,
+		items,
+		after: results?.after,
+		communities: communities?.items || [],
+		message,
+		subscribedSubs: getSubscribedSubs(req.user.id),
+		currentUrl: req.url,
+	});
 });
 
 // GET /dashboard

@@ -2023,6 +2023,144 @@ details.link-details,
   max-width: none;
 }
 
+/* Post search: options under the bar, matching subreddits, and the
+   results' sort and time menus. */
+.search-options {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--r-text);
+  font-size: 14px;
+}
+
+.search-options label {
+  display: inline-flex;
+  flex-basis: auto;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  margin: 0;
+}
+
+.search-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.search-selects select {
+  padding: 6px 12px;
+}
+
+.search-communities {
+  margin-top: 20px;
+}
+
+.search-community {
+  padding: 12px 0;
+  border-top: 1px solid var(--r-border-weak);
+}
+
+.search-community-name {
+  margin: 0;
+  font-size: 16px;
+}
+
+.search-community-name a,
+.search-community-name a:visited {
+  color: var(--r-text-strong);
+  text-decoration: none;
+}
+
+.search-community-meta,
+.search-more {
+  margin: 4px 0;
+  color: var(--r-text-weak);
+  font-size: 12px;
+}
+
+.search-community-meta .subscribe-button {
+  margin-right: 8px;
+  padding: 4px 12px;
+  background: var(--r-join-bg);
+  color: var(--r-join-text);
+  font-size: 12px;
+}
+
+.search-community-meta .subscribe-button.is-joined {
+  background: var(--r-pill);
+  color: var(--r-pill-text);
+}
+
+.search-community-description {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.search-within {
+  font-size: 14px;
+}
+
+.search-menus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  color: var(--r-text-weak);
+  font-size: 14px;
+}
+
+.search-menus h2 {
+  margin: 0 auto 0 0;
+  color: var(--r-text-strong);
+  font-size: 16px;
+}
+
+.search-menus .dropdown {
+  position: relative;
+}
+
+.search-menus summary {
+  color: var(--r-text-strong);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.search-menus summary::-webkit-details-marker {
+  display: none;
+}
+
+.search-menus summary::after {
+  content: " \25BE";
+}
+
+.search-menus .drop-choices {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 160px;
+  padding: 8px 0;
+  border-radius: 8px;
+  background: var(--r-menu-bg);
+  box-shadow: var(--r-menu-shadow);
+}
+
+.search-menus .choice,
+.search-menus .choice:visited {
+  padding: 10px 16px;
+  color: var(--r-text-strong);
+  text-decoration: none;
+}
+
+.search-menus .choice.selected {
+  font-weight: 700;
+}
+
 input[type="text"],
 input[type="password"],
 input[type="email"],

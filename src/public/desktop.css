@@ -1961,6 +1961,24 @@ main#content > .comments-container > a {
   height: 1.6rem;
 }
 
+/* old reddit's search options open under the box while it has focus. */
+.search-expando {
+  display: none;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--o-input-border);
+  border-top: 0;
+  background: var(--o-box-bg);
+}
+
+.search-box:focus-within .search-expando {
+  display: block;
+}
+
+.search-advanced {
+  margin: 0.8rem 0 0;
+  color: var(--o-muted);
+}
+
 .morelink,
 .morelink:visited {
   display: block;
@@ -2248,6 +2266,77 @@ form input[type="submit"],
 .search-results {
   gap: 1.2rem;
   margin-top: 1rem;
+}
+
+/* A post search's checkboxes, then its sort and time selects. */
+.search-options {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0;
+  color: var(--o-text);
+  font-size: 1.2rem;
+}
+
+.search-options label {
+  display: inline-flex;
+  flex-basis: auto;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  margin: 0;
+}
+
+.search-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+}
+
+.search-options select {
+  margin: 0;
+  padding: 0.1rem 0.3rem;
+  font-size: 1.2rem;
+}
+
+/* Subreddits matching a search, listed above its posts. */
+.search-community {
+  margin: 0 0 1.2rem;
+}
+
+main#content > .hero .search-community-name {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: normal;
+}
+
+.search-community-meta,
+.search-more {
+  margin: 0.2rem 0;
+  color: var(--o-muted);
+  font-size: 1.1rem;
+}
+
+.search-community-meta .subscribe-button {
+  margin: 0 0.6rem 0 0;
+}
+
+.search-community-description {
+  margin: 0.2rem 0;
+}
+
+/* The results' "sorted by" and "links from" menus, after a "posts" title. */
+main#content > .hero .search-menus {
+  margin: 2rem 0 1rem;
+  padding: 0 0 0.3rem;
+}
+
+main#content > .hero .search-menus h2 {
+  margin: 0 auto 0 0;
+  padding: 0;
+  border: 0;
+  color: var(--o-muted);
+  font-size: 1.6rem;
 }
 
 main#content > .hero .sub-title {

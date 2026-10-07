@@ -229,7 +229,7 @@ html
             })();
 
       aside.side.d-only
-        +searchBox()
+        +searchBox(isHomePage || isMulti || ['all', 'popular'].includes(String(subreddit).toLowerCase()) ? null : communityName)
         if hasCommunityHeader
           +titlebox(about, subreddit, isSubbed, about.description_html)
         else

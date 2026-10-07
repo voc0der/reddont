@@ -1,4 +1,5 @@
 include icons
+include search
 
 //- Building blocks of the old reddit desktop layout. They render on every
 //- page but stay hidden (.d-only) on phones, where mobile.css applies.
@@ -30,12 +31,21 @@ mixin midcol(score, hidden)
       span.score #{hidden ? '•' : fmtscore(score)}
     span.arrow.down
 
-mixin searchBox()
+//- old reddit's sidebar search. Its options open while the box has focus;
+//- on a community's pages the search starts limited to that subreddit.
+mixin searchBox(subreddit)
+  - var boxView = query && query.view ? query.view : 'compact'
   form.search-box(action="/post-search" method="get" role="search")
     input(type="search" name="q" placeholder="search" aria-label="Search posts" autocomplete="off")
-    input(type="hidden" name="view" value=(query && query.view ? query.view : 'compact'))
+    input(type="hidden" name="view" value=boxView)
     button(type="submit" aria-label="Search")
       +icon("search")
+    div.search-expando
+      +searchOptions({ sort: 'relevance', t: 'all', restrict: Boolean(subreddit), nsfw: false }, subreddit)
+      p.search-advanced
+        | advanced search:
+        |
+        a(href=`/search?view=${boxView}`) by author, subreddit...
 
 //- old reddit's join/leave toggle, wired to the same toggleJoin() as the
 //- mobile Join button.

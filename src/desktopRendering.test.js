@@ -179,3 +179,19 @@ describe("feed paging", () => {
 		expect(html).toContain('data-sort="hot\';alert(1)//"');
 	});
 });
+
+describe("sidebar search", () => {
+	test("start limited to the community on its pages", () => {
+		const html = renderFeed({ sort: "hot" }, "/r/test");
+		expect(html).toContain("limit my search to r/test");
+		expect(html).toContain('name="restrict_sr" value="on" checked');
+		expect(html).toContain('<input type="hidden" name="sr" value="test"/>');
+		expect(html).toContain('<select name="sort">');
+	});
+
+	test("search everything from home", () => {
+		const html = renderFeed({ sort: "hot" }, "/", { isHomePage: true });
+		expect(html).not.toContain('name="restrict_sr"');
+		expect(html).toContain('name="include_over_18" value="on"');
+	});
+});
