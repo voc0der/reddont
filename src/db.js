@@ -127,6 +127,13 @@ runMigration("add-reddit-auth-headers-column", () => {
   `).run();
 });
 
+runMigration("add-share-reddit-cookie-column", () => {
+	db.query(`
+    ALTER TABLE users
+    ADD COLUMN shareRedditCookie INTEGER NOT NULL DEFAULT 0
+  `).run();
+});
+
 runMigration("add-oidc-support", () => {
 	// Core OIDC fields
 	db.query(`

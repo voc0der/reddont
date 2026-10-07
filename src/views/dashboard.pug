@@ -41,10 +41,14 @@ html
               option(value="dark" selected=(user.themePreference === 'dark')) Dark
               option(value="res" selected=(user.themePreference === 'res')) RES Night Mode
 
-          fieldset.dashboard-fieldset
+          fieldset#reddit-authentication.dashboard-fieldset
             legend reddit authentication - burner account only
             p.dashboard-help
+              | If Reddit blocks your feed, add a cookie or bearer token from a signed-in burner account and save your preferences. Leave the credential field blank to keep your saved authentication.
+            p.dashboard-help
               | Current: #{redditAuthStatus.description}
+            if usingSharedRedditCookie
+              p.dashboard-help A shared cookie is being used for your requests. Add your own credential to use it instead.
 
             label(for="reddit-auth-type") Credential Type
             select(id="reddit-auth-type" name="redditAuthType")
@@ -55,6 +59,13 @@ html
 
             label(for="reddit-auth-credential") Reddit Credential
             textarea#reddit-auth-credential.dashboard-textarea(name="redditAuthCredential" rows="6" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Cookie: reddit_session=...; token_v2=...\nAuthorization: Bearer ...")
+
+            div
+              label(for="share-reddit-cookie")
+                input(type="checkbox" id="share-reddit-cookie" name="shareRedditCookie" value="1" checked=(user.shareRedditCookie === 1) aria-describedby="share-reddit-cookie-help")
+                | &nbsp;Allow other users on this instance to fall back to my Reddit cookie
+              p#share-reddit-cookie-help.dashboard-help
+                | Users without their own Reddit authentication will make requests using your account. Only cookies are shared; the saved value stays hidden. Uncheck this option or clear your credential to stop sharing.
 
             if redditAuthStatus.configured
               label(for="clear-reddit-auth")

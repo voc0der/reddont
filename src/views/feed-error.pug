@@ -1,0 +1,25 @@
+include ../mixins/header
+include ../mixins/head
+
+mixin feedError
+  section.feed-error(role="status" aria-labelledby="feed-error-title")
+    h1#feed-error-title Feed unavailable
+    if missingRedditAuth
+      p Reddit couldn't load this feed, and no Reddit authentication is available for your account. Add a cookie or bearer token from a signed-in burner account in Settings, then try again.
+      a.feed-error-settings(href="/dashboard#reddit-authentication") Add Reddit authentication
+    else
+      p Reddit couldn't load this feed. Try again in a moment. If the problem continues, check your Reddit authentication in Settings.
+      a.feed-error-settings(href="/dashboard#reddit-authentication") Check Reddit authentication
+    a(href=retryUrl) Try again
+
+if fragment
+  +feedError
+else
+  doctype html
+  html
+    +head("feed unavailable")
+    body(data-theme=user.themePreference)
+      main#content
+        +header(user)
+        div.hero
+          +feedError

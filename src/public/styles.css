@@ -791,6 +791,21 @@ form input[type="submit"]:hover {
   font-family: monospace;
 }
 
+.feed-error {
+  max-width: 60rem;
+  padding: 20px 0;
+  line-height: 1.5;
+}
+
+.feed-error p {
+  margin: 12px 0 20px;
+}
+
+.feed-error a {
+  display: inline-block;
+  margin: 0 20px 12px 0;
+}
+
 .api-key-input {
   width: 100%;
   box-sizing: border-box;

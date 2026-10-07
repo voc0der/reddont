@@ -2,7 +2,9 @@
 
 The read-only API lives at `/api/v1`. It uses a personal API key instead of a
 browser login cookie, and reads upstream content using the key owner's
-[saved Reddit credential](../usage/preferences.md#reddit-credentials).
+[saved Reddit credential](../usage/preferences.md#reddit-credentials). If the
+key owner has no credential, it uses an explicitly shared instance cookie when
+available, or requests content anonymously.
 
 ## Get a key
 
