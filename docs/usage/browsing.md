@@ -66,7 +66,17 @@ thumbnails while keeping the rest of your preferences. See
 
 ## Search and paging
 
-Use **search** to find communities or posts. Feeds normally offer pagination;
+Use **search** to find communities or posts. A post search can be sorted by
+relevance, new, hot, top, or comments, narrowed to a time range, and set to
+include NSFW results. On desktop, the sidebar's search box shows these
+options when you click into it, and on a community's pages it starts limited
+to that subreddit.
+
+Results list matching subreddits above the posts, each with a join button and
+a link to search within it. The **sorted by** and **links from** menus above
+the posts change the sort or time range of the current search.
+
+Feeds normally offer pagination;
 the dashboard's **Never Ending Reddit** preference loads more posts and
 comments while you scroll instead.
 

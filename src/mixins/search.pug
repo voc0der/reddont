@@ -1,0 +1,50 @@
+//- Post search options, shared by the search page, the desktop sidebar's
+//- search box, and the results page. Forms and result menus label the time
+//- ranges differently, as old reddit's do.
+-
+  var searchSorts = ['relevance', 'new', 'hot', 'top', 'comments']
+  var searchFormTimes = [['all', 'all time'], ['hour', 'this hour'], ['day', 'today'], ['week', 'this week'], ['month', 'this month'], ['year', 'this year']]
+  var searchMenuTimes = [['hour', 'past hour'], ['day', 'past 24 hours'], ['week', 'past week'], ['month', 'past month'], ['year', 'past year'], ['all', 'all time']]
+
+//- A search form's checkboxes and selects. With subreddit, the search can be
+//- limited to that community.
+mixin searchOptions(search, subreddit)
+  div.search-options
+    if subreddit
+      label
+        input(type="checkbox" name="restrict_sr" value="on" checked=search.restrict)
+        |  limit my search to r/#{subreddit}
+      input(type="hidden" name="sr" value=subreddit)
+    label
+      input(type="checkbox" name="include_over_18" value="on" checked=search.nsfw)
+      |  include NSFW results
+    div.search-selects
+      label
+        | Sort:
+        select(name="sort")
+          each sort in searchSorts
+            option(value=sort selected=(sort === search.sort)) #{sort}
+      label
+        | Time:
+        select(name="t")
+          each range in searchFormTimes
+            option(value=range[0] selected=(range[0] === search.t)) #{range[1]}
+
+//- The results' "sorted by" and "links from" menus. searchHref, from the
+//- route, links to the same search with one option changed.
+mixin searchMenus(search)
+  - var timeLabel = (searchMenuTimes.find((range) => range[0] === search.t) || searchMenuTimes[5])[1]
+  div.menuarea.search-menus
+    h2 posts
+    span.dropdown-title sorted by:
+    details.dropdown.lightdrop
+      summary #{search.sort}
+      div.drop-choices
+        each sort in searchSorts
+          a.choice(href=searchHref({ sort: sort }) class=(sort === search.sort ? 'selected' : false)) #{sort}
+    span.dropdown-title links from:
+    details.dropdown.lightdrop
+      summary #{timeLabel}
+      div.drop-choices
+        each range in searchMenuTimes
+          a.choice(href=searchHref({ t: range[0] }) class=(range[0] === search.t ? 'selected' : false)) #{range[1]}

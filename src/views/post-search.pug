@@ -2,8 +2,7 @@ include ../mixins/post
 include ../mixins/header
 include ../mixins/head
 
-- var viewQuery = query && query.view ? query.view : 'compact'
-- var sortQuery = query && query.sort ? query.sort + (query.t ? '&t=' + query.t : '') : 'hot'
+- var viewQuery = query && query.view === 'card' ? 'card' : 'compact'
 doctype html
 html
   +head("search posts")
@@ -13,16 +12,48 @@ html
       +header(user, { name: 'search', href: '/search', current: 'search' })
       div.hero
         h1 search posts
-        form(action="/post-search" method="get").search-bar
-          - var prefill = original_query ?? "";
-          input(type="text" name="q" placeholder="type in a search term..." value=prefill required).search-input
-          input(type="hidden" name="sort" value=sortQuery)
+        form.search-form(action="/post-search" method="get" role="search")
+          div.search-bar
+            input(type="text" name="q" placeholder="type in a search term..." value=search.q required).search-input
+            button(type="submit").search-button go
           input(type="hidden" name="view" value=viewQuery)
-          button(type="submit").search-button go
+          +searchOptions(search, search.subreddit)
+        //- old reddit lists matching subreddits above a site-wide search.
+        if communities && communities.length
+          section.search-communities(aria-label="Matching subreddits")
+            h2 subreddits
+            each child in communities
+              - var sr = child.data
+              div.search-community
+                h3.search-community-name
+                  a(href=`/r/${sr.display_name}?view=${viewQuery}`) #{sr.display_name}
+                p.search-community-meta
+                  +subscribeButton(sr.display_name, subscribedSubs.includes(sr.display_name.toLowerCase()))
+                  | r/#{sr.display_name}
+                  if sr.subscribers !== undefined
+                    |  · #{fmtint(sr.subscribers)} readers
+                  if sr.created_utc
+                    |  · a community for #{timeSpan(Date.now() / 1000 - sr.created_utc) || 'less than a day'}
+                if sr.public_description
+                  p.search-community-description #{sr.public_description}
+                a.search-within(href=searchHref({ subreddit: sr.display_name, restrict: true })) search within r/#{sr.display_name}
+            p.search-more
+              | view more:
+              |
+              a(href=`/sub-search?q=${encodeURIComponent(search.q)}&view=${viewQuery}`) next ›
+        if search.q
+          +searchMenus(search)
         if message
           div.search-message
             i #{message}
-      if items
+      if items && items.length
         div#posts-container
           each item in items
             +post(item.data, currentUrl)
+        if after
+          div.footer
+            div.footer-item
+              span.d-only view more:
+              a(href=searchHref({ after: after, count: search.count + items.length }))
+                span.m-only next ⟶
+                span.d-only next ›

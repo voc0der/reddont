@@ -302,7 +302,7 @@ mixin head(title)
       //- Menus are <details>; close them on outside clicks like reddit's.
       document.addEventListener('click', function (event) {
         var menus = window.matchMedia('(max-width: 767px)').matches
-          ? 'details.m-overflow[open], details.sort-details[open], details.view-details[open]'
+          ? 'details.m-overflow[open], details.sort-details[open], details.view-details[open], details.dropdown[open]'
           : 'details.dropdown[open]';
         document.querySelectorAll(menus).forEach(function (menu) {
           if (!menu.contains(event.target)) menu.open = false;
