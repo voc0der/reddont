@@ -1,6 +1,11 @@
 const crypto = require('node:crypto');
-const { db } = require('./db');
 const logger = require('./logger');
+
+// Loaded lazily so that importing the OIDC helpers does not open the sqlite
+// database as a side effect.
+function getDb() {
+  return require('./db').db;
+}
 
 let _config = null; // OIDC server configuration
 let _enabled = false;
@@ -395,7 +400,7 @@ function computeExpiresAtSeconds(tokenSet) {
 async function refreshAccessToken(userId) {
   if (!isOIDCEnabled()) return false;
 
-  const user = db.query('SELECT id, oidc_refresh_token FROM users WHERE id = $id').get({ id: userId });
+  const user = getDb().query('SELECT id, oidc_refresh_token FROM users WHERE id = $id').get({ id: userId });
   if (!user || !user.oidc_refresh_token) return false;
 
   const refreshToken = decryptRefreshToken(user.oidc_refresh_token);
@@ -423,7 +428,7 @@ async function refreshAccessToken(userId) {
   const enc = encryptRefreshToken(newRefresh);
   const expiresAt = computeExpiresAtSeconds(tokenSet);
 
-  db.query(
+  getDb().query(
     'UPDATE users SET oidc_refresh_token = $rt, oidc_token_expires_at = $exp WHERE id = $id'
   ).run({
     rt: enc,
