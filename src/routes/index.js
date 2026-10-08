@@ -19,6 +19,7 @@ const { validateInviteToken } = require("../invite");
 const logger = require("../logger");
 const oidc = require("../oidc");
 const { unescapeSelfText } = require("../utils/redditHtml");
+const { parseFeedQuery, recentListing } = require("../utils/redditListing");
 const {
 	parseSearchQuery,
 	searchHref,
@@ -257,10 +258,11 @@ function feedErrorOptions(req, redditRequestOptions, fragment = false) {
 	};
 }
 
-// Listing requests ask reddit to inline each post's subreddit (sr_detail) so
-// the mobile feed can show community icons without extra requests.
-function withSubredditDetail(query) {
-	return { ...query, sr_detail: true };
+function getFeedPosts(subreddit, query, requestOptions) {
+	return recentListing(
+		(options) => G.getSubmissions(query.sort, subreddit, options, requestOptions),
+		query,
+	);
 }
 
 function getSubscribedSubs(userId) {
@@ -300,13 +302,7 @@ router.get("/", authenticateToken, async (req, res) => {
 		.query("SELECT * FROM subscriptions WHERE user_id = $id")
 		.all({ id: req.user.id });
 
-	const query = req.query ? req.query : {};
-	if (!query.sort) {
-		query.sort = "hot";
-	}
-	if (!query.view) {
-		query.view = "compact";
-	}
+	const query = parseFeedQuery(req.query);
 
 	// If no subscriptions, redirect to /r/all
 	if (subs.length === 0) {
@@ -320,10 +316,9 @@ router.get("/", authenticateToken, async (req, res) => {
 	const isHomePage = true; // Flag to indicate this is the home page
 
 	const redditRequestOptions = getRedditRequestOptions(req.user);
-	const postsReq = G.getSubmissions(
-		query.sort,
+	const postsReq = getFeedPosts(
 		subreddit,
-		withSubredditDetail(query),
+		query,
 		redditRequestOptions,
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
@@ -360,13 +355,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 		return res.status(400).send("Invalid subreddit");
 	}
 	const isMulti = subreddit.includes("+");
-	const query = req.query ? req.query : {};
-	if (!query.sort) {
-		query.sort = "hot";
-	}
-	if (!query.view) {
-		query.view = "compact";
-	}
+	const query = parseFeedQuery(req.query);
 
 	let isSubbed = false;
 	if (!isMulti) {
@@ -379,10 +368,9 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 	}
 
 	const redditRequestOptions = getRedditRequestOptions(req.user);
-	const postsReq = G.getSubmissions(
-		query.sort,
+	const postsReq = getFeedPosts(
 		subreddit,
-		withSubredditDetail(query),
+		query,
 		redditRequestOptions,
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
@@ -414,13 +402,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 // API endpoint to fetch more posts for infinite scroll
 router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 	let subreddit = req.params.subreddit;
-	const query = req.query ? req.query : {};
-	if (!query.sort) {
-		query.sort = "hot";
-	}
-	if (!query.view) {
-		query.view = "compact";
-	}
+	const query = parseFeedQuery(req.query);
 
 	// Handle "home" as a special case - build multi-reddit from subscriptions
 	if (subreddit === "home") {
@@ -439,10 +421,9 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 	}
 
 	const redditRequestOptions = getRedditRequestOptions(req.user);
-	const posts = await G.getSubmissions(
-		query.sort,
+	const posts = await getFeedPosts(
 		subreddit,
-		withSubredditDetail(query),
+		query,
 		redditRequestOptions,
 	);
 	if (!Array.isArray(posts?.posts)) {
@@ -469,6 +450,7 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 			"posts-partial",
 			{
 				posts: posts ? posts.posts : [],
+				after: posts.after,
 				query,
 				subreddit: req.params.subreddit === "home" ? "home" : subreddit,
 				subscribedSubs: getSubscribedSubs(req.user.id),
@@ -487,6 +469,8 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 	res.json({
 		html,
 		after: posts ? posts.after : null,
+		empty: posts.posts.length === 0,
+		expiresAt: posts.expiresAt,
 	});
 });
 

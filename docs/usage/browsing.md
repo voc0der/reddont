@@ -18,6 +18,13 @@ Home combines your subscribed communities. If your subscription list is
 empty, it shows the all feed. Open a community directly at `/r/community`.
 Multiple communities can be combined as `/r/programming+technology`.
 
+The **hot**, **new**, **rising**, **controversial**, and **top** feeds show only
+posts submitted within the past seven days, including when paging or scrolling.
+Older pinned posts are excluded too. Each tab keeps Reddit's listing order;
+filtering does not re-rank posts by score or mix in posts from other sorts.
+Home uses Reddit's combined listing for your reddont subscriptions, so it can
+differ from the personalized home feed of a separate Reddit account.
+
 ## Follow communities
 
 Subscribe from a community page (**join** in the desktop sidebar) or open
@@ -35,7 +42,9 @@ or unsubscribe your account on Reddit.
 
 The desktop layout follows old reddit with Reddit Enhancement Suite. The tabs
 beside the logo choose the sort; for **top** and **controversial**, **links
-from** picks the time range. **show images** switches to card view, which
+from** narrows the time range to the past hour, day, or week (the default).
+Older feed links requesting a month, year, or all time use the past week.
+**show images** switches to card view, which
 opens every post's media in place, and **hide images** returns to the compact
 listing. On a phone, the same choices live in the sort and view menus above
 the feed.
@@ -79,6 +88,12 @@ the posts change the sort or time range of the current search.
 Feeds normally offer pagination;
 the dashboard's **Never Ending Reddit** preference loads more posts and
 comments while you scroll instead.
+
+When older posts are filtered out, feeds fetch ahead to fill the page while
+keeping the original order. Quiet communities may have fewer recent posts or
+an empty page; use **next** when it is available to continue. Post search and
+the JSON/RSS API retain their separate time-range controls for finding older
+content.
 
 The app is read-only. Follow the original post link if you want to vote,
 submit a post, or comment on Reddit itself.

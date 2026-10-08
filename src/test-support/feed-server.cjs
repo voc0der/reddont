@@ -9,13 +9,13 @@ const { db } = require("../db");
 db.query("INSERT INTO users (username, infiniteScroll, redditAuthHeaders) VALUES (?, 1, ?)")
 	.run("reader_scroll", JSON.stringify({ authorization: "Bearer feed-test" }));
 
-const PAGE_SIZE = 20;
-const PAGES = 5;
+const POST_COUNT = 100;
+const now = Date.now() / 1000;
 const post = (index) => ({
 	kind: "t3",
 	data: {
 		id: `p${index}`, name: `t3_p${index}`, author: `poster_${index}`, subreddit: "test",
-		title: `Post number ${index}`, created: 1780000000 - index * 60, num_comments: 2,
+		title: `Post number ${index}`, created: now - index * 60, created_utc: now - index * 60, num_comments: 2,
 		score: 100 - index, ups: 100 - index, is_self: true, domain: "self.test",
 		selftext_html: `&lt;div class="md"&gt;&lt;p&gt;Body ${index}&lt;/p&gt;&lt;/div&gt;`,
 		permalink: `/r/test/comments/p${index}/post/`,
@@ -33,12 +33,13 @@ globalThis.fetch = async (input) => {
 	}
 	if (/^\/r\/test\/[a-z]+\.json$/.test(url.pathname)) {
 		const after = url.searchParams.get("after");
-		const page = after ? Number(after.replace("t3_page", "")) : 0;
 		if (!after) firstPageLoads++;
-		const start = page * PAGE_SIZE + 1;
-		const children = Array.from({ length: PAGE_SIZE }, (_, i) => post(start + i));
-		if (!after && firstPageLoads > 1) children.unshift(post(1000 + firstPageLoads));
-		return Response.json({ kind: "Listing", data: { after: page + 1 < PAGES ? `t3_page${page + 1}` : null, children } });
+		const source = Array.from({ length: POST_COUNT }, (_, i) => post(i + 1));
+		if (!after && firstPageLoads > 1) source.unshift(post(1000 + firstPageLoads));
+		const start = after ? source.findIndex((post) => post.data.name === after) + 1 : 0;
+		const limit = Number(url.searchParams.get("limit")) || 25;
+		const children = source.slice(start, start + limit);
+		return Response.json({ kind: "Listing", data: { after: start + children.length < source.length ? children.at(-1).data.name : null, children } });
 	}
 	if (url.pathname.startsWith("/comments/")) {
 		const id = url.pathname.match(/^\/comments\/([a-z0-9]+)/)[1];

@@ -160,14 +160,37 @@ describe("desktop header", () => {
 		);
 		expect(renderComments([])).toContain('<div class="d-only" id="sr-header-area" data-subreddit="test">');
 		expect(home).toContain('<div class="d-only" id="sr-header-area">');
+		expect(home).toContain('data-subreddit="home"');
 	});
 });
 
 describe("feed paging", () => {
+	test("offers only hour, day and week feed ranges and defaults to week", () => {
+		const html = renderFeed({ sort: "top", view: "compact" }, "/r/test");
+		const menu = html.match(/<div class="menuarea d-only">[\s\S]*?<div id="posts-container"/)[0];
+		expect(menu).toContain("<summary>past week</summary>");
+		for (const range of ["hour", "day", "week"]) expect(menu).toContain(`&amp;t=${range}`);
+		for (const range of ["month", "year", "all"]) {
+			expect(menu).not.toContain(`&amp;t=${range}`);
+			expect(html).not.toContain(`top ${range}</a>`);
+		}
+		expect(html).toContain('href="/r/test?sort=controversial&amp;view=compact"');
+	});
+
+	test("keeps a manual continuation on empty filtered pages even with infinite scroll enabled", () => {
+		const html = renderFeed({ sort: "hot", t: "week", view: "compact" }, "/r/test", {
+			posts: { posts: [], after: "t3_next" },
+		});
+		expect(html).toContain("No posts from the past week on this page.");
+		expect(html).toContain('href="/r/test?sort=hot&amp;t=week&amp;view=compact&amp;after=t3_next&amp;count=0"');
+		expect(html).not.toContain('id="infinite-scroll-sentinel"');
+	});
+
 	test("carry the post count into the next page for ranks", () => {
 		const html = renderFeed({ sort: "hot", view: "compact", count: "25" }, "/r/test");
 
 		expect(html).toContain('<span class="rank d-only">26</span>');
+		expect(html).toContain('data-count="25"');
 	});
 
 	test("keep request values out of the infinite scroll script", () => {
