@@ -6,13 +6,63 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-08
+
+### Added
+
+- Post search offers old reddit's sort, time range, and NSFW options on the
+  search page, the desktop sidebar box, and the results page; on a community's
+  pages, the sidebar search starts limited to that subreddit
+- Search results list matching subreddits above the posts, with join and
+  search-within links, add sorted by and links from menus, and page forward
+  with the same options
+- A preference shares your Reddit cookie with signed-in users of the instance
+  who have no saved credential; it is off by default, personal credentials take
+  priority, and bearer tokens are never shared
+
 ### Changed
 
-- The home, all, and popular browser feeds show posts from the past week in
-  upstream order, fetching ahead to fill filtered pages; saved back-navigation
-  pages expire when a displayed post leaves the range
-- Community feeds retain older posts in all five sorts, prefer recent posts
-  within each page, and offer historical time ranges again
+- The home, all, and popular feeds show only posts from the past week in all
+  five sorts, keeping Reddit's order and fetching ahead to fill filtered pages;
+  their time ranges stop at a week, and saved back-navigation pages expire when
+  a displayed post leaves the range
+- Community feeds keep older posts but put posts from the past week first on
+  each page; top and controversial default to all time
+- Failed feeds, including infinite-scroll pages, show a recovery page that
+  explains Reddit authentication and links to its settings
+
+### Fixed
+
+- Going back to an infinitely scrolled feed after opening a post reloaded only
+  its first page whenever the browser had not kept the feed in memory, as phones
+  often do, so you lost your place; the feed now comes back with the posts
+  already loaded, scrolled to where you left it
+- A failed upstream search showed an error page instead of a message
+- The desktop header's wordmark now shares the page name and sort tabs'
+  baseline, and the search buttons match the input's height
+
+## [0.1.0] - 2026-10-06
+
+### Added
+
+- Initial reddont release, including the existing client, mobile layouts, SSO,
+  user preferences, PWA support, and authenticated read-only API
+- RES keyboard navigation on desktop: j and k select posts and comments, x or
+  Enter expands or collapses the selection, and c opens a post's comments
+- RES's subreddit list under "my subreddits": filter your subscriptions, press
+  Enter to open the first match, and sort by name or by when you last visited
+  each one in this browser
+- Desktop comment buttons for permalink, parent, and hiding child comments,
+  plus "hide all child comments" on the post
+- `branding/` holds the logo's SVG sources, wordmarks, one-color versions, and
+  PNGs from 64 to 1024px
+
+### Changed
+
+- Rename the application, configuration variables, data paths, API key prefix,
+  container images, and Nix package to reddont
+- Publish container images from the new repository's main branch, tagged with
+  both latest and the application version
 - Desktop pages (768px and wider) now mirror old reddit as Reddit Enhancement
   Suite shows it: the subreddit bar with a "my subreddits" menu and your
   subscriptions, sort tabs beside the logo, ranked listings with thumbnails,
@@ -32,18 +82,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   tab icon, the desktop header logo, and the icon of the installed app and the
   documentation site, replacing the generated letter icons
 
-### Added
-
-- RES keyboard navigation on desktop: j and k select posts and comments, x or
-  Enter expands or collapses the selection, and c opens a post's comments
-- RES's subreddit list under "my subreddits": filter your subscriptions, press
-  Enter to open the first match, and sort by name or by when you last visited
-  each one in this browser
-- Desktop comment buttons for permalink, parent, and hiding child comments,
-  plus "hide all child comments" on the post
-- `branding/` holds the logo's SVG sources, wordmarks, one-color versions, and
-  PNGs from 64 to 1024px
-
 ### Removed
 
 - The "Classic RES-style Layout" preference; old reddit is now the desktop
@@ -53,10 +91,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- Going back to an infinitely scrolled feed after opening a post reloaded only
-  its first page whenever the browser had not kept the feed in memory, as phones
-  often do, so you lost your place; the feed now comes back with the posts
-  already loaded, scrolled to where you left it
+- Load more comments loads a batch of sibling comments and their replies
+  instead of stopping after one comment's subtree
 - Next and previous links in the single comment thread pointed at list
   positions instead of comments, and its header showed you as logged out
 - App icons were SVG files served under .png names, which iOS does not accept
@@ -67,20 +103,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - The infinite-scroll script placed request values inside JavaScript strings,
   so a crafted link could run script; it now reads them from data attributes
-
-## [0.1.0] - 2026-10-04
-
-### Added
-
-- Initial reddont release, including the existing client, mobile layouts, SSO,
-  user preferences, PWA support, and authenticated read-only API
-
-### Changed
-
-- Rename the application, configuration variables, data paths, API key prefix,
-  container images, and Nix package to reddont
-- Publish container images from the new repository's main branch, tagged with
-  both latest and the application version
 
 ## Inherited project history
 
