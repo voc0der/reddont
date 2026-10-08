@@ -41,6 +41,11 @@ loading in Chromium. This covers manual and automatic loading at desktop and
 phone widths across all themes, retries, and navigation without JavaScript. It
 uses a temporary database and simulated upstream responses.
 
+`npm --prefix dev/screenshots run test:feed` checks in Chromium that going back
+to an infinitely scrolled feed restores the posts already loaded and the
+reader's place, at desktop and phone widths. Chromium runs there without the
+back/forward cache, as a phone often does, so going back reloads the feed page.
+
 See [test coverage](coverage.md) for the README badge's scope, calculation,
 and the commands to reproduce and refresh it.
 
