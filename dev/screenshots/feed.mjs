@@ -87,12 +87,12 @@ try {
       if (url.pathname === '/api/r/test/posts') cursors.push(url.searchParams.get('after'));
     });
 
-    // Infinite scroll loads more pages, a post from the third page opens,
+    // Infinite scroll loads more pages, a post from a later page opens,
     // and the reader goes back. How many pages load depends on how many
     // posts fit on screen.
     await page.goto(`${base}/r/test`);
     const firstPage = (await feedState(page, 'p1')).ids;
-    const inOrder = (ids) => firstPage.concat(range(21, Number(ids.at(-1).slice(1))));
+    const inOrder = (ids) => firstPage.concat(range(Number(firstPage.at(-1).slice(1)) + 1, Number(ids.at(-1).slice(1))));
     await loadThrough(page, 'p41');
     await place(page, 'p45', 200);
     const before = await feedState(page, 'p45');
@@ -111,7 +111,7 @@ try {
     const continued = await feedState(page, next);
     assert.deepEqual(continued.ids, inOrder(continued.ids));
     assert.equal(new Set(cursors).size, cursors.length, 'Each page must be requested once');
-    const fetched = (continued.ids.length - firstPage.length) / 20;
+    const fetched = Math.ceil((continued.ids.length - firstPage.length) / 25);
     const dividers = await page.locator('#posts-container .page-divider[data-page]').evaluateAll((nodes) => nodes.map((node) => Number(node.dataset.page)));
     assert.deepEqual(dividers, Array.from({ length: fetched }, (_, i) => i + 2));
 
@@ -124,7 +124,7 @@ try {
     await page.goto(`${base}/r/test`);
     const fresh = await feedState(page, 'p5');
     assert.equal(fresh.scrollY, 0);
-    assert.deepEqual(fresh.ids.slice(-20), range(1, 20), 'A new visit shows the fresh listing');
+    assert.deepEqual(fresh.ids.slice(1), range(1, 24), 'A new visit shows the fresh listing');
     assert.notEqual(fresh.ids[0], firstPage[0]);
     await place(page, 'p5', 300);
     const secondBefore = await feedState(page, 'p5');
@@ -150,15 +150,33 @@ try {
     await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
     await page.waitForTimeout(300);
     const exhausted = await feedState(page, 'p90');
-    assert.deepEqual(exhausted.ids, firstPage.concat(range(21, 100)));
+    assert.deepEqual(exhausted.ids, inOrder(['p100']));
     assert.equal(exhausted.sentinel, false);
     assert.equal(cursors.length, loadsBefore);
 
     // Reloading shows the fresh listing.
     await page.reload({ waitUntil: 'load' });
     const reloaded = await feedState(page, 'p1');
-    assert.deepEqual(reloaded.ids.slice(-20), range(1, 20));
+    assert.deepEqual(reloaded.ids.slice(1), range(1, 24));
     assert.notEqual(reloaded.ids[0], firstPage[0]);
+
+    // Old snapshots cannot reintroduce expired posts. Snapshots from before
+    // the age policy have no expiration and must also be discarded.
+    for (const legacy of [false, true]) {
+      await loadThrough(page, 'p45');
+      await openPost(page, 'p45');
+      await page.evaluate((legacy) => {
+        const key = JSON.parse(sessionStorage.getItem('reddont:feeds'))[0];
+        const saved = JSON.parse(sessionStorage.getItem(key));
+        if (legacy) delete saved.expiresAt;
+        else saved.expiresAt = Date.now() - 1;
+        sessionStorage.setItem(key, JSON.stringify(saved));
+      }, legacy);
+      await back(page);
+      const refreshed = await feedState(page, 'p1');
+      assert.equal(refreshed.ids.length, 25, 'Expired snapshots reload the recent first page');
+      assert.deepEqual(refreshed.ids.slice(1), range(1, 24));
+    }
 
     // Only the most recent feeds stay in storage.
     for (let visit = 0; visit < 5; visit++) {

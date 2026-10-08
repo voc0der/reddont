@@ -1,16 +1,16 @@
 {
   "metric": "JavaScript line coverage",
-  "covered": 1142,
-  "total": 2113,
-  "percent": 54.05,
+  "covered": 1178,
+  "total": 2149,
+  "percent": 54.82,
   "bunVersion": "1.4.2",
   "tests": {
-    "passed": 121,
+    "passed": 151,
     "skipped": 0,
     "failed": 0
   },
-  "processes": 3,
-  "sourceSha256": "a7278ee8c693b35df940b05bab9999922c30b2b1cb9e9c95d119fcee697143ef",
+  "processes": 4,
+  "sourceSha256": "28e7e4893a134bb03b0116b7025f4a24bb44091cf928c987efbaa052172a50ee",
   "files": {
     "src/apiAuth.js": {
       "covered": 106,
@@ -61,8 +61,8 @@
       "total": 160
     },
     "src/routes/index.js": {
-      "covered": 243,
-      "total": 534
+      "covered": 233,
+      "total": 524
     },
     "src/utils/redditComments.js": {
       "covered": 38,
@@ -75,6 +75,10 @@
     "src/utils/redditHtml.js": {
       "covered": 8,
       "total": 8
+    },
+    "src/utils/redditListing.js": {
+      "covered": 46,
+      "total": 46
     },
     "src/utils/redditSearch.js": {
       "covered": 34,

@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- The hot, new, rising, controversial, and top browser feeds show posts from
+  the past week in upstream order, fetching ahead to fill filtered pages;
+  saved back-navigation pages expire when a displayed post leaves the range
 - Desktop pages (768px and wider) now mirror old reddit as Reddit Enhancement
   Suite shows it: the subreddit bar with a "my subreddits" menu and your
   subscriptions, sort tabs beside the logo, ranked listings with thumbnails,

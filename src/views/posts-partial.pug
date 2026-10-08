@@ -4,3 +4,12 @@ include ../utils
 - var rankStart = Math.max(0, parseInt(query && query.count, 10) || 0)
 each child, index in posts
   +post(child.data, currentUrl, rankStart + index + 1)
+if !posts.length
+  p.search-message No posts from the #{query.t === 'hour' ? 'past hour' : query.t === 'day' ? 'past 24 hours' : 'past week'} on this page.
+  if typeof after !== 'undefined' && after
+    div.footer
+      div.footer-item
+        - var newQuery = {sort: query.sort, t: query.t, view: query.view, after: after, count: rankStart}
+        a(href=`${subreddit === 'home' ? '/' : `/r/${subreddit}`}?${encodeQueryParams(newQuery)}`)
+          span.m-only next ⟶
+          span.d-only next ›
