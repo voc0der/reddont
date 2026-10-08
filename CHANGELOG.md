@@ -48,6 +48,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Going back to an infinitely scrolled feed after opening a post reloaded only
+  its first page whenever the browser had not kept the feed in memory, as phones
+  often do, so you lost your place; the feed now comes back with the posts
+  already loaded, scrolled to where you left it
 - Next and previous links in the single comment thread pointed at list
   positions instead of comments, and its header showed you as logged out
 - App icons were SVG files served under .png names, which iOS does not accept

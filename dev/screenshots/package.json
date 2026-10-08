@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "capture": "node gallery.mjs",
-    "test:comments": "node comments.mjs"
+    "test:comments": "node comments.mjs",
+    "test:feed": "node feed.mjs"
   },
   "dependencies": {
     "playwright": "1.63.0"

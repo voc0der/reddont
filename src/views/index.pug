@@ -163,79 +163,6 @@ html
                   span.m-only next ⟶
                   span.d-only next ›
 
-        if user.infiniteScroll && posts && posts.after
-          script.
-            (function() {
-              let isLoading = false;
-              const sentinel = document.getElementById('infinite-scroll-sentinel');
-              const loadingIndicator = document.getElementById('loading-indicator');
-              const postsContainer = document.getElementById('posts-container');
-              const feed = sentinel.dataset;
-              let afterCursor = feed.after;
-              let page = 1;
-
-              const observer = new IntersectionObserver(async (entries) => {
-                if (entries[0].isIntersecting && !isLoading && afterCursor) {
-                  isLoading = true;
-                  loadingIndicator.style.display = 'block';
-
-                  try {
-                    const params = new URLSearchParams({
-                      sort: feed.sort || 'hot',
-                      view: feed.view || 'compact',
-                      after: afterCursor,
-                      count: postsContainer.querySelectorAll('article.post').length,
-                      currentUrl: feed.currentUrl
-                    });
-                    if (feed.t) params.set('t', feed.t);
-
-                    const response = await fetch(`/api/r/${encodeURIComponent(feed.subreddit)}/posts?${params}`);
-                    const data = await response.json();
-
-                    if (data.error) {
-                      if (data.html) postsContainer.insertAdjacentHTML('beforeend', data.html);
-                      afterCursor = null;
-                      observer.disconnect();
-                      sentinel.remove();
-                      return;
-                    }
-
-                    if (data.html) {
-                      // Add divider before new content
-                      const divider = document.createElement('div');
-                      divider.className = 'page-divider';
-                      divider.textContent = '─────';
-                      divider.dataset.page = String(++page);
-                      postsContainer.insertAdjacentElement('beforeend', divider);
-
-                      // Add new posts
-                      postsContainer.insertAdjacentHTML('beforeend', data.html);
-                      if (window.initVideoPreviews) {
-                        initVideoPreviews(postsContainer);
-                      }
-                    }
-
-                    afterCursor = data.after;
-
-                    if (!afterCursor) {
-                      observer.disconnect();
-                      sentinel.remove();
-                      loadingIndicator.textContent = 'No more posts';
-                      loadingIndicator.style.display = 'block';
-                    }
-                  } catch (error) {
-                    console.error('Error loading more posts:', error);
-                    loadingIndicator.textContent = 'Error loading posts';
-                  } finally {
-                    loadingIndicator.style.display = 'none';
-                    isLoading = false;
-                  }
-                }
-              }, { threshold: 0.1 });
-
-              observer.observe(sentinel);
-            })();
-
       aside.side.d-only
         +searchBox(isHomePage || isMulti || ['all', 'popular'].includes(String(subreddit).toLowerCase()) ? null : communityName)
         if hasCommunityHeader
@@ -243,3 +170,188 @@ html
         else
           a.morelink(href=`/subs?view=${viewQuery}`) Manage subscriptions
           a.morelink(href=`/search?view=${viewQuery}`) Find communities
+
+      //- After the sidebar, so the desktop columns have their final widths
+      //- when the script measures where a returning reader left off.
+      if user.infiniteScroll && posts && posts.after
+        script.
+          (function() {
+            let isLoading = false;
+            const sentinel = document.getElementById('infinite-scroll-sentinel');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const postsContainer = document.getElementById('posts-container');
+            const feed = sentinel.dataset;
+            let afterCursor = feed.after;
+            let page = 1;
+
+            // Going back to the feed without the browser's back/forward cache
+            // renders only its first page, losing the place of a reader further
+            // down. Each history entry keeps the pages it has shown, and a back
+            // or forward navigation puts them back where the reader left off.
+            const FEEDS_KEY = 'reddont:feeds';
+            const SAVED_FEEDS = 4;
+            const feedUrl = location.pathname + location.search;
+            const feedKey = historyEntryKey();
+            let chunks = [postsContainer.innerHTML];
+            restoreFeed();
+
+            const observer = new IntersectionObserver(async (entries) => {
+              if (entries[0].isIntersecting && !isLoading && afterCursor) {
+                isLoading = true;
+                loadingIndicator.style.display = 'block';
+
+                try {
+                  const params = new URLSearchParams({
+                    sort: feed.sort || 'hot',
+                    view: feed.view || 'compact',
+                    after: afterCursor,
+                    count: postsContainer.querySelectorAll('article.post').length,
+                    currentUrl: feed.currentUrl
+                  });
+                  if (feed.t) params.set('t', feed.t);
+
+                  const response = await fetch(`/api/r/${encodeURIComponent(feed.subreddit)}/posts?${params}`);
+                  const data = await response.json();
+
+                  if (data.error) {
+                    if (data.html) append(data.html);
+                    afterCursor = null;
+                    observer.disconnect();
+                    sentinel.remove();
+                    return;
+                  }
+
+                  if (data.html) {
+                    // Add a divider before the new posts
+                    append(`<div class="page-divider" data-page="${++page}">─────</div>${data.html}`);
+                    if (window.initVideoPreviews) {
+                      initVideoPreviews(postsContainer);
+                    }
+                  }
+
+                  afterCursor = data.after;
+
+                  if (!afterCursor) {
+                    observer.disconnect();
+                    sentinel.remove();
+                    loadingIndicator.textContent = 'No more posts';
+                    loadingIndicator.style.display = 'block';
+                  }
+                } catch (error) {
+                  console.error('Error loading more posts:', error);
+                  loadingIndicator.textContent = 'Error loading posts';
+                } finally {
+                  loadingIndicator.style.display = 'none';
+                  isLoading = false;
+                }
+              }
+            }, { threshold: 0.1 });
+
+            if (afterCursor) {
+              observer.observe(sentinel);
+            } else {
+              sentinel.remove();
+            }
+            addEventListener('pagehide', saveFeed);
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'hidden') saveFeed();
+            });
+
+            function append(html) {
+              postsContainer.insertAdjacentHTML('beforeend', html);
+              chunks.push(html);
+            }
+
+            // A new visit to the same address is a new history entry with its
+            // own key, so going back to one visit never shows another.
+            function historyEntryKey() {
+              try {
+                let id = history.state && history.state.reddontFeed;
+                if (!id) {
+                  id = Date.now().toString(36) + Math.random().toString(36).slice(2);
+                  history.replaceState(Object.assign({}, history.state, { reddontFeed: id }), '');
+                }
+                return `reddont:feed:${id}`;
+              } catch (_error) {
+                return null;
+              }
+            }
+
+            function isHistoryNavigation() {
+              const navigation = performance.getEntriesByType('navigation')[0];
+              if (navigation) return navigation.type === 'back_forward';
+              return Boolean(performance.navigation && performance.navigation.type === 2);
+            }
+
+            function savedFeedKeys() {
+              try {
+                const keys = JSON.parse(sessionStorage.getItem(FEEDS_KEY));
+                return Array.isArray(keys) ? keys : [];
+              } catch (_error) {
+                return [];
+              }
+            }
+
+            function restoreFeed() {
+              if (!feedKey || !isHistoryNavigation()) return;
+              let saved;
+              try {
+                saved = JSON.parse(sessionStorage.getItem(feedKey));
+              } catch (_error) {
+                return;
+              }
+              if (!saved || saved.url !== feedUrl || !Array.isArray(saved.chunks) || !saved.chunks.length) return;
+              chunks = saved.chunks;
+              postsContainer.innerHTML = chunks.join('');
+              if (saved.style) postsContainer.setAttribute('style', saved.style);
+              afterCursor = saved.after || null;
+              page = saved.page || 1;
+              // The header above the posts is rendered afresh and images may
+              // not have loaded yet, so the old scroll offset can miss. Place
+              // the remembered post at its old height instead, without the
+              // browser's own restoration moving the page afterwards.
+              history.scrollRestoration = 'manual';
+              const anchor = postsContainer.querySelectorAll('article.post')[saved.anchor];
+              const top = anchor ? anchor.getBoundingClientRect().top + window.scrollY - saved.offset : saved.scrollY;
+              window.scrollTo({ top, left: 0, behavior: 'instant' });
+            }
+
+            function saveFeed() {
+              if (!feedKey) return;
+              // The first post that starts on screen marks the reader's place.
+              const posts = postsContainer.querySelectorAll('article.post');
+              let anchor = 0;
+              while (anchor < posts.length - 1 && posts[anchor].getBoundingClientRect().top < 0) anchor++;
+              const state = JSON.stringify({
+                url: feedUrl,
+                chunks,
+                style: postsContainer.getAttribute('style'),
+                after: afterCursor,
+                page,
+                anchor,
+                offset: posts.length ? posts[anchor].getBoundingClientRect().top : 0,
+                scrollY: window.scrollY
+              });
+              try {
+                // Most recent first. The oldest feeds make room for this one.
+                const others = savedFeedKeys().filter((key) => key !== feedKey);
+                while (others.length >= SAVED_FEEDS) sessionStorage.removeItem(others.pop());
+                for (;;) {
+                  try {
+                    sessionStorage.setItem(feedKey, state);
+                    break;
+                  } catch (error) {
+                    if (!others.length) throw error;
+                    sessionStorage.removeItem(others.pop());
+                  }
+                }
+                sessionStorage.setItem(FEEDS_KEY, JSON.stringify([feedKey].concat(others)));
+              } catch (_error) {
+                // Without room to save, going back starts over at the first
+                // page, rather than at an older place.
+                try {
+                  sessionStorage.removeItem(feedKey);
+                } catch (_ignored) {}
+              }
+            }
+          })();
