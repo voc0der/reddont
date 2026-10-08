@@ -77,6 +77,7 @@ function renderFeed(query, currentUrl, extra = {}) {
 			],
 		},
 		about: null,
+		recentOnly: false,
 		query,
 		isMulti: false,
 		user,
@@ -166,7 +167,7 @@ describe("desktop header", () => {
 
 describe("feed paging", () => {
 	test("offers only hour, day and week feed ranges and defaults to week", () => {
-		const html = renderFeed({ sort: "top", view: "compact" }, "/r/test");
+		const html = renderFeed({ sort: "top", view: "compact" }, "/r/all", { subreddit: "all", recentOnly: true });
 		const menu = html.match(/<div class="menuarea d-only">[\s\S]*?<div id="posts-container"/)[0];
 		expect(menu).toContain("<summary>past week</summary>");
 		for (const range of ["hour", "day", "week"]) expect(menu).toContain(`&amp;t=${range}`);
@@ -174,11 +175,20 @@ describe("feed paging", () => {
 			expect(menu).not.toContain(`&amp;t=${range}`);
 			expect(html).not.toContain(`top ${range}</a>`);
 		}
-		expect(html).toContain('href="/r/test?sort=controversial&amp;view=compact"');
+		expect(html).toContain('href="/r/all?sort=controversial&amp;view=compact"');
+	});
+
+	test("restores historical ranges for communities and defaults to all time", () => {
+		const html = renderFeed({ sort: "top", view: "compact" }, "/r/test");
+		const menu = html.match(/<div class="menuarea d-only">[\s\S]*?<div id="posts-container"/)[0];
+		expect(menu).toContain("<summary>all time</summary>");
+		for (const t of ["hour", "day", "week", "month", "year", "all"]) expect(menu).toContain(`&amp;t=${t}`);
+		for (const t of ["month", "year", "all"]) expect(html).toContain(`top ${t}</a>`);
 	});
 
 	test("keeps a manual continuation on empty filtered pages even with infinite scroll enabled", () => {
 		const html = renderFeed({ sort: "hot", t: "week", view: "compact" }, "/r/test", {
+			recentOnly: true,
 			posts: { posts: [], after: "t3_next" },
 		});
 		expect(html).toContain("No posts from the past week on this page.");

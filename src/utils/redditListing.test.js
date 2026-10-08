@@ -1,5 +1,5 @@
 const { describe, expect, test } = require("bun:test");
-const { parseFeedQuery, recentListing } = require("./redditListing");
+const { browserListing, isRecentFeed, parseFeedQuery, recentListing } = require("./redditListing");
 
 const NOW = 1800000000;
 const WEEK = 7 * 86400;
@@ -12,16 +12,67 @@ const ids = (listing) => listing.posts.map((post) => post.data.id);
 describe("browser feed options", () => {
 	test("defaults to a week and clamps older bookmarked ranges", () => {
 		for (const t of [undefined, "month", "year", "all", "invalid", "toString"]) {
-			expect(parseFeedQuery({ t })).toEqual({ sort: "hot", t: "week", view: "compact" });
+			expect(parseFeedQuery({ t }, "all")).toEqual({ sort: "hot", t: "week", view: "compact" });
 		}
-		for (const t of ["hour", "day", "week"]) expect(parseFeedQuery({ t }).t).toBe(t);
+		for (const t of ["hour", "day", "week"]) expect(parseFeedQuery({ t }, "popular").t).toBe(t);
 	});
 
 	test("validates sort, cursor and view without forwarding arbitrary input", () => {
 		expect(parseFeedQuery({ sort: "bad", after: "t1_abc", view: "bad", count: "90", q: "x" }))
-			.toEqual({ sort: "hot", t: "week", view: "compact" });
+			.toEqual({ sort: "hot", t: "all", view: "compact" });
 		expect(parseFeedQuery({ sort: ["new", "top"], after: "t3_abc", count: "-5", view: "card" }))
-			.toEqual({ sort: "new", t: "week", view: "card", after: "t3_abc", count: 0 });
+			.toEqual({ sort: "new", t: "all", view: "card", after: "t3_abc", count: 0 });
+	});
+
+	test("only caps all and popular, including mixed case", () => {
+		for (const name of ["all", "ALL", "Popular"]) expect(isRecentFeed(name)).toBe(true);
+		for (const name of ["", "test", "test+other", "all+test", "home", "allthings"]) {
+			expect(isRecentFeed(name)).toBe(false);
+			expect(parseFeedQuery({}, name).t).toBe("all");
+			for (const t of ["hour", "day", "week", "month", "year", "all"]) expect(parseFeedQuery({ t }, name).t).toBe(t);
+		}
+	});
+});
+
+describe("community feed fallback", () => {
+	test.each(["hot", "new", "rising", "controversial", "top"])("%s prefers recent posts but keeps every older post and the upstream cursor", async (sort) => {
+		const source = [post("oldpin", WEEK * 3, { stickied: true }), post("first", 600, { score: 1 }), post("old", WEEK + 1), post("second", 60, { score: 500 }), post("boundary", WEEK)];
+		const calls = [];
+		const listing = await browserListing(async (options) => {
+			calls.push(options);
+			return { posts: source, after: "t3_boundary" };
+		}, { sort }, "test", NOW);
+		expect(ids(listing)).toEqual(["first", "second", "boundary", "oldpin", "old"]);
+		expect(listing.after).toBe("t3_boundary");
+		expect(listing.expiresAt).toBeNull();
+		expect(calls).toEqual([{ limit: 25, t: "all", sr_detail: true }]);
+		expect(source[0].data.id).toBe("oldpin");
+	});
+
+	test.each(["hot", "new", "rising", "controversial", "top"])("%s still shows a community with only old or undated posts", async (sort) => {
+		const source = [post("old", WEEK + 1), post("older", WEEK * 10), post("unknown", 60, { created_utc: undefined })];
+		const listing = await browserListing(async () => ({ posts: source, after: "t3_unknown" }), { sort }, "quiet", NOW);
+		expect(listing).toEqual({ posts: source, after: "t3_unknown", expiresAt: null });
+	});
+
+	test("preserves all posts across a page boundary after partitioning", async () => {
+		const source = [post("old1", WEEK + 1), post("recent1"), post("old2", WEEK + 1), post("recent2")];
+		const getPage = async ({ after }) => after
+			? { posts: source.slice(2), after: null }
+			: { posts: source.slice(0, 2), after: "t3_recent1" };
+		const first = await browserListing(getPage, { sort: "hot" }, "test", NOW);
+		const next = await browserListing(getPage, { sort: "hot", after: first.after }, "test", NOW);
+		expect(ids(first).concat(ids(next))).toEqual(["recent1", "old1", "recent2", "old2"]);
+	});
+
+	test("honors explicit historical ranges and distinguishes empty listings from errors", async () => {
+		for (const t of ["month", "year", "all"]) {
+			let request;
+			await browserListing(async (options) => { request = options; return { posts: [], after: null }; }, { sort: "top", t, after: "t3_next", count: 25 }, "test+other", NOW);
+			expect(request).toMatchObject({ t, after: "t3_next", count: 25 });
+		}
+		expect(await browserListing(async () => ({ posts: [], after: null }), {}, "test", NOW)).toEqual({ posts: [], after: null, expiresAt: null });
+		for (const failed of [null, {}, { posts: {} }]) expect(await browserListing(async () => failed, {}, "test", NOW)).toBeNull();
 	});
 });
 
