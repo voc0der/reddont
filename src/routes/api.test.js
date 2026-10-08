@@ -84,6 +84,11 @@ beforeAll(async () => {
 		requestedUrls.push(url);
 		requestedHeaders.push(init?.headers || {});
 
+		// Reddit answers blocked or failed requests with an HTML error page.
+		if (url.includes("broken")) {
+			return new Response("<html>unavailable</html>", { status: 503 });
+		}
+
 		let body;
 		if (url.includes("/about.json")) {
 			body = { data: { public_description: "pc sales" } };
@@ -416,5 +421,119 @@ describe("input validation", () => {
 		const res = await get("/api/v1/nonsense");
 		expect(res.status).toBe(404);
 		expect((await res.json()).error).toBe("not_found");
+	});
+});
+
+describe("listing parameters", () => {
+	test("forwards valid paging and time range values", async () => {
+		await get("/api/v1/r/buildapcsales/top.json?after=t3_abc&before=t3_def&t=WEEK");
+		const url = new URL(requestedUrls[0]);
+
+		expect(Object.fromEntries(url.searchParams)).toMatchObject({
+			after: "t3_abc",
+			before: "t3_def",
+			t: "week",
+		});
+	});
+
+	test("drops malformed paging and time range values", async () => {
+		await get("/api/v1/r/buildapcsales/top.json?after=t3_a%26b&before=../x&t=decade");
+		const url = new URL(requestedUrls[0]);
+
+		expect(url.searchParams.has("after")).toBe(false);
+		expect(url.searchParams.has("before")).toBe(false);
+		expect(url.searchParams.has("t")).toBe(false);
+	});
+});
+
+describe("home feed", () => {
+	function subscribe(...subreddits) {
+		const { id } = db.query("SELECT id FROM users WHERE apiKey = $apiKey").get({ apiKey: API_KEY });
+		for (const subreddit of subreddits) {
+			db.query("INSERT INTO subscriptions (user_id, subreddit) VALUES ($id, $subreddit)").run({ id, subreddit });
+		}
+	}
+
+	afterEach(() => {
+		db.query("DELETE FROM subscriptions").run();
+	});
+
+	test("combines the key owner's subscriptions", async () => {
+		subscribe("buildapcsales", "hardwareswap");
+		const res = await get("/api/v1/home.json");
+
+		expect(await res.json()).toMatchObject({ subreddit: "buildapcsales+hardwareswap", sort: "hot" });
+		expect(requestedUrls[0]).toContain("/r/buildapcsales+hardwareswap/hot.json");
+		expect(await (await get("/api/v1/subscriptions")).json()).toEqual({
+			count: 2,
+			subscriptions: ["buildapcsales", "hardwareswap"],
+		});
+	});
+
+	test("falls back to r/all without subscriptions", async () => {
+		const res = await get("/api/v1/home.rss?sort=new");
+
+		expect(res.headers.get("content-type")).toBe("application/atom+xml; charset=utf-8");
+		expect(await res.text()).toContain("<title>newest submissions : all</title>");
+		expect(requestedUrls.some((url) => url.includes("/r/all/new.json"))).toBe(true);
+	});
+});
+
+describe("search", () => {
+	test("serves atom results scoped to a community", async () => {
+		const res = await get("/api/v1/search.rss?q=ryzen&subreddit=buildapcsales&sort=new");
+		const xml = await res.text();
+
+		expect(res.headers.get("content-type")).toBe("application/atom+xml; charset=utf-8");
+		expect(xml).toContain("<title>search results for &quot;ryzen&quot; : buildapcsales</title>");
+		expect(xml).toContain("<id>/r/buildapcsales/search.rss?q=ryzen</id>");
+		expect(xml).toContain("<id>t3_1vi0whp</id>");
+		expect(new URL(requestedUrls[0]).searchParams.get("sort")).toBe("new");
+	});
+
+	test("serves site-wide json results and ignores a malformed sort", async () => {
+		const res = await get("/api/v1/search?q=%20ryzen%20&sort=NEW;");
+		const body = await res.json();
+
+		expect(body).toMatchObject({ kind: "search", query: "ryzen", subreddit: null, after: "t3_next", count: 1 });
+		expect(body.results[0].id).toBe("1vi0whp");
+		expect(new URL(requestedUrls[0]).searchParams.has("sort")).toBe(false);
+	});
+});
+
+describe("subreddit about", () => {
+	test("passes reddit's object through with ?raw=1", async () => {
+		const res = await get("/api/v1/r/buildapcsales/about.json?raw=1");
+		expect(await res.json()).toEqual({ public_description: "pc sales" });
+	});
+
+	test("rejects a multireddit", async () => {
+		const res = await get("/api/v1/r/buildapcsales+hardwareswap/about.json");
+		expect(res.status).toBe(400);
+		expect(requestedUrls).toHaveLength(0);
+	});
+});
+
+describe("upstream failures", () => {
+	test("answer 502 when reddit does not return data", async () => {
+		for (const path of [
+			"/api/v1/r/broken/new.json",
+			"/api/v1/r/broken/about.json",
+			"/api/v1/comments/broken.rss",
+			"/api/v1/search.json?q=broken",
+		]) {
+			const res = await get(path);
+			expect(res.status).toBe(502);
+			expect(await res.json()).toMatchObject({ error: "upstream_error" });
+		}
+	});
+
+	test("reject invalid identifiers without contacting reddit", async () => {
+		for (const path of ["/api/v1/comments/abc!def.json", "/api/v1/r/not%20a%20sub"]) {
+			const res = await get(path);
+			expect(res.status).toBe(400);
+			expect((await res.json()).error).toBe("bad_request");
+		}
+		expect(requestedUrls).toHaveLength(0);
 	});
 });

@@ -83,6 +83,45 @@ describe("isApiWhitelisted", () => {
 		expect(isApiWhitelisted("fd00::1")).toBe(false);
 		expect(isApiWhitelisted("not-an-ip")).toBe(true); // exact string match only
 	});
+
+	test("rejects malformed prefix lengths and ipv4 networks", () => {
+		setWhitelist("10.2.5.0/-1,10.2.5.0/8.5,10.2.5/24,10.2.5.256/24,10.2.x.0/24");
+		expect(isApiWhitelisted("10.2.5.50")).toBe(false);
+		expect(isApiWhitelisted("10.2.5.0")).toBe(false);
+
+		setWhitelist("10.2.5.0/24");
+		expect(isApiWhitelisted("10.2.5")).toBe(false);
+		expect(isApiWhitelisted("10.2.5.50.1")).toBe(false);
+	});
+
+	test("treats a zero-length ipv4 prefix as every ipv4 address", () => {
+		setWhitelist("10.0.0.0/0");
+		expect(isApiWhitelisted("203.0.113.9")).toBe(true);
+		expect(isApiWhitelisted("fd00::1")).toBe(false);
+	});
+
+	test("parses full, zoned, and ipv4-embedded ipv6 forms", () => {
+		setWhitelist("fe80::/64,64:ff9b::/96,2001:db8::/32");
+		expect(isApiWhitelisted("fe80::1%eth0")).toBe(true);
+		expect(isApiWhitelisted("64:ff9b::192.0.2.33")).toBe(true);
+		expect(isApiWhitelisted("2001:db8:0:0:0:0:192.0.2.33")).toBe(true);
+		expect(isApiWhitelisted("2001:0db8:0000:0000:0000:0000:0000:0001")).toBe(true);
+		expect(isApiWhitelisted("2001:db9:0:0:0:0:192.0.2.33")).toBe(false);
+	});
+
+	test("rejects malformed ipv6 addresses instead of matching their prefix", () => {
+		setWhitelist("2001:db8::/32");
+		for (const address of [
+			"2001:db8::1::2",
+			"2001:db8:1:2:3:4:5:6:7",
+			"2001:db8:1:2:3:4:5",
+			"2001:db8::zzzz",
+			"2001:db8::12345",
+			"2001:db8::192.0.2.999",
+		]) {
+			expect(isApiWhitelisted(address)).toBe(false);
+		}
+	});
 });
 
 describe("redactApiKey", () => {

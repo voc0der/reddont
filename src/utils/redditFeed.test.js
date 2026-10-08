@@ -203,9 +203,40 @@ describe("buildCommentsFeed", () => {
 	});
 });
 
+describe("feed robustness", () => {
+	test("uses the community icon as the logo and a plain thumbnail without a preview", () => {
+		const xml = buildSubmissionsFeed({
+			posts: [{ ...linkPost, data: { ...linkPost.data, thumbnail: "https://b.thumbs.redditmedia.com/a.jpg?s=1&amp;w=2" } }],
+			subreddit: "buildapcsales",
+			about: { icon_img: "https://styles.redditmedia.com/icon.png?a=1&amp;b=2" },
+		});
+
+		expect(xml).toContain("<logo>https://styles.redditmedia.com/icon.png?a=1&amp;b=2</logo>");
+		expect(xml).toContain('<media:thumbnail url="https://b.thumbs.redditmedia.com/a.jpg?s=1&amp;w=2"/>');
+	});
+
+	test("skips entries that are not usable objects", () => {
+		const xml = buildSubmissionsFeed({ posts: [null, "deleted", linkPost], subreddit: "buildapcsales" });
+		expect(xml.match(/<entry>/g)).toHaveLength(1);
+
+		const comments = buildCommentsFeed({
+			submission: null,
+			comments: [{ kind: "t1", data: { body: "no id" } }, { kind: "t1", data: { id: "c9", author: "carol" } }],
+			id: "1vi0whp",
+		});
+		expect(comments.match(/<entry>/g)).toHaveLength(1);
+		expect(comments).toContain("<title>comments for 1vi0whp</title>");
+		expect(flattenComments({ data: { children: [] } })).toEqual([]);
+	});
+});
+
 describe("toFeedDate", () => {
 	test("formats epoch seconds the way reddit does", () => {
 		expect(toFeedDate(1786217886)).toBe("2026-08-08T19:38:06+00:00");
+	});
+
+	test("formats dates", () => {
+		expect(toFeedDate(new Date(Date.UTC(2026, 7, 8, 19, 38, 6, 512)))).toBe("2026-08-08T19:38:06+00:00");
 	});
 
 	test("falls back to now for unusable values", () => {
