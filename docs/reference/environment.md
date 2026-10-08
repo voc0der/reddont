@@ -2,7 +2,7 @@
 
 Set these on the application process or under Compose's `environment:`.
 Recreate a container after changing its environment. Values below describe
-reddont 0.1.0; omit optional settings when unused instead of filling every
+reddont 0.1.1; omit optional settings when unused instead of filling every
 entry with an empty value.
 
 ## Server and storage

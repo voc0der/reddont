@@ -65,7 +65,7 @@ Your subscriptions and preferences belong to your reddont account.
 
 </div>
 
-These guides describe **reddont 0.1.0**. Start with
+These guides describe **reddont 0.1.1**. Start with
 [troubleshooting](reference/troubleshooting.md) if something is not working.
 Changes are recorded in the [changelog](changelog.md).
 
