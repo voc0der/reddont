@@ -1,6 +1,6 @@
 # Test coverage
 
-[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-55.24%25-red)](../assets/coverage-summary.json)
+[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-87.62%25-brightgreen)](../assets/coverage-summary.json)
 
 The README badge reports **JavaScript line coverage** from the Bun test suite.
 It is a checked-in measurement; it changes when a contributor recalculates it.
@@ -24,8 +24,9 @@ instance or upstream credentials are needed.
 
 The runner copies `src/` into a temporary directory, instruments application
 JavaScript with Istanbul, and runs the existing tests on that copy. It merges
-counters from the test process and the comment fixture server. Every eligible
-file starts with zero hits, so files that tests never load remain in the total.
+counters from the test process and every server process the tests start. Every
+eligible file starts with zero hits, so files that tests never load remain in
+the total.
 The source checkout is not instrumented, and the temporary copy is removed
 after the run.
 
@@ -48,7 +49,7 @@ line coverage (%) = 100 × total covered lines / total eligible lines
 
 An eligible line is a line containing an executable statement identified by
 Istanbul. It is covered when a statement on that line runs. A line reached in
-both processes counts once. Sum the line counts across files before dividing;
+several processes counts once. Sum the line counts across files before dividing;
 do not average file percentages or combine percentages from different tools.
 
 The inventory includes every `.js`, `.cjs`, and `.mjs` application file under
@@ -62,12 +63,14 @@ The inventory includes every `.js`, `.cjs`, and `.mjs` application file under
 | Dependencies, build output, and `dev/` tooling | Third-party, generated, or development-only code. |
 
 Standalone browser scripts in `src/public/` **are included**, even when they
-have zero hits. The separate Playwright harness is not part of this calculation,
-so its browser activity does not contribute to the badge.
+have zero hits. Unit tests run the service worker with stand-ins for its browser
+globals. The separate Playwright harness is not part of this calculation, so its
+browser activity does not contribute to the badge; `comments.js`, which only
+that harness exercises, counts as uncovered.
 
 [Bun's built-in coverage](https://bun.com/docs/test/code-coverage) only tracks
-loaded files. Its default report also misses the fixture server's separate
-process. Use `bun run coverage` for the badge instead of copying the percentage
+loaded files. Its default report also misses the fixture servers' separate
+processes. Use `bun run coverage` for the badge instead of copying the percentage
 from `bun test --coverage`.
 
 ## Refresh the badge
