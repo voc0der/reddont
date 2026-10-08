@@ -1,2 +1,2 @@
 # Match local previews and CI to the same Zensical release.
-zensical==0.0.67
+zensical==0.0.68
