@@ -1,6 +1,6 @@
 # Test coverage
 
-[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-55.20%25-red)](../assets/coverage-summary.json)
+[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-55.24%25-red)](../assets/coverage-summary.json)
 
 The README badge reports **JavaScript line coverage** from the Bun test suite.
 It is a checked-in measurement; it changes when a contributor recalculates it.

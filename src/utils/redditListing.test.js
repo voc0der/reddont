@@ -12,9 +12,9 @@ const ids = (listing) => listing.posts.map((post) => post.data.id);
 describe("browser feed options", () => {
 	test("defaults to a week and clamps older bookmarked ranges", () => {
 		for (const t of [undefined, "month", "year", "all", "invalid", "toString"]) {
-			expect(parseFeedQuery({ t }, "all")).toEqual({ sort: "hot", t: "week", view: "compact" });
+			expect(parseFeedQuery({ t }, true)).toEqual({ sort: "hot", t: "week", view: "compact" });
 		}
-		for (const t of ["hour", "day", "week"]) expect(parseFeedQuery({ t }, "popular").t).toBe(t);
+		for (const t of ["hour", "day", "week"]) expect(parseFeedQuery({ t }, true).t).toBe(t);
 	});
 
 	test("validates sort, cursor and view without forwarding arbitrary input", () => {
@@ -28,9 +28,9 @@ describe("browser feed options", () => {
 		for (const name of ["all", "ALL", "Popular"]) expect(isRecentFeed(name)).toBe(true);
 		for (const name of ["", "test", "test+other", "all+test", "home", "allthings"]) {
 			expect(isRecentFeed(name)).toBe(false);
-			expect(parseFeedQuery({}, name).t).toBe("all");
-			for (const t of ["hour", "day", "week", "month", "year", "all"]) expect(parseFeedQuery({ t }, name).t).toBe(t);
 		}
+		expect(parseFeedQuery({}).t).toBe("all");
+		for (const t of ["hour", "day", "week", "month", "year", "all"]) expect(parseFeedQuery({ t }).t).toBe(t);
 	});
 });
 
@@ -41,7 +41,7 @@ describe("community feed fallback", () => {
 		const listing = await browserListing(async (options) => {
 			calls.push(options);
 			return { posts: source, after: "t3_boundary" };
-		}, { sort }, "test", NOW);
+		}, { sort }, false, NOW);
 		expect(ids(listing)).toEqual(["first", "second", "boundary", "oldpin", "old"]);
 		expect(listing.after).toBe("t3_boundary");
 		expect(listing.expiresAt).toBeNull();
@@ -51,7 +51,7 @@ describe("community feed fallback", () => {
 
 	test.each(["hot", "new", "rising", "controversial", "top"])("%s still shows a community with only old or undated posts", async (sort) => {
 		const source = [post("old", WEEK + 1), post("older", WEEK * 10), post("unknown", 60, { created_utc: undefined })];
-		const listing = await browserListing(async () => ({ posts: source, after: "t3_unknown" }), { sort }, "quiet", NOW);
+		const listing = await browserListing(async () => ({ posts: source, after: "t3_unknown" }), { sort }, false, NOW);
 		expect(listing).toEqual({ posts: source, after: "t3_unknown", expiresAt: null });
 	});
 
@@ -60,19 +60,19 @@ describe("community feed fallback", () => {
 		const getPage = async ({ after }) => after
 			? { posts: source.slice(2), after: null }
 			: { posts: source.slice(0, 2), after: "t3_recent1" };
-		const first = await browserListing(getPage, { sort: "hot" }, "test", NOW);
-		const next = await browserListing(getPage, { sort: "hot", after: first.after }, "test", NOW);
+		const first = await browserListing(getPage, { sort: "hot" }, false, NOW);
+		const next = await browserListing(getPage, { sort: "hot", after: first.after }, false, NOW);
 		expect(ids(first).concat(ids(next))).toEqual(["recent1", "old1", "recent2", "old2"]);
 	});
 
 	test("honors explicit historical ranges and distinguishes empty listings from errors", async () => {
 		for (const t of ["month", "year", "all"]) {
 			let request;
-			await browserListing(async (options) => { request = options; return { posts: [], after: null }; }, { sort: "top", t, after: "t3_next", count: 25 }, "test+other", NOW);
+			await browserListing(async (options) => { request = options; return { posts: [], after: null }; }, { sort: "top", t, after: "t3_next", count: 25 }, false, NOW);
 			expect(request).toMatchObject({ t, after: "t3_next", count: 25 });
 		}
-		expect(await browserListing(async () => ({ posts: [], after: null }), {}, "test", NOW)).toEqual({ posts: [], after: null, expiresAt: null });
-		for (const failed of [null, {}, { posts: {} }]) expect(await browserListing(async () => failed, {}, "test", NOW)).toBeNull();
+		expect(await browserListing(async () => ({ posts: [], after: null }), {}, false, NOW)).toEqual({ posts: [], after: null, expiresAt: null });
+		for (const failed of [null, {}, { posts: {} }]) expect(await browserListing(async () => failed, {}, false, NOW)).toBeNull();
 	});
 });
 
