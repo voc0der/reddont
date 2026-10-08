@@ -16,6 +16,10 @@ for (const [index, theme] of ["res", "light", "dark"].entries()) {
 		}
 	}
 }
+db.query("INSERT INTO users (id, username, redditAuthHeaders) VALUES (7, 'unsubscribed', ?)")
+	.run(JSON.stringify({ authorization: "Bearer recent-feed-fixture" }));
+db.query("INSERT INTO users (id, username, redditAuthHeaders) VALUES (8, 'sparse', ?)")
+	.run(JSON.stringify({ authorization: "Bearer sparse-feed-fixture" }));
 
 const now = Date.now() / 1000;
 function post(id, age, extra = {}) {
@@ -43,14 +47,22 @@ globalThis.fetch = async (input, options) => {
 	const sort = url.pathname.match(/\/(hot|new|rising|controversial|top)\.json$/)?.[1];
 	if (!sort) throw new Error(`Unexpected fixture request: ${url.pathname}`);
 	let source = [post("oldpin", 20 * 86400, { stickied: true })];
-	if (url.pathname.startsWith("/r/sparse/")) {
+	if (options?.headers?.Authorization === "Bearer sparse-feed-fixture" || url.pathname.startsWith("/r/sparse/")) {
 		source = source.concat(Array.from({ length: 150 }, (_, i) => stale(i)), fresh);
+	} else if (url.pathname.startsWith("/r/quiet/")) {
+		source = source.concat(Array.from({ length: 40 }, (_, i) => stale(i)));
 	} else if (url.pathname.startsWith("/r/gap/")) {
 		source = source.concat(fresh.slice(0, 25), Array.from({ length: 150 }, (_, i) => stale(i)), fresh.slice(25));
 	} else if (sort === "new") {
 		source = source.concat(fresh.map((p, i) => ({ ...p, data: { ...p.data, created_utc: now - 60 - i * 3600 } })), stale(0));
 	} else {
 		source = source.concat(fresh.flatMap((p, i) => [stale(i), p]));
+	}
+	// These two native sorts honor time ranges. Catch an accidental week
+	// request that would still hide a quiet community upstream.
+	if (["top", "controversial"].includes(sort)) {
+		const seconds = { hour: 3600, day: 86400, week: 7 * 86400, month: 30 * 86400, year: 365 * 86400 }[url.searchParams.get("t")];
+		if (seconds) source = source.filter((p) => p.data.created_utc >= now - seconds);
 	}
 	const after = url.searchParams.get("after");
 	const start = after ? source.findIndex((p) => p.data.name === after) + 1 : 0;

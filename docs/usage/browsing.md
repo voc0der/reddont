@@ -18,10 +18,15 @@ Home combines your subscribed communities. If your subscription list is
 empty, it shows the all feed. Open a community directly at `/r/community`.
 Multiple communities can be combined as `/r/programming+technology`.
 
-The **hot**, **new**, **rising**, **controversial**, and **top** feeds show only
-posts submitted within the past seven days, including when paging or scrolling.
-Older pinned posts are excluded too. Each tab keeps Reddit's listing order;
-filtering does not re-rank posts by score or mix in posts from other sorts.
+On **all** and **popular**, the **hot**, **new**, **rising**, **controversial**,
+and **top** feeds show only posts submitted within the past seven days,
+including when paging or scrolling. Older pinned posts are excluded too.
+Each tab keeps Reddit's listing order.
+
+Individual communities, combined communities, and subscribed home feeds keep
+older posts available. In all five sorts, each page puts posts from the past
+week first, preserving upstream order within the recent and older groups.
+Quiet communities with only older posts still show what is available.
 Home uses Reddit's combined listing for your reddont subscriptions, so it can
 differ from the personalized home feed of a separate Reddit account.
 
@@ -42,8 +47,10 @@ or unsubscribe your account on Reddit.
 
 The desktop layout follows old reddit with Reddit Enhancement Suite. The tabs
 beside the logo choose the sort; for **top** and **controversial**, **links
-from** narrows the time range to the past hour, day, or week (the default).
-Older feed links requesting a month, year, or all time use the past week.
+from** selects the time range. Community and subscribed home feeds default to
+all time and offer hour, day, week, month, year, and all time. On **all** and
+**popular**, the choices stop at a week (the default); older links requesting
+a month, year, or all time use the past week instead.
 **show images** switches to card view, which
 opens every post's media in place, and **hide images** returns to the compact
 listing. On a phone, the same choices live in the sort and view menus above
@@ -89,11 +96,11 @@ Feeds normally offer pagination;
 the dashboard's **Never Ending Reddit** preference loads more posts and
 comments while you scroll instead.
 
-When older posts are filtered out, feeds fetch ahead to fill the page while
-keeping the original order. Quiet communities may have fewer recent posts or
-an empty page; use **next** when it is available to continue. Post search and
-the JSON/RSS API retain their separate time-range controls for finding older
-content.
+On **all** and **popular**, feeds fetch ahead to fill gaps left by filtered
+posts. An empty filtered page offers **next** when more results are available.
+Saved pages from these feeds expire when a displayed post leaves the selected
+range. Community feeds retain older posts when returning with the back button.
+Post search and the JSON/RSS API keep their separate time-range controls.
 
 The app is read-only. Follow the original post link if you want to vote,
 submit a post, or comment on Reddit itself.

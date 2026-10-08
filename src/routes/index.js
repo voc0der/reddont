@@ -19,7 +19,7 @@ const { validateInviteToken } = require("../invite");
 const logger = require("../logger");
 const oidc = require("../oidc");
 const { unescapeSelfText } = require("../utils/redditHtml");
-const { parseFeedQuery, recentListing } = require("../utils/redditListing");
+const { browserListing, isRecentFeed, parseFeedQuery } = require("../utils/redditListing");
 const {
 	parseSearchQuery,
 	searchHref,
@@ -259,9 +259,10 @@ function feedErrorOptions(req, redditRequestOptions, fragment = false) {
 }
 
 function getFeedPosts(subreddit, query, requestOptions) {
-	return recentListing(
+	return browserListing(
 		(options) => G.getSubmissions(query.sort, subreddit, options, requestOptions),
 		query,
+		subreddit,
 	);
 }
 
@@ -302,7 +303,8 @@ router.get("/", authenticateToken, async (req, res) => {
 		.query("SELECT * FROM subscriptions WHERE user_id = $id")
 		.all({ id: req.user.id });
 
-	const query = parseFeedQuery(req.query);
+	const subreddit = subs.map((s) => s.subreddit).join("+") || "all";
+	const query = parseFeedQuery(req.query, subreddit);
 
 	// If no subscriptions, redirect to /r/all
 	if (subs.length === 0) {
@@ -311,7 +313,6 @@ router.get("/", authenticateToken, async (req, res) => {
 	}
 
 	// Build multi-reddit internally (don't put in URL)
-	const subreddit = subs.map((s) => s.subreddit).join("+");
 	const isMulti = true;
 	const isHomePage = true; // Flag to indicate this is the home page
 
@@ -335,6 +336,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
 	res.render("index", {
 		subreddit,
+		recentOnly: isRecentFeed(subreddit),
 		posts,
 		about: decodeSidebar(about),
 		query,
@@ -355,7 +357,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 		return res.status(400).send("Invalid subreddit");
 	}
 	const isMulti = subreddit.includes("+");
-	const query = parseFeedQuery(req.query);
+	const query = parseFeedQuery(req.query, subreddit);
 
 	let isSubbed = false;
 	if (!isMulti) {
@@ -387,6 +389,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 
 	res.render("index", {
 		subreddit,
+		recentOnly: isRecentFeed(subreddit),
 		posts,
 		about: decodeSidebar(about),
 		query,
@@ -402,7 +405,6 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 // API endpoint to fetch more posts for infinite scroll
 router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 	let subreddit = req.params.subreddit;
-	const query = parseFeedQuery(req.query);
 
 	// Handle "home" as a special case - build multi-reddit from subscriptions
 	if (subreddit === "home") {
@@ -420,6 +422,7 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 		}
 	}
 
+	const query = parseFeedQuery(req.query, subreddit);
 	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const posts = await getFeedPosts(
 		subreddit,
@@ -450,6 +453,7 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 			"posts-partial",
 			{
 				posts: posts ? posts.posts : [],
+				recentOnly: isRecentFeed(subreddit),
 				after: posts.after,
 				query,
 				subreddit: req.params.subreddit === "home" ? "home" : subreddit,

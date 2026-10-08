@@ -6,7 +6,7 @@
 [![License badge](https://img.shields.io/github/license/voc0der/reddont)](LICENSE)
 [![Version badge](https://img.shields.io/docker/v/voc0der/reddont?sort=semver)](https://hub.docker.com/r/voc0der/reddont/tags)
 [![Build status badge](https://img.shields.io/github/actions/workflow/status/voc0der/reddont/publish-docker.yml?branch=main&label=build)](https://github.com/voc0der/reddont/actions/workflows/publish-docker.yml)
-[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-54.82%25-red)](docs/development/coverage.md)
+[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-55.20%25-red)](docs/development/coverage.md)
 [![GitHub issues badge](https://img.shields.io/github/issues/voc0der/reddont)](https://github.com/voc0der/reddont/issues)
 [![Docker pulls badge](https://img.shields.io/docker/pulls/voc0der/reddont)](https://hub.docker.com/r/voc0der/reddont)
 [![Docker image size badge](https://img.shields.io/docker/image-size/voc0der/reddont?sort=date)](https://hub.docker.com/r/voc0der/reddont)

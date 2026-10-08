@@ -1,25 +1,51 @@
 const FEED_SORTS = ["hot", "new", "rising", "controversial", "top"];
 const FEED_TIMES = { hour: 3600, day: 86400, week: 7 * 86400 };
+const COMMUNITY_TIMES = ["hour", "day", "week", "month", "year", "all"];
 const MAX_FEED_PAGES = 5;
 
 function firstValue(value) {
 	return Array.isArray(value) ? value[0] : value;
 }
 
-// Browser feeds always cover at most a rolling week. Keep the rendered
-// controls and upstream requests in agreement, including old bookmarked URLs.
-function parseFeedQuery(query = {}) {
+function isRecentFeed(subreddit) {
+	return ["all", "popular"].includes(String(subreddit).toLowerCase());
+}
+
+// Only the broad discovery feeds have a hard age cap. Community listings,
+// including the subscribed home feed, must remain useful when they are quiet.
+function parseFeedQuery(query = {}, subreddit = "") {
+	const recentOnly = isRecentFeed(subreddit);
 	const sort = firstValue(query.sort);
 	const time = firstValue(query.t);
 	const after = firstValue(query.after);
 	return {
 		sort: FEED_SORTS.includes(sort) ? sort : "hot",
-		t: Object.hasOwn(FEED_TIMES, time) ? time : "week",
+		t: recentOnly
+			? (Object.hasOwn(FEED_TIMES, time) ? time : "week")
+			: (COMMUNITY_TIMES.includes(time) ? time : "all"),
 		view: firstValue(query.view) === "card" ? "card" : "compact",
 		...(typeof after === "string" && /^t3_[a-z0-9]+$/i.test(after)
 			? { after, count: Math.max(0, Number.parseInt(firstValue(query.count), 10) || 0) }
 			: {}),
 	};
+}
+
+async function browserListing(getPage, query, subreddit, now = Date.now() / 1000) {
+	if (isRecentFeed(subreddit)) return recentListing(getPage, query, now);
+
+	const { t, after, count } = parseFeedQuery(query, subreddit);
+	const listing = await getPage({ limit: 25, t, sr_detail: true, ...(after ? { after, count } : {}) });
+	if (!Array.isArray(listing?.posts)) return null;
+	const recent = [];
+	const older = [];
+	for (const post of listing.posts) {
+		const created = post?.data?.created_utc;
+		const fresh = typeof created === "number" && created >= now - FEED_TIMES.week && created <= now;
+		(fresh ? recent : older).push(post);
+	}
+	// Stable partition within the upstream page for every sort: keep every
+	// post and its original cursor, so reordering cannot skip older posts.
+	return { ...listing, posts: recent.concat(older), expiresAt: null };
 }
 
 function postName(post) {
@@ -31,7 +57,7 @@ function postName(post) {
 // ahead to fill gaps without skipping eligible posts at a page boundary.
 // The JSON/RSS API deliberately keeps its independent historical time ranges.
 async function recentListing(getPage, query, now = Date.now() / 1000) {
-	const { sort, t, after: initialAfter, count = 0 } = parseFeedQuery(query);
+	const { sort, t, after: initialAfter, count = 0 } = parseFeedQuery(query, "all");
 	const cutoff = now - FEED_TIMES[t];
 	const limit = 25;
 	const posts = [];
@@ -93,4 +119,4 @@ async function recentListing(getPage, query, now = Date.now() / 1000) {
 	return result(after);
 }
 
-module.exports = { parseFeedQuery, recentListing };
+module.exports = { browserListing, isRecentFeed, parseFeedQuery, recentListing };

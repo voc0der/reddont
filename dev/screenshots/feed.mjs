@@ -44,7 +44,8 @@ function feedState(page, id) {
   return page.evaluate((id) => {
     const ids = [...document.querySelectorAll('#posts-container article.post details[id]')].map((details) => details.id);
     const post = document.getElementById(id);
-    return { ids, top: post ? Math.round(post.closest('article').getBoundingClientRect().top) : null, scrollY: window.scrollY, sentinel: !!document.getElementById('infinite-scroll-sentinel') };
+    const dividers = [...document.querySelectorAll('#posts-container .page-divider[data-page]')].map((node) => Number(node.dataset.page));
+    return { ids, dividers, top: post ? Math.round(post.closest('article').getBoundingClientRect().top) : null, scrollY: window.scrollY, sentinel: !!document.getElementById('infinite-scroll-sentinel') };
   }, id);
 }
 
@@ -112,8 +113,9 @@ try {
     assert.deepEqual(continued.ids, inOrder(continued.ids));
     assert.equal(new Set(cursors).size, cursors.length, 'Each page must be requested once');
     const fetched = Math.ceil((continued.ids.length - firstPage.length) / 25);
-    const dividers = await page.locator('#posts-container .page-divider[data-page]').evaluateAll((nodes) => nodes.map((node) => Number(node.dataset.page)));
-    assert.deepEqual(dividers, Array.from({ length: fetched }, (_, i) => i + 2));
+    // Capture posts and dividers together: another page can arrive between
+    // separate browser reads when the community response is fast.
+    assert.deepEqual(continued.dividers, Array.from({ length: fetched }, (_, i) => i + 2));
 
     // A later visit to the same address starts over; going back to it and
     // then to the earlier visit returns each to its own place.
@@ -162,16 +164,17 @@ try {
 
     // Old snapshots cannot reintroduce expired posts. Snapshots from before
     // the age policy have no expiration and must also be discarded.
-    for (const legacy of [false, true]) {
+    for (const invalid of ['expired', 'missing-expiry', 'old-policy']) {
       await loadThrough(page, 'p45');
       await openPost(page, 'p45');
-      await page.evaluate((legacy) => {
+      await page.evaluate((invalid) => {
         const key = JSON.parse(sessionStorage.getItem('reddont:feeds'))[0];
         const saved = JSON.parse(sessionStorage.getItem(key));
-        if (legacy) delete saved.expiresAt;
+        if (invalid === 'missing-expiry') delete saved.expiresAt;
+        else if (invalid === 'old-policy') delete saved.version;
         else saved.expiresAt = Date.now() - 1;
         sessionStorage.setItem(key, JSON.stringify(saved));
-      }, legacy);
+      }, invalid);
       await back(page);
       const refreshed = await feedState(page, 'p1');
       assert.equal(refreshed.ids.length, 25, 'Expired snapshots reload the recent first page');
