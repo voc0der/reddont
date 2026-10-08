@@ -258,11 +258,11 @@ function feedErrorOptions(req, redditRequestOptions, fragment = false) {
 	};
 }
 
-function getFeedPosts(subreddit, query, requestOptions) {
+function getFeedPosts(subreddit, query, requestOptions, recentOnly) {
 	return browserListing(
 		(options) => G.getSubmissions(query.sort, subreddit, options, requestOptions),
 		query,
-		subreddit,
+		recentOnly,
 	);
 }
 
@@ -303,8 +303,9 @@ router.get("/", authenticateToken, async (req, res) => {
 		.query("SELECT * FROM subscriptions WHERE user_id = $id")
 		.all({ id: req.user.id });
 
-	const subreddit = subs.map((s) => s.subreddit).join("+") || "all";
-	const query = parseFeedQuery(req.query, subreddit);
+	// Home is a broad feed like all and popular, so it keeps their age cap.
+	const recentOnly = true;
+	const query = parseFeedQuery(req.query, recentOnly);
 
 	// If no subscriptions, redirect to /r/all
 	if (subs.length === 0) {
@@ -313,6 +314,7 @@ router.get("/", authenticateToken, async (req, res) => {
 	}
 
 	// Build multi-reddit internally (don't put in URL)
+	const subreddit = subs.map((s) => s.subreddit).join("+");
 	const isMulti = true;
 	const isHomePage = true; // Flag to indicate this is the home page
 
@@ -321,6 +323,7 @@ router.get("/", authenticateToken, async (req, res) => {
 		subreddit,
 		query,
 		redditRequestOptions,
+		recentOnly,
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
 	const [posts, about] = await Promise.all([postsReq, aboutReq]);
@@ -336,7 +339,7 @@ router.get("/", authenticateToken, async (req, res) => {
 
 	res.render("index", {
 		subreddit,
-		recentOnly: isRecentFeed(subreddit),
+		recentOnly,
 		posts,
 		about: decodeSidebar(about),
 		query,
@@ -357,7 +360,8 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 		return res.status(400).send("Invalid subreddit");
 	}
 	const isMulti = subreddit.includes("+");
-	const query = parseFeedQuery(req.query, subreddit);
+	const recentOnly = isRecentFeed(subreddit);
+	const query = parseFeedQuery(req.query, recentOnly);
 
 	let isSubbed = false;
 	if (!isMulti) {
@@ -374,6 +378,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 		subreddit,
 		query,
 		redditRequestOptions,
+		recentOnly,
 	);
 	const aboutReq = G.getSubreddit(subreddit, redditRequestOptions);
 	const [posts, about] = await Promise.all([postsReq, aboutReq]);
@@ -389,7 +394,7 @@ router.get("/r/:subreddit", authenticateToken, async (req, res) => {
 
 	res.render("index", {
 		subreddit,
-		recentOnly: isRecentFeed(subreddit),
+		recentOnly,
 		posts,
 		about: decodeSidebar(about),
 		query,
@@ -422,12 +427,14 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 		}
 	}
 
-	const query = parseFeedQuery(req.query, subreddit);
+	const recentOnly = req.params.subreddit === "home" || isRecentFeed(subreddit);
+	const query = parseFeedQuery(req.query, recentOnly);
 	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const posts = await getFeedPosts(
 		subreddit,
 		query,
 		redditRequestOptions,
+		recentOnly,
 	);
 	if (!Array.isArray(posts?.posts)) {
 		return res.render(
@@ -453,7 +460,7 @@ router.get("/api/r/:subreddit/posts", authenticateToken, async (req, res) => {
 			"posts-partial",
 			{
 				posts: posts ? posts.posts : [],
-				recentOnly: isRecentFeed(subreddit),
+				recentOnly,
 				after: posts.after,
 				query,
 				subreddit: req.params.subreddit === "home" ? "home" : subreddit,

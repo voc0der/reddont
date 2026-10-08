@@ -55,8 +55,8 @@ function titles(html) {
 const expected = Array.from({ length: 60 }, (_, i) => `recent${i}`);
 
 describe("recent browser feeds", () => {
-	test.each(["hot", "new", "rising", "controversial", "top"])("%s enforces a week on all and popular, retaining upstream order", async (sort) => {
-		for (const route of ["/r/all", "/r/popular", "/r/Popular"]) {
+	test.each(["hot", "new", "rising", "controversial", "top"])("%s enforces a week on home, all and popular, retaining upstream order", async (sort) => {
+		for (const route of ["/", "/r/all", "/r/popular", "/r/Popular"]) {
 			const response = await request(`${route}?sort=${sort}&t=all`);
 			const html = await response.text();
 			expect(response.status).toBe(200);
@@ -68,18 +68,20 @@ describe("recent browser feeds", () => {
 	});
 
 	test.each(["hot", "new", "rising", "controversial", "top"])("%s paginates without losing or repeating eligible posts", async (sort) => {
-		let route = `/api/r/all/posts?sort=${sort}&t=year`;
-		const found = [];
-		for (let page = 0; page < 10; page++) {
-			const response = await request(route);
-			expect(response.status).toBe(200);
-			const body = await response.json();
-			found.push(...titles(body.html));
-			expect(body.html).not.toContain("Feed post expired");
-			if (!body.after) break;
-			route = `/api/r/all/posts?sort=${sort}&after=${body.after}&count=${found.length}`;
+		for (const feed of ["home", "all"]) {
+			let route = `/api/r/${feed}/posts?sort=${sort}&t=year`;
+			const found = [];
+			for (let page = 0; page < 10; page++) {
+				const response = await request(route);
+				expect(response.status).toBe(200);
+				const body = await response.json();
+				found.push(...titles(body.html));
+				expect(body.html).not.toContain("Feed post expired");
+				if (!body.after) break;
+				route = `/api/r/${feed}/posts?sort=${sort}&after=${body.after}&count=${found.length}`;
+			}
+			expect(found).toEqual(expected);
 		}
-		expect(found).toEqual(expected);
 	});
 
 	test("empty filtered pages preserve a manual next link for initial and infinite-scroll responses", async () => {
@@ -94,8 +96,8 @@ describe("recent browser feeds", () => {
 		expect(titles(next.html)).toEqual(expected.slice(0, 25));
 	});
 
-	test.each(["hot", "new", "rising", "controversial", "top"])("%s keeps older community and home posts, with recent entries first", async (sort) => {
-		for (const route of ["/", "/r/test", "/r/test+other"]) {
+	test.each(["hot", "new", "rising", "controversial", "top"])("%s keeps older community posts, with recent entries first", async (sort) => {
+		for (const route of ["/r/test", "/r/test+other"]) {
 			const response = await request(`${route}?sort=${sort}`);
 			expect(response.status).toBe(200);
 			const names = titles(await response.text());
@@ -129,7 +131,7 @@ describe("recent browser feeds", () => {
 		let after;
 		const found = [];
 		for (let page = 0; page < 8; page++) {
-			const body = await (await request(`/api/r/home/posts?sort=${sort}${after ? `&after=${after}&count=${found.length}` : ""}`)).json();
+			const body = await (await request(`/api/r/test+other/posts?sort=${sort}${after ? `&after=${after}&count=${found.length}` : ""}`)).json();
 			const names = titles(body.html);
 			const recent = names.filter((id) => id.startsWith("recent"));
 			expect(names.slice(0, recent.length)).toEqual(recent);
@@ -164,7 +166,8 @@ describe("recent browser feeds", () => {
 	test("forwards normalized ranges and the reader's authentication on every page", () => {
 		const requests = fs.readFileSync(path.join(dataDir, "requests.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
 		for (const request of requests.filter((r) => !r.path.endsWith("/about.json"))) {
-			if (/^\/r\/(all|popular)\//i.test(request.path)) expect(request.params.t).toBe("week");
+			// Home lists its subscriptions alphabetically as other+test.
+			if (/^\/r\/(all|popular|other\+test)\//i.test(request.path)) expect(request.params.t).toBe("week");
 			else expect(["all", "month", "year"]).toContain(request.params.t);
 			expect(request.params.sr_detail).toBe("true");
 			expect(request.params.view).toBeUndefined();

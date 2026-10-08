@@ -11,10 +11,9 @@ function isRecentFeed(subreddit) {
 	return ["all", "popular"].includes(String(subreddit).toLowerCase());
 }
 
-// Only the broad discovery feeds have a hard age cap. Community listings,
-// including the subscribed home feed, must remain useful when they are quiet.
-function parseFeedQuery(query = {}, subreddit = "") {
-	const recentOnly = isRecentFeed(subreddit);
+// Home, all and popular have a hard age cap. Community listings must remain
+// useful when they are quiet.
+function parseFeedQuery(query = {}, recentOnly = false) {
 	const sort = firstValue(query.sort);
 	const time = firstValue(query.t);
 	const after = firstValue(query.after);
@@ -30,10 +29,10 @@ function parseFeedQuery(query = {}, subreddit = "") {
 	};
 }
 
-async function browserListing(getPage, query, subreddit, now = Date.now() / 1000) {
-	if (isRecentFeed(subreddit)) return recentListing(getPage, query, now);
+async function browserListing(getPage, query, recentOnly, now = Date.now() / 1000) {
+	if (recentOnly) return recentListing(getPage, query, now);
 
-	const { t, after, count } = parseFeedQuery(query, subreddit);
+	const { t, after, count } = parseFeedQuery(query);
 	const listing = await getPage({ limit: 25, t, sr_detail: true, ...(after ? { after, count } : {}) });
 	if (!Array.isArray(listing?.posts)) return null;
 	const recent = [];
@@ -57,7 +56,7 @@ function postName(post) {
 // ahead to fill gaps without skipping eligible posts at a page boundary.
 // The JSON/RSS API deliberately keeps its independent historical time ranges.
 async function recentListing(getPage, query, now = Date.now() / 1000) {
-	const { sort, t, after: initialAfter, count = 0 } = parseFeedQuery(query, "all");
+	const { sort, t, after: initialAfter, count = 0 } = parseFeedQuery(query, true);
 	const cutoff = now - FEED_TIMES[t];
 	const limit = 25;
 	const posts = [];

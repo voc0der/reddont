@@ -8,11 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- The all and popular browser feeds show posts from the past week in upstream
-  order, fetching ahead to fill filtered pages; saved back-navigation pages
-  expire when a displayed post leaves the range
-- Community and subscribed home feeds retain older posts in all five sorts,
-  prefer recent posts within each page, and offer historical time ranges again
+- The home, all, and popular browser feeds show posts from the past week in
+  upstream order, fetching ahead to fill filtered pages; saved back-navigation
+  pages expire when a displayed post leaves the range
+- Community feeds retain older posts in all five sorts, prefer recent posts
+  within each page, and offer historical time ranges again
 - Desktop pages (768px and wider) now mirror old reddit as Reddit Enhancement
   Suite shows it: the subreddit bar with a "my subreddits" menu and your
   subscriptions, sort tabs beside the logo, ranked listings with thumbnails,
