@@ -53,8 +53,14 @@ function request(url, { method = "GET", destination = "", headers = {} } = {}) {
 	return { url: new URL(url, ORIGIN).href, method, destination, headers: new Headers(headers) };
 }
 
-// Runs the worker script with stand-ins for the service worker globals it uses.
-function startWorker({ network = (req) => new Response(`network ${req.url}`), clients = {} } = {}) {
+function fromNetwork(req) {
+	return new Response(`network ${new URL(req.url).pathname}`);
+}
+
+// Runs the worker script with stand-ins for the service worker globals it
+// uses. `respond` answers its fetches until the test calls goOffline().
+function startWorker({ respond = fromNetwork, clients = {} } = {}) {
+	let online = true;
 	const listeners = {};
 	const calls = { fetched: [], skipWaiting: 0, claim: 0 };
 	const caches = fakeCacheStorage();
@@ -75,7 +81,8 @@ function startWorker({ network = (req) => new Response(`network ${req.url}`), cl
 	};
 	const fetch = async (req) => {
 		calls.fetched.push(req.url);
-		return network(req);
+		if (!online) throw new TypeError("Failed to fetch");
+		return respond(req);
 	};
 	const quiet = { log() {}, error() {} };
 	new Function("self", "caches", "fetch", "console", source)(self, caches, fetch, quiet);
@@ -92,6 +99,9 @@ function startWorker({ network = (req) => new Response(`network ${req.url}`), cl
 		install: () => lifecycle("install"),
 		activate: () => lifecycle("activate"),
 		message: (data, init = {}) => lifecycle("message", { data, ...init }),
+		goOffline() {
+			online = false;
+		},
 		// Resolves to the worker's response, or undefined when it lets the browser handle the request.
 		fetch(url, init) {
 			let response;
@@ -100,8 +110,6 @@ function startWorker({ network = (req) => new Response(`network ${req.url}`), cl
 		},
 	};
 }
-
-const offline = () => Promise.reject(new TypeError("Failed to fetch"));
 
 describe("service worker lifecycle", () => {
 	test("install caches the app shell and activates without waiting", async () => {
@@ -153,54 +161,53 @@ describe("service worker requests", () => {
 	});
 
 	test("scripts and styles use the network first and fall back to a cached copy", async () => {
-		let network = (req) => new Response(`network ${new URL(req.url).pathname}`);
-		const worker = startWorker({ network: (req) => network(req) });
+		const worker = startWorker({
+			respond: (req) =>
+				req.url.endsWith("/comments.js") ? new Response("missing", { status: 404 }) : fromNetwork(req),
+		});
 
 		expect(await (await worker.fetch("/styles.css")).text()).toBe("network /styles.css");
-		network = () => new Response("missing", { status: 404 });
 		expect((await worker.fetch("/comments.js")).status).toBe(404);
 
-		network = offline;
+		worker.goOffline();
 		expect(await (await worker.fetch("/styles.css")).text()).toBe("network /styles.css");
 		await expect(worker.fetch("/comments.js")).rejects.toThrow("Failed to fetch");
 	});
 
 	test("images and icons come from the cache once stored", async () => {
-		let network = () => new Response("image");
-		const worker = startWorker({ network: (req) => network(req) });
+		const worker = startWorker();
 
 		await worker.fetch("/icons/icon-192.png");
-		network = offline;
-		expect(await (await worker.fetch("/icons/icon-192.png")).text()).toBe("image");
+		worker.goOffline();
+		expect(await (await worker.fetch("/icons/icon-192.png")).text()).toBe("network /icons/icon-192.png");
 		expect(worker.calls.fetched).toHaveLength(1);
 		await expect(worker.fetch("/assets/nsfw.svg")).rejects.toThrow("Failed to fetch");
 	});
 
 	test("API and subscription requests always use the network", async () => {
-		let network = () => Response.json({ html: "" });
-		const worker = startWorker({ network: (req) => network(req) });
+		const worker = startWorker();
 
 		for (const url of ["/api/r/test/posts", "/unsubscribe-all"]) {
-			expect((await worker.fetch(url)).status).toBe(200);
+			expect(await (await worker.fetch(url)).text()).toBe(`network ${url}`);
 		}
-		network = offline;
+		worker.goOffline();
 		await expect(worker.fetch("/api/r/test/posts")).rejects.toThrow("Failed to fetch");
 		expect(worker.caches.stores.size).toBe(0);
 	});
 
 	test("pages fall back to a cached copy, then the cached offline page", async () => {
-		let network = (req) => new Response(`page ${new URL(req.url).pathname}`);
-		const worker = startWorker({ network: (req) => network(req) });
+		const worker = startWorker();
 		await worker.install();
 		await worker.fetch("/r/test");
 
-		network = offline;
-		expect(await (await worker.fetch("/r/test")).text()).toBe("page /r/test");
+		worker.goOffline();
+		expect(await (await worker.fetch("/r/test")).text()).toBe("network /r/test");
 		expect(await (await worker.fetch("/r/other")).text()).toBe("cached /offline");
 	});
 
 	test("pages without any cached copy get a minimal offline response", async () => {
-		const worker = startWorker({ network: offline });
+		const worker = startWorker();
+		worker.goOffline();
 		const response = await worker.fetch("/r/test");
 
 		expect(response.status).toBe(503);
