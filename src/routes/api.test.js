@@ -4,6 +4,7 @@ const {
 	beforeAll,
 	describe,
 	expect,
+	spyOn,
 	test,
 } = require("bun:test");
 const fs = require("node:fs");
@@ -535,5 +536,24 @@ describe("upstream failures", () => {
 			expect((await res.json()).error).toBe("bad_request");
 		}
 		expect(requestedUrls).toHaveLength(0);
+	});
+});
+
+describe("unexpected failures", () => {
+	test("answer a generic 500 and keep the key out of the log", async () => {
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		db.run("ALTER TABLE subscriptions RENAME TO subscriptions_unavailable");
+		try {
+			const res = await get(`/api/v1/home.json?api_key=${API_KEY}`, { key: null });
+			expect(res.status).toBe(500);
+			expect(await res.json()).toEqual({ error: "internal_error", message: "Failed to handle API request." });
+
+			const log = logged.mock.calls.flat().join("\n");
+			expect(log).toContain("API request failed: /api/v1/home.json?api_key=[redacted]");
+			expect(log).not.toContain(API_KEY);
+		} finally {
+			db.run("ALTER TABLE subscriptions_unavailable RENAME TO subscriptions");
+			logged.mockRestore();
+		}
 	});
 });

@@ -2,7 +2,7 @@ const { afterAll, beforeAll, describe, expect, test } = require("bun:test");
 const { Database } = require("bun:sqlite");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
-const { startServer } = require("../test-support/server.cjs");
+const { startServer, withFailingWrites } = require("../test-support/server.cjs");
 
 // The tests run in order and share one reader's subscriptions.
 const secret = "isolated-browsing-test-secret";
@@ -73,6 +73,19 @@ describe("subscriptions", () => {
 			expect(invalid.status).toBe(400);
 			expect((await invalid.json()).error).toContain("non-empty array");
 		}
+	});
+
+	test("reports subscriptions it could not save or remove", async () => {
+		await withFailingWrites(server.dataDir, "INSERT", "subscriptions", async () => {
+			const response = await post("/subscribe-bulk", { subreddits: ["Unsaved"] });
+			expect(await response.json()).toEqual({ added: [], skipped: [], failed: ["Unsaved"] });
+		});
+		await withFailingWrites(server.dataDir, "DELETE", "subscriptions", async () => {
+			const response = await post("/unsubscribe-all");
+			expect(response.status).toBe(500);
+			expect(await response.text()).toBe("Failed to remove subscriptions");
+		});
+		expect(subscriptions()).toEqual(["Other", "Test", "Third"]);
 	});
 
 	test("the subscriptions page links each community", async () => {
