@@ -2,7 +2,7 @@ const { afterAll, beforeAll, describe, expect, test } = require("bun:test");
 const { Database } = require("bun:sqlite");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
-const { responseCookies, startServer } = require("../test-support/server.cjs");
+const { responseCookies, startServer, withFailingWrites, withLockedDatabase } = require("../test-support/server.cjs");
 
 // The tests run in order and build on the accounts created by earlier ones.
 const secret = "isolated-accounts-test-secret";
@@ -269,6 +269,38 @@ describe("remote header sign-in", () => {
 			expect(await response.text()).toContain('name="password"');
 		}
 	});
+
+	test("ignores the header from an address that is not a trusted proxy", async () => {
+		const response = await request("/login?redirect=%2Fsubs", {
+			headers: { "Remote-User": "spoofed", "Remote-Groups": "admin", "X-Test-Peer": "198.51.100.7" },
+		});
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain('name="password"');
+		expect(responseCookies(response).auth_token).toBeUndefined();
+		expect(user("spoofed")).toBeNull();
+	});
+
+	test("accepts the header from a whitelisted proxy, including an IPv4-mapped address", async () => {
+		for (const [peer, username] of [["203.0.113.10", "via-proxy"], ["::ffff:203.0.113.10", "via-mapped-proxy"]]) {
+			const response = await request("/login", { headers: { "Remote-User": username, "X-Test-Peer": peer } });
+			expect(redirectTarget(response)).toEqual({ path: "/" });
+			expect(jwt.verify(responseCookies(response).auth_token.value, secret).username).toBe(username);
+		}
+	});
+
+	test("changes admin rights only for groups from a trusted address", async () => {
+		const token = sessionFor("proxied");
+		const untrusted = await request("/create-invite", {
+			token,
+			headers: { "Remote-Groups": "staff,admin", "X-Test-Peer": "198.51.100.7" },
+		});
+		expect(untrusted.status).toBe(403);
+		expect(user("proxied")).toMatchObject({ isAdmin: 0, groups: '["staff"]' });
+
+		await request("/subs", { token, headers: { "Remote-Groups": "staff,admin", "X-Test-Peer": "203.0.113.10" } });
+		expect(user("proxied")).toMatchObject({ isAdmin: 1, groups: '["staff","admin"]' });
+		await request("/subs", { token, headers: { "Remote-Groups": "staff" } });
+	});
 });
 
 describe("preferences", () => {
@@ -381,5 +413,77 @@ describe("request handling", () => {
 				message: "OIDC not configured",
 			});
 		}
+	});
+});
+
+describe("database failures", () => {
+	test("signed-in pages keep the session and explain a locked database", async () => {
+		const token = sessionFor("owner");
+		await withLockedDatabase(server.dataDir, async () => {
+			for (const route of ["/subs", "/create-invite"]) {
+				const response = await request(route, { token });
+				expect(redirectTarget(response)).toEqual({ path: "/login", message: "Database error." });
+				expect(responseCookies(response).auth_token).toBeUndefined();
+			}
+			const login = await request("/login", { token });
+			expect(login.status).toBe(200);
+			expect(await login.text()).toContain("Database error.");
+
+			const api = await realFetch(`${server.baseUrl}/api/v1/whoami`, { headers: { "X-API-Key": "reddont_locked" } });
+			expect(api.status).toBe(500);
+			expect(await api.json()).toEqual({ error: "internal_error", message: "Failed to validate API key." });
+		});
+		expect((await request("/subs", { token })).status).toBe(200);
+	});
+
+	test("settings report a failed save and keep the saved values", async () => {
+		const token = sessionFor("reader");
+		await request("/api-key/regenerate", { token, fields: {} });
+		const { apiKey, themePreference } = user("reader");
+
+		await withFailingWrites(server.dataDir, "UPDATE", "users", async () => {
+			for (const [route, message] of [
+				["/api-key/regenerate", "Failed to regenerate API key"],
+				["/api-key/revoke", "Failed to revoke API key"],
+				["/update-preferences", "Failed to update preferences"],
+			]) {
+				const response = await request(route, { token, fields: { themePreference: "dark" } });
+				expect(redirectTarget(response)).toEqual({ path: "/dashboard", message });
+			}
+		});
+		expect(user("reader")).toMatchObject({ apiKey, themePreference });
+	});
+
+	test("invites and registration report failures and leave invites unchanged", async () => {
+		const owner = sessionFor("owner");
+		await request("/create-invite", { token: owner });
+		const invites = () => db.query("SELECT id, usedAt FROM invites ORDER BY id").all();
+		const before = invites();
+		const invite = db.query("SELECT id, token FROM invites ORDER BY id DESC").get();
+
+		await withFailingWrites(server.dataDir, "INSERT", "invites", async () => {
+			expect(await (await request("/create-invite", { token: owner })).text()).toBe("failed to create invite");
+		});
+		await withFailingWrites(server.dataDir, "DELETE", "invites", async () => {
+			expect(await (await request(`/delete-invite/${invite.id}`, { token: owner })).text()).toBe("failed to delete invite");
+		});
+		await withFailingWrites(server.dataDir, "UPDATE", "invites", async () => {
+			const response = await request(`/register?token=${invite.token}`, {
+				fields: { username: "latecomer", password: "pw", confirm_password: "pw" },
+			});
+			expect(await response.text()).toContain("error registering user, try again later");
+		});
+		expect(invites()).toEqual(before);
+		expect(user("latecomer")).toBeNull();
+	});
+
+	test("header sign-in reports an account it could not create", async () => {
+		await withFailingWrites(server.dataDir, "INSERT", "users", async () => {
+			const response = await request("/login", { headers: { "Remote-User": "unsaved" } });
+			expect(response.status).toBe(200);
+			expect(await response.text()).toContain("Error creating account, please try again.");
+			expect(responseCookies(response).auth_token).toBeUndefined();
+		});
+		expect(user("unsaved")).toBeNull();
 	});
 });

@@ -1,8 +1,9 @@
 # Test coverage
 
-[![JavaScript line coverage](https://img.shields.io/badge/line_coverage-87.62%25-brightgreen)](../assets/coverage-summary.json)
+[![JavaScript line coverage](https://img.shields.io/badge/coverage-97.93%25-brightgreen)](../assets/coverage-summary.json)
 
-The README badge reports **JavaScript line coverage** from the Bun test suite.
+The README's **coverage** badge reports JavaScript line coverage from the Bun
+test suite.
 It is a checked-in measurement; it changes when a contributor recalculates it.
 The [published summary](../assets/coverage-summary.json) records the covered and
 eligible line counts for every source file, test results, Bun version, and a
@@ -10,7 +11,7 @@ hash of the measured source files.
 
 ## Calculate coverage
 
-From the repository root, with Bun 1.4.2 and npm installed:
+From the repository root, with Bun 1.4.3 and npm installed:
 
 ```sh
 bun install --frozen-lockfile
@@ -63,10 +64,10 @@ The inventory includes every `.js`, `.cjs`, and `.mjs` application file under
 | Dependencies, build output, and `dev/` tooling | Third-party, generated, or development-only code. |
 
 Standalone browser scripts in `src/public/` **are included**, even when they
-have zero hits. Unit tests run the service worker with stand-ins for its browser
-globals. The separate Playwright harness is not part of this calculation, so its
-browser activity does not contribute to the badge; `comments.js`, which only
-that harness exercises, counts as uncovered.
+have zero hits. Unit tests run the service worker and the comment loader,
+`comments.js`, with stand-ins for the browser features they use. The separate
+Playwright harness is not part of this calculation, so its browser activity
+does not contribute to the badge.
 
 [Bun's built-in coverage](https://bun.com/docs/test/code-coverage) only tracks
 loaded files. Its default report also misses the fixture servers' separate

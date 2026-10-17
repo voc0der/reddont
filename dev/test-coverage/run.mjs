@@ -29,7 +29,7 @@ async function sourceFiles(dir) {
 
 function badgeUrl(percent) {
 	const color = percent >= 80 ? "brightgreen" : percent >= 60 ? "yellow" : "red";
-	return `https://img.shields.io/badge/line_coverage-${percent.toFixed(2)}%25-${color}`;
+	return `https://img.shields.io/badge/coverage-${percent.toFixed(2)}%25-${color}`;
 }
 
 const workDir = await mkdtemp(join(tmpdir(), "reddont-coverage-"));

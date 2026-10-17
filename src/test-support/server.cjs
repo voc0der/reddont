@@ -1,6 +1,7 @@
 // Starts a fixture script as an isolated reddont process for route tests. Each
 // server gets a marked, empty temporary data directory and no environment
 // beyond PATH and the settings a test passes.
+const { Database } = require("bun:sqlite");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -78,4 +79,30 @@ function responseCookies(response) {
 	return cookies;
 }
 
-module.exports = { responseCookies, startServer };
+// Makes one kind of write to a test server's database fail, as a full disk or a
+// damaged table would, until `run` finishes. Reads still work.
+async function withFailingWrites(dataDir, operation, table, run) {
+	const db = new Database(path.join(dataDir, "reddont.db"));
+	db.run(`CREATE TRIGGER simulated_failure BEFORE ${operation} ON ${table} BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END`);
+	try {
+		return await run();
+	} finally {
+		db.run("DROP TRIGGER simulated_failure");
+		db.close();
+	}
+}
+
+// Holds an exclusive lock on a test server's database until `run` finishes, so
+// the server's queries fail with "database is locked".
+async function withLockedDatabase(dataDir, run) {
+	const db = new Database(path.join(dataDir, "reddont.db"));
+	db.run("BEGIN EXCLUSIVE");
+	try {
+		return await run();
+	} finally {
+		db.run("ROLLBACK");
+		db.close();
+	}
+}
+
+module.exports = { responseCookies, startServer, withFailingWrites, withLockedDatabase };
