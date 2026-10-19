@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Feeds and post pages failed to load with a TypeError when a gallery post
+  listed an image missing from Reddit's `media_metadata`; that image now gets a
+  best-guess `.jpg` link, and a gallery with no images shows as a plain post
+
 ## [0.1.1] - 2026-10-08
 
 ### Added

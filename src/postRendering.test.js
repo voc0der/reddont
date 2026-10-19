@@ -179,3 +179,63 @@ describe("desktop listing", () => {
 		);
 	});
 });
+
+function galleryPost(overrides = {}) {
+	return {
+		is_self: false,
+		selftext_html: null,
+		is_gallery: true,
+		domain: "reddit.com",
+		url: "https://www.reddit.com/gallery/abc123",
+		thumbnail: "https://b.thumbs.redditmedia.com/gallery.jpg",
+		gallery_data: {
+			items: [
+				{ media_id: "first", id: 1 },
+				{ media_id: "second", id: 2 },
+			],
+		},
+		// Reddit can leave a gallery item out of media_metadata (issue #41).
+		media_metadata: {
+			first: { status: "valid", e: "Image", m: "image/png" },
+		},
+		...overrides,
+	};
+}
+
+function renderPostPage(overrides = {}) {
+	return pug.renderFile("src/views/comments.pug", {
+		data: { post: { ...basePost(), ...overrides }, comments: [] },
+		isSubbed: false,
+		user: { username: "reader", highResThumbnails: 1, showNsfwThumbnails: 0 },
+		query: {},
+		navSubscriptions: () => ["test"],
+	});
+}
+
+describe("gallery posts", () => {
+	test("render in a listing when the metadata leaves out an item", () => {
+		const html = renderPost(galleryPost());
+
+		expect(html).toContain('src="https://i.redd.it/first.png"');
+		expect(html).toContain('src="https://i.redd.it/second.jpg"');
+		expect(html).toContain("1 of 2");
+	});
+
+	test("render on the post page when the metadata leaves out an item", () => {
+		const html = renderPostPage(galleryPost());
+
+		expect(html).toContain('src="https://i.redd.it/first.png"');
+		expect(html).toContain('src="https://i.redd.it/second.jpg"');
+		expect(html).toContain("1 of 2");
+	});
+
+	test("show a gallery with no items as a plain post", () => {
+		const empty = { gallery_data: null, media_metadata: null };
+		const listing = renderPost(galleryPost(empty));
+		const page = renderPostPage(galleryPost(empty));
+
+		expect(listing).not.toContain('class="gallery"');
+		expect(listing).not.toContain("expando-button");
+		expect(page).not.toContain('class="gallery"');
+	});
+});
