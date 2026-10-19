@@ -23,7 +23,9 @@
 -
   function isPostGallery(p) {
     p = getPostData(p);
-    return (p.is_gallery && p.is_gallery == true);
+    // Without items there is nothing to show, so render it as a plain post.
+    var items = p.gallery_data && p.gallery_data.items;
+    return p.is_gallery == true && Array.isArray(items) && items.length > 0;
   }
 -
   function isPostImage(p) {
@@ -95,9 +97,10 @@
 -
   function imgExt(p, id) {
     p = getPostData(p);
-    var metadata = p.media_metadata;
-    if (metadata[id].status == 'valid') {
-      return stripPrefix(metadata[id].m, "image/");
+    // Reddit can leave a gallery item out of media_metadata.
+    var meta = p.media_metadata && p.media_metadata[id];
+    if (meta && meta.status == 'valid' && meta.m) {
+      return stripPrefix(meta.m, "image/");
     } else {
       // dosent matter
       return 'jpg';
