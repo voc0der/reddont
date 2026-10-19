@@ -4,7 +4,6 @@
 </h1>
 
 ![Since badge](https://img.shields.io/badge/since-12%2F08%2F2024-blue)
-[![License badge](https://img.shields.io/github/license/voc0der/reddont)](LICENSE)
 [![Version badge](https://img.shields.io/docker/v/voc0der/reddont?sort=semver)](https://hub.docker.com/r/voc0der/reddont/tags)
 [![Build status badge](https://img.shields.io/github/actions/workflow/status/voc0der/reddont/publish-docker.yml?branch=main&label=build)](https://github.com/voc0der/reddont/actions/workflows/publish-docker.yml)
 [![JavaScript line coverage](https://img.shields.io/badge/coverage-97.93%25-brightgreen)](docs/development/coverage.md)
