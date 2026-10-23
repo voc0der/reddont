@@ -258,6 +258,15 @@ function feedErrorOptions(req, redditRequestOptions, fragment = false) {
 	};
 }
 
+function commentErrorOptions(req, redditRequestOptions, redditUrl) {
+	return {
+		...feedErrorOptions(req, redditRequestOptions),
+		errorTitle: "Comments unavailable",
+		errorSubject: "these comments",
+		redditUrl,
+	};
+}
+
 function getFeedPosts(subreddit, query, requestOptions, recentOnly) {
 	return browserListing(
 		(options) => G.getSubmissions(query.sort, subreddit, options, requestOptions),
@@ -497,11 +506,17 @@ router.get("/comments/:id", authenticateToken, async (req, res) => {
 		sr_detail: true,
 		sort: commentSort(req.query.sort),
 	};
+	const redditRequestOptions = getRedditRequestOptions(req.user);
 	const response = await G.getSubmissionComments(
 		id,
 		params,
-		getRedditRequestOptions(req.user),
+		redditRequestOptions,
 	);
+	if (!response) {
+		return res
+			.status(502)
+			.render("feed-error", commentErrorOptions(req, redditRequestOptions, `https://www.reddit.com/comments/${id}/`));
+	}
 	const data = unescape_submission(response);
 	const isSubbed = getSubscribedSubs(req.user.id).includes(
 		String(data.post.subreddit).toLowerCase(),
@@ -576,12 +591,20 @@ router.get(
 			limit: 50,
 			sort: commentSort(req.query.sort),
 		};
+		const redditRequestOptions = getRedditRequestOptions(req.user);
 		const response = await G.getSingleCommentThread(
 			parent_id,
 			child_id,
 			params,
-			getRedditRequestOptions(req.user),
+			redditRequestOptions,
 		);
+		// Reddit answers 404 here for comments with the 13-character IDs it
+		// introduced on 2026-10-21, so offer the thread on Reddit itself.
+		if (!response) {
+			return res
+				.status(502)
+				.render("feed-error", commentErrorOptions(req, redditRequestOptions, `https://www.reddit.com/comments/${parent_id}/_/${child_id}/`));
+		}
 		const comments = response.comments;
 		comments.forEach(unescape_comment);
 		res.render("single_comment_thread", {

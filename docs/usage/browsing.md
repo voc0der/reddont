@@ -66,7 +66,13 @@ opens a single comment thread.
 place. With **Never Ending Reddit** enabled, the next batch loads automatically
 as you reach the bottom of the discussion. Nested reply groups still open when
 you select them. If a load fails, select **load more comments** to retry.
+With a Reddit cookie, these batches load from old.reddit.com, because
+www.reddit.com blocks that request for cookie sessions. If Reddit returns none
+of a group's comments, for example because they were removed, the group
+disappears, as it does on Reddit.
 **continue this thread** opens deeper replies in a separate thread view.
+Reddit doesn't serve that view for comments posted since October 21, 2026, so
+for those it shows an error page with a link to the thread on Reddit.
 
 On desktop, the keyboard works as it does with RES:
 

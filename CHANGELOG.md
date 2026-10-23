@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **load more comments** failed with "Could not load comments. Try again." on
+  every thread when using a Reddit cookie: www.reddit.com now blocks its
+  load-more endpoint for cookie sessions, so batches load from old.reddit.com,
+  and refused requests are logged with Reddit's status
+- Comment pages and **continue this thread** failed with a TypeError when
+  Reddit returned nothing; they now show an error page with a link to the
+  thread on Reddit. Reddit returns 404 for **continue this thread** on comments
+  posted since 2026-10-21
+
 ## [0.1.2] - 2026-10-19
 
 ### Fixed

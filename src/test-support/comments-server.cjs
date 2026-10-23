@@ -14,6 +14,8 @@ for (const theme of ["res", "light", "dark"]) {
 	db.query("INSERT INTO users (username, themePreference, infiniteScroll, redditAuthHeaders) VALUES (?, ?, 1, ?)")
 		.run(`reader_auto_${theme}`, theme, JSON.stringify({ authorization: "Bearer comments-test" }));
 }
+db.query("INSERT INTO users (username, redditAuthHeaders) VALUES (?, ?)")
+	.run("reader_cookie", JSON.stringify({ cookie: "reddit_session=comments-test" }));
 
 const comment = (id, parent_id = "t3_post1", replies = []) => ({
 	kind: "t1",
@@ -39,7 +41,7 @@ const post = {
 let failed = false;
 globalThis.fetch = async (input, options) => {
 	const url = new URL(input);
-	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, params: Object.fromEntries(url.searchParams), authenticated: options?.headers?.Authorization === "Bearer comments-test" })}\n`);
+	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ host: url.host, path: url.pathname, params: Object.fromEntries(url.searchParams), authenticated: options?.headers?.Authorization === "Bearer comments-test" || options?.headers?.Cookie === "reddit_session=comments-test" })}\n`);
 	if (url.pathname === "/api/morechildren.json") {
 		const ids = url.searchParams.get("children").split(",");
 		if (ids.length > 100 || url.searchParams.get("link_id") !== "t3_post1") throw new Error("Invalid batch");
@@ -55,6 +57,7 @@ globalThis.fetch = async (input, options) => {
 		return Response.json({ json: { errors: [], data: { things } } });
 	}
 	if (url.pathname.startsWith("/comments/")) {
+		if (url.pathname.includes("unavailable")) return Response.json({ message: "Not Found", error: 404 }, { status: 404 });
 		const child = url.pathname.match(/\/comment\/([a-z0-9]+)\.json$/)?.[1];
 		const comments = child ? [comment(child)] : [
 			comment("existing", "t3_post1", [more(["reply1", "reply2"], "t1_existing")]),

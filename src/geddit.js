@@ -1,4 +1,10 @@
+const logger = require("./logger");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
+
+// www.reddit.com answers /api/morechildren with its network-security block
+// page, even for a signed-in cookie. old.reddit.com serves it to the same
+// cookie, for old and new comment IDs alike (checked 2026-10-23).
+const MORE_COMMENTS_COOKIE_HOST = "https://old.reddit.com";
 
 class Geddit {
 	constructor() {
@@ -49,8 +55,8 @@ class Geddit {
 		return /^[A-Za-z0-9_]+$/.test(trimmed) ? trimmed : "";
 	}
 
-	buildRedditUrl(pathname, options = {}) {
-		const url = new URL(pathname, this.host);
+	buildRedditUrl(pathname, options = {}, host = this.host) {
+		const url = new URL(pathname, host);
 		url.search = new URLSearchParams(options).toString();
 		return url;
 	}
@@ -224,17 +230,23 @@ class Geddit {
 			children.some((child) => typeof child !== "string" || !/^[a-z0-9]+$/i.test(child))
 		) return null;
 
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			"/api/morechildren.json",
+			{
+				api_type: "json",
+				link_id: `t3_${id}`,
+				children: children.join(","),
+				sort: commentSort(sort),
+			},
+			fetchOptions.headers.Cookie ? MORE_COMMENTS_COOKIE_HOST : this.host,
+		);
 		try {
-			const response = await fetch(
-				this.buildRedditUrl("/api/morechildren.json", {
-					api_type: "json",
-					link_id: `t3_${id}`,
-					children: children.join(","),
-					sort: commentSort(sort),
-				}),
-				this.getFetchOptions(requestOptions),
-			);
-			if (!response.ok) return null;
+			const response = await fetch(url, fetchOptions);
+			if (!response.ok) {
+				logger.warn("Reddit refused a load-more request", { host: url.hostname, status: response.status });
+				return null;
+			}
 			const body = await response.json();
 			if (body.json?.errors?.length) return null;
 			const things = body.json?.data?.things;
@@ -243,6 +255,7 @@ class Geddit {
 			)) return null;
 			return things;
 		} catch {
+			logger.warn("Reddit load-more request failed", { host: url.hostname });
 			return null;
 		}
 	}

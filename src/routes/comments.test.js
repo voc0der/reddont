@@ -53,12 +53,16 @@ afterAll(async () => {
 	fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
-function load(values = {}, accept = "application/json") {
+function load(values = {}, accept = "application/json", sessionCookie = cookie) {
 	return realFetch(`${baseUrl}/comments/post1/more`, {
 		method: "POST",
-		headers: { Cookie: cookie, Accept: accept },
+		headers: { Cookie: sessionCookie, Accept: accept },
 		body: new URLSearchParams({ _csrf: csrf, parent_id: "t3_post1", children: "c0,c1", count: "2", depth: "0", sort: "new", ...values }),
 	});
+}
+
+function lastUpstreamRequest() {
+	return JSON.parse(fs.readFileSync(path.join(dataDir, "requests.jsonl"), "utf8").trim().split("\n").at(-1));
 }
 
 describe("load more comment routes", () => {
@@ -85,8 +89,15 @@ describe("load more comment routes", () => {
 		expect(html).toContain('/comments/post1/comment/grandchild?sort=new');
 		expect(html).toContain('&lt;script&gt; stays text.');
 		expect(html).not.toContain('<script>');
-		const requests = fs.readFileSync(path.join(dataDir, "requests.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-		expect(requests.at(-1)).toMatchObject({ path: "/api/morechildren.json", params: { children: "c0,c1", sort: "new", link_id: "t3_post1" }, authenticated: true });
+		expect(lastUpstreamRequest()).toMatchObject({ host: "www.reddit.com", path: "/api/morechildren.json", params: { children: "c0,c1", sort: "new", link_id: "t3_post1" }, authenticated: true });
+	});
+
+	test("loads groups through old.reddit.com for a cookie credential", async () => {
+		const token = jwt.sign({ id: 7 }, secret, { expiresIn: "1h" });
+		const response = await load({}, "application/json", `auth_token=${token}; csrf_token=${csrf}`);
+		expect(response.status).toBe(200);
+		expect((await response.json()).html).toContain('id="c0"');
+		expect(lastUpstreamRequest()).toMatchObject({ host: "old.reddit.com", path: "/api/morechildren.json", params: { children: "c0,c1" }, authenticated: true });
 	});
 
 	test("keeps a large queue in the next form while limiting each upstream request", async () => {
@@ -125,6 +136,21 @@ describe("load more comment routes", () => {
 		expect((await retry.json()).html).toContain('id="failure"');
 		const gone = await load({ children: "gone" });
 		expect(await gone.json()).toEqual({ html: "" });
+	});
+
+	test("shows an error page with a Reddit link when a comment page fails upstream", async () => {
+		for (const [route, redditUrl] of [
+			["/comments/unavailable", "https://www.reddit.com/comments/unavailable/"],
+			["/comments/post1/comment/unavailable", "https://www.reddit.com/comments/post1/_/unavailable/"],
+		]) {
+			const response = await realFetch(baseUrl + route, { headers: { Cookie: cookie } });
+			expect(response.status).toBe(502);
+			const html = await response.text();
+			expect(html).toContain("<title>comments unavailable · reddont");
+			expect(html).toContain("Reddit couldn't load these comments.");
+			expect(html).toContain(`href="${redditUrl}"`);
+			expect(html).toContain(`href="${route}"`);
+		}
 	});
 
 	test("validates input and requires the normal session and CSRF protection", async () => {
