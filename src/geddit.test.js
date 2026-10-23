@@ -60,6 +60,22 @@ describe("comment threads", () => {
 		]);
 	});
 
+	test("load more from old.reddit.com when sending a cookie", async () => {
+		const things = [{ kind: "t1", data: { id: "c1" } }];
+		respond({ json: { errors: [], data: { things } } });
+		const reddit = new Geddit();
+
+		expect(await reddit.getMoreComments("post1", ["c1", "c2"], "new", { authHeaders: { cookie: "reddit_session=abc" } })).toEqual(things);
+		await reddit.getMoreComments("post1", ["c1"], "top", { authHeaders: { authorization: "Bearer abc" } });
+
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
+			"https://old.reddit.com/api/morechildren.json",
+			"https://www.reddit.com/api/morechildren.json",
+		]);
+		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ api_type: "json", link_id: "t3_post1", children: "c1,c2", sort: "new" });
+		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
+	});
+
 	test("reject unsafe identifiers before making a request", async () => {
 		respond(listing([]));
 		const reddit = new Geddit();
