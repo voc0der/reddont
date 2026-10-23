@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **load more comments** failed with "Could not load comments. Try again." on
+  groups of more than about 6,000 replies: the request carrying their IDs
+  passed the server's 100 KB body limit. That request now accepts up to 2 MB
+
 ## [0.1.3] - 2026-10-23
 
 ### Fixed

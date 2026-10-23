@@ -16,6 +16,10 @@ on a shared Docker network or `http://127.0.0.1:3000` on the same host.
   when the proxy-to-app connection is HTTP.
 - Leave `REDDONT_SSL_CERT_PATH` and `REDDONT_SSL_KEY_PATH` unset when the
   proxy handles TLS.
+- Allow request bodies of up to 2 MB. **load more comments** sends back the ID
+  of every hidden reply in a group, and the largest discussions approach that
+  size. nginx's default `client_max_body_size` of 1 MB covers groups of about
+  65,000 replies.
 
 When OIDC or remote header login is active, explicitly set
 `REVERSE_PROXY_WHITELIST` to the proxy IPs. Without it, the app's forwarded
