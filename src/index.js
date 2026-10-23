@@ -122,6 +122,10 @@ async function bootstrap() {
 	const apiRoutes = require("./routes/api");
 	const { describeApiWhitelist } = require("./apiAuth");
 	app.use(express.json());
+	// "load more comments" posts every hidden reply ID back to the server. A
+	// group of about 6,000 of Reddit's 13-character IDs passes the default
+	// 100 KB limit, so this route accepts more (about 130,000 IDs).
+	app.use("/comments/:id/more", express.urlencoded({ extended: true, limit: "2mb" }));
 	app.use(express.urlencoded({ extended: true }));
 	app.use(express.static(path.join(__dirname, "public")));
 	app.use(express.static(path.join(__dirname, "assets")));

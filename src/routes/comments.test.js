@@ -112,6 +112,17 @@ describe("load more comment routes", () => {
 		expect(html).toContain('name="_csrf" value="' + csrf + '"');
 	});
 
+	test("accepts a group of 11,849 replies with 13-character comment IDs", async () => {
+		const ids = Array.from({ length: 11849 }, (_, i) => `19r${i.toString(36).padStart(10, "0")}`);
+		const response = await load({ children: ids.join(","), count: "11849" });
+		expect(response.status).toBe(200);
+		const { html } = await response.json();
+		expect(html).toContain(`id="${ids[99]}"`);
+		expect(html).not.toContain(`id="${ids[100]}"`);
+		expect(html).toContain(`name="children" value="${ids[100]},`);
+		expect(html).toContain(`${ids.at(-1)}"`);
+	});
+
 	test("preserves depth and parent for nested groups", async () => {
 		const response = await load({ children: "reply1,reply2", parent_id: "t1_existing", depth: "1" });
 		const { html } = await response.json();
