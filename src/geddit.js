@@ -1,10 +1,12 @@
 const logger = require("./logger");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
 
-// www.reddit.com answers /api/morechildren with its network-security block
-// page, even for a signed-in cookie. old.reddit.com serves it to the same
-// cookie, for old and new comment IDs alike (checked 2026-10-23).
-const MORE_COMMENTS_COOKIE_HOST = "https://old.reddit.com";
+// www.reddit.com answers /api/morechildren (checked 2026-10-23) and /r/all
+// listings (checked 2026-10-29) with its network-security block page, even
+// for a signed-in cookie. old.reddit.com serves both to the same cookie, for
+// old and new comment IDs and for every feed and sort. Anonymous requests to
+// old.reddit.com redirect to its login page, so only cookie requests go there.
+const COOKIE_HOST = "https://old.reddit.com";
 
 class Geddit {
 	constructor() {
@@ -88,6 +90,10 @@ class Geddit {
 		};
 	}
 
+	getRequestHost(fetchOptions) {
+		return fetchOptions.headers.Cookie ? COOKIE_HOST : this.host;
+	}
+
 	async getSubmissions(
 		sort = "hot",
 		subreddit = null,
@@ -103,13 +109,20 @@ class Geddit {
 		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
 		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
 		const subredditStr = encodedSubreddit ? `/r/${encodedSubreddit}` : "";
+		const fetchOptions = this.getFetchOptions(requestOptions);
 		const url = this.buildRedditUrl(
 			`${subredditStr}/${encodeURIComponent(safeSort)}.json`,
 			Object.assign({}, params, options),
+			this.getRequestHost(fetchOptions),
 		);
 
-		return await fetch(url, this.getFetchOptions(requestOptions))
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => {
+				if (!res.ok) {
+					logger.warn("Reddit refused a feed request", { host: url.hostname, status: res.status });
+				}
+				return res.json();
+			})
 			.then((json) => json.data)
 			.then((data) => ({
 				after: data.after,
@@ -239,7 +252,7 @@ class Geddit {
 				children: children.join(","),
 				sort: commentSort(sort),
 			},
-			fetchOptions.headers.Cookie ? MORE_COMMENTS_COOKIE_HOST : this.host,
+			this.getRequestHost(fetchOptions),
 		);
 		try {
 			const response = await fetch(url, fetchOptions);
