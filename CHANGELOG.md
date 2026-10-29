@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- On phones, loading more replies shows a spinner in place of the group's icon
+  instead of "Loading…" text
+
 ### Fixed
 
 - **all** showed "Feed unavailable" when using a Reddit cookie: www.reddit.com
