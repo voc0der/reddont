@@ -1984,6 +1984,43 @@ details.link-details,
   height: 16px;
 }
 
+/* A loading group swaps its icon for a spinner, so its button isn't dimmed.
+   The "Loading…" status stays for screen readers; a failure message still
+   shows. */
+.more[aria-busy="true"] button:disabled {
+  opacity: 1;
+}
+
+.more[aria-busy="true"] .m-more-icon .icon {
+  display: none;
+}
+
+.more[aria-busy="true"] .m-more-icon::before {
+  content: "";
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--r-thread);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: m-spin 0.8s linear infinite;
+}
+
+.more[aria-busy="true"] .more-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes m-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .replies > .more {
   padding-left: 0;
 }

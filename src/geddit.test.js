@@ -34,6 +34,25 @@ describe("listing requests", () => {
 		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ limit: "20", include_over_18: "true", t: "week" });
 	});
 
+	test("request feeds from old.reddit.com when sending a cookie", async () => {
+		respond(listing([post("a")], "t3_a"));
+		const reddit = new Geddit();
+
+		expect(await reddit.getSubmissions("new", "all", {}, { authHeaders: { cookie: "reddit_session=abc" } })).toEqual({
+			after: "t3_a",
+			posts: [post("a")],
+		});
+		await reddit.getSubmissions("new", "all", {}, { authHeaders: { authorization: "Bearer abc" } });
+		await reddit.getSubmissions("new", "all");
+
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
+			"https://old.reddit.com/r/all/new.json",
+			"https://www.reddit.com/r/all/new.json",
+			"https://www.reddit.com/r/all/new.json",
+		]);
+		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
+	});
+
 	test("send the reader's stored credential", async () => {
 		respond(listing([]));
 		await new Geddit().getSubreddit("test", { authHeaders: { cookie: "reddit_session=abc" } });

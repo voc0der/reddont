@@ -64,10 +64,11 @@ Save a cookie or bearer token from a signed-in burner account. A user can also
 share their cookie with other users on the instance who have no credential;
 see [preferences and credentials](../usage/preferences.md#reddit-credentials).
 
-With a Reddit cookie, **load more comments** requests go to old.reddit.com
-instead of www.reddit.com; allow both hosts if outbound traffic is restricted.
-When Reddit refuses one, the log shows `Reddit refused a load-more request`
-with the host and HTTP status.
+With a Reddit cookie, feed and **load more comments** requests go to
+old.reddit.com instead of www.reddit.com; allow both hosts if outbound traffic
+is restricted. When Reddit refuses one, the log shows
+`Reddit refused a feed request` or `Reddit refused a load-more request` with
+the host and HTTP status.
 
 The app's browser limit defaults to 100 requests per 15 minutes; the API
 defaults to 600. These are separate from upstream rate limits. Slower polling
