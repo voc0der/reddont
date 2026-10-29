@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'reddont-v0.1.4';
+const CACHE_VERSION = 'reddont-v0.1.5';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const OFFLINE_PAGE = '/offline';
