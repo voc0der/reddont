@@ -1,12 +1,12 @@
 const logger = require("./logger");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
 
-// www.reddit.com answers /api/morechildren (checked 2026-10-23), /r/all
-// listings (checked 2026-10-29) and search (checked 2026-10-31) with its
-// network-security block page, even for a signed-in cookie. old.reddit.com
-// serves them all to the same cookie, for old and new comment IDs and for
-// every feed and sort. Anonymous requests to old.reddit.com redirect to its
-// login page, so only cookie requests go there.
+// www.reddit.com started answering signed-in cookies with its network-security
+// block page one endpoint at a time: /api/morechildren (2026-10-23), /r/all
+// listings (2026-10-29) and search (2026-10-31). old.reddit.com serves every
+// request reddont makes to the same cookie, with the same JSON (checked
+// 2026-10-31), so all cookie requests go there. Anonymous requests to
+// old.reddit.com redirect to its login page, so only cookie requests go there.
 const COOKIE_HOST = "https://old.reddit.com";
 
 class Geddit {
@@ -139,10 +139,13 @@ class Geddit {
 		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
 		if (!safeSubreddit) return null;
 		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
+		const fetchOptions = this.getFetchOptions(requestOptions);
 
+		// Refusals aren't logged: multi-reddits such as home have no about
+		// page, so this request 404s on every home page.
 		return await fetch(
-			`${this.host}/r/${encodedSubreddit}/about.json`,
-			this.getFetchOptions(requestOptions),
+			`${this.getRequestHost(fetchOptions)}/r/${encodedSubreddit}/about.json`,
+			fetchOptions,
 		)
 			.then((res) => res.json())
 			.then((json) => json.data)
@@ -232,15 +235,15 @@ class Geddit {
 	) {
 		const safeId = this.sanitizeThingId(id);
 		if (!safeId) return null;
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			`/comments/${encodeURIComponent(safeId)}.json`,
+			options,
+			this.getRequestHost(fetchOptions),
+		);
 
-		return await fetch(
-			this.buildRedditUrl(
-				`/comments/${encodeURIComponent(safeId)}.json`,
-				options,
-			),
-			this.getFetchOptions(requestOptions),
-		)
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => this.readJson(res, url, "comments"))
 			.then((json) => ({
 				submission: json[0].data.children[0],
 				comments: json[1].data.children,
@@ -295,15 +298,15 @@ class Geddit {
 		const safeParentId = this.sanitizeThingId(parent_id);
 		const safeChildId = this.sanitizeThingId(child_id);
 		if (!safeParentId || !safeChildId) return null;
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			`/comments/${encodeURIComponent(safeParentId)}/comment/${encodeURIComponent(safeChildId)}.json`,
+			options,
+			this.getRequestHost(fetchOptions),
+		);
 
-		return await fetch(
-			this.buildRedditUrl(
-				`/comments/${encodeURIComponent(safeParentId)}/comment/${encodeURIComponent(safeChildId)}.json`,
-				options,
-			),
-			this.getFetchOptions(requestOptions),
-		)
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => this.readJson(res, url, "comments"))
 			.then((json) => ({
 				submission: json[0].data.children[0],
 				comments: json[1].data.children,

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- With a Reddit cookie, subreddit sidebars, discussions, and comment threads
+  also load from old.reddit.com, so every Reddit request goes there instead of
+  breaking as www.reddit.com blocks more endpoints for cookie sessions
+
 ### Fixed
 
 - Post and community searches failed when using a Reddit cookie: www.reddit.com
