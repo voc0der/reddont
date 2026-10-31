@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- On desktop, a link post without a thumbnail showed a grey rectangle; it now
+  shows a grey circle with a link icon, as self posts and old reddit do
+
 ## [0.1.6] - 2026-10-31
 
 ### Changed

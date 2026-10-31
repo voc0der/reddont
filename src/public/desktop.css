@@ -882,13 +882,16 @@ main#content > .side {
   stroke-width: 1.5;
 }
 
+/* Like the self-post circle above, as old reddit draws a link post without a
+   thumbnail. */
 .link-preview,
 .media-preview .link-preview {
   display: grid;
-  width: 7rem;
+  width: 5rem;
   height: 5rem;
+  margin: 0 auto;
   place-items: center;
-  border-radius: 0;
+  border-radius: 50%;
   background: var(--o-thumb-bg);
   color: var(--o-thumb-icon);
 }
