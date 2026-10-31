@@ -197,8 +197,12 @@ class Geddit {
 	}
 
 	async searchAll(query, subreddit = null, options = {}, requestOptions = {}) {
+		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
+		// An unusable community must not widen the search to all of Reddit.
+		if (subreddit && !safeSubreddit) return null;
 		options.q = query;
-		const subredditStr = subreddit ? `/r/${subreddit}` : "";
+		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
+		const subredditStr = encodedSubreddit ? `/r/${encodedSubreddit}` : "";
 
 		const params = {
 			limit: 25,

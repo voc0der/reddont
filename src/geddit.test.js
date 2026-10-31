@@ -129,6 +129,8 @@ describe("comment threads", () => {
 		expect(await reddit.getSubmissionComments(42)).toBeNull();
 		expect(await reddit.getSingleCommentThread("post1", "c1/../../me")).toBeNull();
 		expect(await reddit.getSingleCommentThread("", "c1")).toBeNull();
+		expect(await reddit.searchAll("gpu", "//evil.example/x")).toBeNull();
+		expect(await reddit.searchAll("gpu", ["test"])).toBeNull();
 		expect(requests).toEqual([]);
 	});
 });
