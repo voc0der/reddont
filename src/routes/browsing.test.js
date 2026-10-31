@@ -128,6 +128,9 @@ describe("search pages", () => {
 		expect(html).toContain("About test");
 
 		expect(await (await get("/sub-search?q=nothing")).text()).toContain("no results found");
+		const failed = await get("/sub-search?q=broken");
+		expect(failed.status).toBe(200);
+		expect(await failed.text()).toContain("search failed, try again later");
 	});
 
 	test("post search explains empty and failed searches", async () => {

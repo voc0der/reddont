@@ -127,6 +127,27 @@ describe("search requests", () => {
 		expect(Object.fromEntries(restricted.searchParams)).toMatchObject({ q: "gpu", restrict_sr: "on", type: "link" });
 	});
 
+	test("search from old.reddit.com when sending a cookie", async () => {
+		respond(listing([post("a")], "t3_a"));
+		const reddit = new Geddit();
+		const cookie = { authHeaders: { cookie: "reddit_session=abc" } };
+
+		expect(await reddit.searchSubmissions("gpu", {}, cookie)).toEqual({ after: "t3_a", items: [post("a")] });
+		await reddit.searchSubreddits("gpu", {}, cookie);
+		await reddit.searchAll("gpu", "buildapcsales", { restrict_sr: "on", type: "link" }, cookie);
+		await reddit.searchSubmissions("gpu", {}, { authHeaders: { authorization: "Bearer abc" } });
+		await reddit.searchSubmissions("gpu");
+
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
+			"https://old.reddit.com/search.json",
+			"https://old.reddit.com/subreddits/search.json",
+			"https://old.reddit.com/r/buildapcsales/search.json",
+			"https://www.reddit.com/search.json",
+			"https://www.reddit.com/search.json",
+		]);
+		expect(requests.slice(0, 3).every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
+	});
+
 	test("merge the community and post listings of a mixed search", async () => {
 		const community = { kind: "t5", data: { display_name: "gpus" } };
 		respond([listing([community]), listing([post("a")], "t3_a")]);

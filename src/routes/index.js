@@ -648,23 +648,23 @@ router.get("/sub-search", authenticateToken, async (req, res) => {
 	if (!req.query || !req.query.q) {
 		res.render("sub-search", { user: req.user, ...commonRenderOptions });
 	} else {
-		const { items, after } = await G.searchSubreddits(
+		const results = await G.searchSubreddits(
 			req.query.q,
 			{},
 			getRedditRequestOptions(req.user),
 		);
+		const items = results?.items || [];
 		const subs = db
 			.query("SELECT subreddit FROM subscriptions WHERE user_id = $id")
 			.all({ id: req.user.id })
 			.map((res) => res.subreddit);
-		const message =
-			items.length === 0
-				? "no results found"
-				: `showing ${items.length} results`;
+		let message = `showing ${items.length} results`;
+		if (!results) message = "search failed, try again later";
+		else if (items.length === 0) message = "no results found";
 		res.render("sub-search", {
 			items,
 			subs,
-			after,
+			after: results?.after,
 			message,
 			user: req.user,
 			original_query: req.query.q,

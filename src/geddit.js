@@ -1,11 +1,12 @@
 const logger = require("./logger");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
 
-// www.reddit.com answers /api/morechildren (checked 2026-10-23) and /r/all
-// listings (checked 2026-10-29) with its network-security block page, even
-// for a signed-in cookie. old.reddit.com serves both to the same cookie, for
-// old and new comment IDs and for every feed and sort. Anonymous requests to
-// old.reddit.com redirect to its login page, so only cookie requests go there.
+// www.reddit.com answers /api/morechildren (checked 2026-10-23), /r/all
+// listings (checked 2026-10-29) and search (checked 2026-10-31) with its
+// network-security block page, even for a signed-in cookie. old.reddit.com
+// serves them all to the same cookie, for old and new comment IDs and for
+// every feed and sort. Anonymous requests to old.reddit.com redirect to its
+// login page, so only cookie requests go there.
 const COOKIE_HOST = "https://old.reddit.com";
 
 class Geddit {
@@ -94,6 +95,14 @@ class Geddit {
 		return fetchOptions.headers.Cookie ? COOKIE_HOST : this.host;
 	}
 
+	// Callers turn a body that isn't JSON into null; the log keeps the status.
+	readJson(response, url, request) {
+		if (!response.ok) {
+			logger.warn(`Reddit refused a ${request} request`, { host: url.hostname, status: response.status });
+		}
+		return response.json();
+	}
+
 	async getSubmissions(
 		sort = "hot",
 		subreddit = null,
@@ -117,12 +126,7 @@ class Geddit {
 		);
 
 		return await fetch(url, fetchOptions)
-			.then((res) => {
-				if (!res.ok) {
-					logger.warn("Reddit refused a feed request", { host: url.hostname, status: res.status });
-				}
-				return res.json();
-			})
+			.then((res) => this.readJson(res, url, "feed"))
 			.then((json) => json.data)
 			.then((data) => ({
 				after: data.after,
@@ -148,12 +152,15 @@ class Geddit {
 	async searchSubmissions(query, options = {}, requestOptions = {}) {
 		options.q = query;
 		options.type = "link";
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			"/search.json",
+			options,
+			this.getRequestHost(fetchOptions),
+		);
 
-		return await fetch(
-			`${this.host}/search.json?${new URLSearchParams(options)}`,
-			this.getFetchOptions(requestOptions),
-		)
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => this.readJson(res, url, "search"))
 			.then((json) => json.data)
 			.then((data) => ({
 				after: data.after,
@@ -169,12 +176,15 @@ class Geddit {
 			limit: 25,
 			include_over_18: false,
 		};
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			"/subreddits/search.json",
+			Object.assign(params, options),
+			this.getRequestHost(fetchOptions),
+		);
 
-		return await fetch(
-			`${this.host}/subreddits/search.json?${new URLSearchParams(Object.assign(params, options))}`,
-			this.getFetchOptions(requestOptions),
-		)
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => this.readJson(res, url, "search"))
 			.then((json) => json.data)
 			.then((data) => ({
 				after: data.after,
@@ -192,12 +202,15 @@ class Geddit {
 			include_over_18: true,
 			type: "sr,link,user",
 		};
+		const fetchOptions = this.getFetchOptions(requestOptions);
+		const url = this.buildRedditUrl(
+			`${subredditStr}/search.json`,
+			Object.assign(params, options),
+			this.getRequestHost(fetchOptions),
+		);
 
-		return await fetch(
-			`${this.host + subredditStr}/search.json?${new URLSearchParams(Object.assign(params, options))}`,
-			this.getFetchOptions(requestOptions),
-		)
-			.then((res) => res.json())
+		return await fetch(url, fetchOptions)
+			.then((res) => this.readJson(res, url, "search"))
 			.then((json) =>
 				Array.isArray(json)
 					? {
