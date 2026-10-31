@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-31
+
+### Changed
+
+- With a Reddit cookie, subreddit sidebars, discussions, and comment threads
+  also load from old.reddit.com, so every Reddit request goes there instead of
+  breaking as www.reddit.com blocks more endpoints for cookie sessions
+
+### Fixed
+
+- Post and community searches failed when using a Reddit cookie: www.reddit.com
+  now blocks search for cookie sessions, so searches load from old.reddit.com,
+  and refused searches are logged with Reddit's status
+- Community search showed an error page when Reddit returned nothing; it now
+  says "search failed, try again later", as post search does
+
 ## [0.1.5] - 2026-10-29
 
 ### Changed

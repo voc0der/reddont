@@ -56,8 +56,12 @@ describe("listing requests", () => {
 	test("send the reader's stored credential", async () => {
 		respond(listing([]));
 		await new Geddit().getSubreddit("test", { authHeaders: { cookie: "reddit_session=abc" } });
+		await new Geddit().getSubreddit("test");
 
-		expect(requests[0].url.pathname).toBe("/r/test/about.json");
+		expect(requests.map(({ url }) => url.href)).toEqual([
+			"https://old.reddit.com/r/test/about.json",
+			"https://www.reddit.com/r/test/about.json",
+		]);
 		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
 	});
 });
@@ -77,6 +81,26 @@ describe("comment threads", () => {
 			"/comments/post1.json?sort=new",
 			"/comments/post1/comment/c1.json?sort=top",
 		]);
+	});
+
+	test("load discussions and threads from old.reddit.com when sending a cookie", async () => {
+		respond([listing([post("post1")]), listing([{ kind: "t1", data: { id: "c1" } }])]);
+		const reddit = new Geddit();
+		const cookie = { authHeaders: { cookie: "reddit_session=abc" } };
+
+		expect(await reddit.getSubmissionComments("post1", { sort: "new" }, cookie)).toEqual({
+			submission: post("post1"),
+			comments: [{ kind: "t1", data: { id: "c1" } }],
+		});
+		await reddit.getSingleCommentThread("post1", "c1", { sort: "top" }, cookie);
+		await reddit.getSubmissionComments("post1", { sort: "new" }, { authHeaders: { authorization: "Bearer abc" } });
+
+		expect(requests.map(({ url }) => url.href)).toEqual([
+			"https://old.reddit.com/comments/post1.json?sort=new",
+			"https://old.reddit.com/comments/post1/comment/c1.json?sort=top",
+			"https://www.reddit.com/comments/post1.json?sort=new",
+		]);
+		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
 	});
 
 	test("load more from old.reddit.com when sending a cookie", async () => {
@@ -105,6 +129,8 @@ describe("comment threads", () => {
 		expect(await reddit.getSubmissionComments(42)).toBeNull();
 		expect(await reddit.getSingleCommentThread("post1", "c1/../../me")).toBeNull();
 		expect(await reddit.getSingleCommentThread("", "c1")).toBeNull();
+		expect(await reddit.searchAll("gpu", "//evil.example/x")).toBeNull();
+		expect(await reddit.searchAll("gpu", ["test"])).toBeNull();
 		expect(requests).toEqual([]);
 	});
 });
@@ -125,6 +151,27 @@ describe("search requests", () => {
 		expect(Object.fromEntries(communities.searchParams)).toEqual({ limit: "25", include_over_18: "false", q: "gpu" });
 		expect(restricted.pathname).toBe("/r/buildapcsales/search.json");
 		expect(Object.fromEntries(restricted.searchParams)).toMatchObject({ q: "gpu", restrict_sr: "on", type: "link" });
+	});
+
+	test("search from old.reddit.com when sending a cookie", async () => {
+		respond(listing([post("a")], "t3_a"));
+		const reddit = new Geddit();
+		const cookie = { authHeaders: { cookie: "reddit_session=abc" } };
+
+		expect(await reddit.searchSubmissions("gpu", {}, cookie)).toEqual({ after: "t3_a", items: [post("a")] });
+		await reddit.searchSubreddits("gpu", {}, cookie);
+		await reddit.searchAll("gpu", "buildapcsales", { restrict_sr: "on", type: "link" }, cookie);
+		await reddit.searchSubmissions("gpu", {}, { authHeaders: { authorization: "Bearer abc" } });
+		await reddit.searchSubmissions("gpu");
+
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
+			"https://old.reddit.com/search.json",
+			"https://old.reddit.com/subreddits/search.json",
+			"https://old.reddit.com/r/buildapcsales/search.json",
+			"https://www.reddit.com/search.json",
+			"https://www.reddit.com/search.json",
+		]);
+		expect(requests.slice(0, 3).every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
 	});
 
 	test("merge the community and post listings of a mixed search", async () => {
