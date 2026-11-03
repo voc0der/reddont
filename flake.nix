@@ -19,7 +19,7 @@
   in {
     overlays.default = final: prev: let
       pname = "reddont";
-      version = "0.1.7";
+      version = "0.1.8";
     in {
       node_modules = with final;
         stdenv.mkDerivation {
