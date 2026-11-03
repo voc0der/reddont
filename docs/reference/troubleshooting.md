@@ -65,10 +65,14 @@ share their cookie with other users on the instance who have no credential;
 see [preferences and credentials](../usage/preferences.md#reddit-credentials).
 
 With a Reddit cookie, every request to Reddit goes to old.reddit.com instead
-of www.reddit.com; allow both hosts if outbound traffic is restricted. When
-Reddit refuses a feed, search, comments, or load-more request, the log shows
-`Reddit refused a feed request` (or `search`, `comments`, `load-more`) with
-the host and HTTP status.
+of www.reddit.com; allow both hosts if outbound traffic is restricted. Reddit
+blocks its JSON feeds and post search for cookie sessions, so with a cookie a
+feed or search reads the order of posts from old reddit's page and loads the
+posts from `/api/info.json`. When Reddit refuses a feed, search, comments, or
+load-more request, the log shows `Reddit refused a feed request` (or `search`,
+`comments`, `load-more`) with the host and HTTP status. If Reddit answers with
+a page that holds no listing, the log shows
+`Reddit sent a feed page without a listing` (or `search`).
 
 The app's browser limit defaults to 100 requests per 15 minutes; the API
 defaults to 600. These are separate from upstream rate limits. Slower polling

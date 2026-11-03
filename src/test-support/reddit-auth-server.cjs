@@ -23,13 +23,22 @@ globalThis.fetch = async (input, options) => {
 	const url = new URL(input);
 	const headers = options?.headers || {};
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, headers })}\n`);
+	// Cookie feeds and searches read old reddit's page, then load its posts
+	// from /api/info.json.
+	const listing = (children) =>
+		url.pathname.endsWith(".json")
+			? Response.json({ data: { children, after: null } })
+			: new Response(
+					`<div id="siteTable">${children.map(({ data }) => `<div class="thing" data-fullname="${data.name}"></div>`).join("")}</div>`,
+					{ headers: { "content-type": "text/html; charset=UTF-8" } },
+				);
 	if (url.pathname.startsWith("/r/broken/")) return new Response("Unavailable", { status: 503 });
-	if (url.pathname.startsWith("/r/empty/")) return Response.json({ data: { children: [], after: null } });
+	if (url.pathname.startsWith("/r/empty/")) return listing([]);
 	if (!headers.Cookie && !headers.Authorization) return new Response("Blocked", { status: 403 });
 	if (url.searchParams.has("after")) return new Response("Blocked", { status: 403 });
-	if (url.pathname === "/subreddits/search.json") return Response.json({ data: { children: [], after: null } });
+	if (url.pathname === "/subreddits/search.json") return listing([]);
 	if (url.pathname.endsWith("/about.json")) return Response.json({ data: { display_name: "test", subscribers: 42 } });
 	if (url.pathname.startsWith("/comments/")) return Response.json([{ data: { children: [post] } }, { data: { children: [] } }]);
-	return Response.json({ data: { children: [post], after: null } });
+	return listing([post]);
 };
 require("../index");
