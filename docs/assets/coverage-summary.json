@@ -1,16 +1,16 @@
 {
   "metric": "JavaScript line coverage",
-  "covered": 2097,
-  "total": 2139,
-  "percent": 98.04,
+  "covered": 2119,
+  "total": 2161,
+  "percent": 98.06,
   "bunVersion": "1.4.4",
   "tests": {
-    "passed": 343,
+    "passed": 346,
     "skipped": 0,
     "failed": 0
   },
   "processes": 13,
-  "sourceSha256": "de381dfe57378918c264d909ed17eb9a9cfdd5d2f9dabe1081f40a2ae8178459",
+  "sourceSha256": "3b8635db1e36caf219dc637c8a179a97a009424c2390386703f1bc52c496bcf2",
   "files": {
     "src/apiAuth.js": {
       "covered": 117,
@@ -25,8 +25,8 @@
       "total": 50
     },
     "src/geddit.js": {
-      "covered": 172,
-      "total": 172
+      "covered": 194,
+      "total": 194
     },
     "src/index.js": {
       "covered": 113,

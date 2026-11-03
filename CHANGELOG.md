@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-03
+
+### Fixed
+
+- The home feed showed "Feed unavailable" when using a Reddit cookie:
+  old.reddit.com redirects a feed of several communities to their canonical
+  spelling, and reddont treated the redirect as a refusal. It now follows a
+  redirect to the same kind of page on old.reddit.com and goes to the canonical
+  page directly on later loads; a redirect it doesn't follow is logged with
+  its location
+
 ## [0.1.8] - 2026-11-03
 
 ### Fixed

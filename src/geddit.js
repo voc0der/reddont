@@ -18,10 +18,22 @@ const COOKIE_HOST = "https://old.reddit.com";
 // /api/info.json takes up to 100 fullnames.
 const INFO_BATCH_SIZE = 100;
 const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
+// old.reddit.com redirects a multi to its canonical spelling: each name in
+// its community's case, missing communities dropped (seen 2026-11-03).
+const MAX_PAGE_REDIRECTS = 2;
+const CANONICAL_PAGES_KEPT = 100;
+
+// "/r/a+b/hot/" and "/r/A+B/hot" are the same kind of page: "/hot".
+function pageKind(url) {
+	return url.pathname.replace(/^\/r\/[^/]+/, "").replace(/\/$/, "");
+}
 
 class Geddit {
 	constructor() {
 		this.host = "https://www.reddit.com";
+		// Requested page path -> the canonical path old reddit redirected it
+		// to, so a feed's later loads skip the redirect.
+		this.canonicalPages = new Map();
 		this.parameters = {
 			limit: 25,
 			include_over_18: true,
@@ -138,15 +150,13 @@ class Geddit {
 		const { sr_detail: srDetail, ...query } = params;
 		const url = this.buildRedditUrl(pathname, query, COOKIE_HOST);
 		try {
-			const response = await fetch(url, {
-				...fetchOptions,
-				headers: { ...fetchOptions.headers, Accept: "text/html" },
-				// A missing community redirects to community search, and a
-				// signed-out cookie to the login page.
-				redirect: "manual",
-			});
+			const { response, refusedLocation } = await this.fetchListingPage(url, fetchOptions);
 			if (!response.ok) {
-				logger.warn(`Reddit refused a ${request} request`, { host: url.hostname, status: response.status });
+				logger.warn(`Reddit refused a ${request} request`, {
+					host: url.hostname,
+					status: response.status,
+					...(refusedLocation ? { location: `${refusedLocation.origin}${refusedLocation.pathname}` } : {}),
+				});
 				return null;
 			}
 			const page = await readListingPage(await response.text());
@@ -170,6 +180,43 @@ class Geddit {
 			return { after: page.after, items };
 		} catch {
 			return null;
+		}
+	}
+
+	// Follows old reddit's redirects to the same kind of page on its own host,
+	// such as a multi's canonical spelling. A missing community redirects to
+	// community search, and a signed-out cookie to the login page: those come
+	// back unfollowed, with the refused location.
+	async fetchListingPage(url, fetchOptions) {
+		const requested = url.pathname;
+		let target = new URL(url);
+		const canonical = this.canonicalPages.get(requested);
+		if (canonical) target.pathname = canonical;
+
+		for (let hop = 0; ; hop++) {
+			const response = await fetch(target, {
+				...fetchOptions,
+				headers: { ...fetchOptions.headers, Accept: "text/html" },
+				redirect: "manual",
+			});
+			const location = response.headers.get("location");
+			if (response.status < 300 || response.status > 399 || !location) {
+				if (response.ok && target.pathname !== requested) this.rememberCanonicalPage(requested, target.pathname);
+				return { response };
+			}
+			const next = new URL(location, target);
+			if (hop >= MAX_PAGE_REDIRECTS || next.origin !== COOKIE_HOST || pageKind(next) !== pageKind(url)) {
+				return { response, refusedLocation: next };
+			}
+			target = next;
+		}
+	}
+
+	rememberCanonicalPage(requested, canonical) {
+		this.canonicalPages.delete(requested);
+		this.canonicalPages.set(requested, canonical);
+		if (this.canonicalPages.size > CANONICAL_PAGES_KEPT) {
+			this.canonicalPages.delete(this.canonicalPages.keys().next().value);
 		}
 	}
 
