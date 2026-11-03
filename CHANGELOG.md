@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-03
+
 ### Fixed
 
 - The home feed showed "Feed unavailable" when using a Reddit cookie:
