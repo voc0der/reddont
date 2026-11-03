@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Feeds and post searches failed when using a Reddit cookie: Reddit now blocks
+  its JSON feeds and search for cookie sessions on old.reddit.com too, so
+  reddont reads the order of posts from old reddit's feed and search pages and
+  loads the posts from Reddit's `/api/info.json`
+
 ## [0.1.7] - 2026-10-31
 
 ### Fixed

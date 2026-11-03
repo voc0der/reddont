@@ -1,5 +1,6 @@
-const { afterEach, describe, expect, test } = require("bun:test");
+const { afterEach, describe, expect, spyOn, test } = require("bun:test");
 const { Geddit } = require("./geddit");
+const logger = require("./logger");
 
 const realFetch = globalThis.fetch;
 let requests;
@@ -7,8 +8,8 @@ let requests;
 function respond(body) {
 	requests = [];
 	globalThis.fetch = async (url, options) => {
-		requests.push({ url: new URL(url), headers: options?.headers });
-		return typeof body === "function" ? body() : Response.json(body);
+		requests.push({ url: new URL(url), headers: options?.headers, redirect: options?.redirect });
+		return typeof body === "function" ? body(new URL(url)) : Response.json(body);
 	};
 }
 
@@ -18,6 +19,36 @@ afterEach(() => {
 
 const listing = (children, after = null) => ({ kind: "Listing", data: { after, children } });
 const post = (id) => ({ kind: "t3", data: { id, title: `Post ${id}` } });
+
+const cookie = { authHeaders: { cookie: "reddit_session=abc" } };
+const thing = (name, data = {}) => ({ kind: name.slice(0, 2), data: { name, id: name.slice(3), ...data } });
+const nextLink = (after) => (after ? `<a href="https://old.reddit.com/x/?count=25&amp;after=${after}" rel="nofollow next">next</a>` : "");
+const feedPage = (posts, after = null) =>
+	`<div id="siteTable" class="sitetable linklisting">${posts
+		.map(([name, community]) => `<div class=" thing link" data-fullname="${name}" data-subreddit-fullname="${community || ""}" data-promoted="false"></div>`)
+		.join("")}<span class="next-button">${nextLink(after)}</span></div>`;
+const searchPage = (names, after = null) =>
+	`<div class=" listing search-result-listing">${names
+		.map((name) => `<div class=" search-result" data-fullname="${name}"></div>`)
+		.join("")}<span class="nextprev">${nextLink(after)}</span></div>`;
+
+// Serves old reddit pages by path, and /api/info.json from `things` in its
+// own order: reversed, so callers must restore the page's order.
+function oldReddit(pages, things = [], info = null) {
+	const byName = new Map(things.map((item) => [item.data.name, item]));
+	respond((url) => {
+		if (url.pathname === "/api/info.json") {
+			if (info) return info(url);
+			const names = url.searchParams.get("id").split(",");
+			return Response.json(listing(names.map((name) => byName.get(name)).filter(Boolean).reverse()));
+		}
+		const page = pages[url.pathname];
+		if (typeof page === "function") return page();
+		return page === undefined
+			? new Response("not found", { status: 404 })
+			: new Response(page, { headers: { "content-type": "text/html; charset=UTF-8" } });
+	});
+}
 
 describe("listing requests", () => {
 	test("sanitize the sort and community path", async () => {
@@ -34,23 +65,21 @@ describe("listing requests", () => {
 		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ limit: "20", include_over_18: "true", t: "week" });
 	});
 
-	test("request feeds from old.reddit.com when sending a cookie", async () => {
+	test("keep bearer and signed-out feeds on www.reddit.com's JSON", async () => {
 		respond(listing([post("a")], "t3_a"));
 		const reddit = new Geddit();
 
-		expect(await reddit.getSubmissions("new", "all", {}, { authHeaders: { cookie: "reddit_session=abc" } })).toEqual({
+		expect(await reddit.getSubmissions("new", "all", {}, { authHeaders: { authorization: "Bearer abc" } })).toEqual({
 			after: "t3_a",
 			posts: [post("a")],
 		});
-		await reddit.getSubmissions("new", "all", {}, { authHeaders: { authorization: "Bearer abc" } });
 		await reddit.getSubmissions("new", "all");
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
-			"https://old.reddit.com/r/all/new.json",
 			"https://www.reddit.com/r/all/new.json",
 			"https://www.reddit.com/r/all/new.json",
 		]);
-		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
+		expect(requests[0].headers.Authorization).toBe("Bearer abc");
 	});
 
 	test("send the reader's stored credential", async () => {
@@ -153,25 +182,20 @@ describe("search requests", () => {
 		expect(Object.fromEntries(restricted.searchParams)).toMatchObject({ q: "gpu", restrict_sr: "on", type: "link" });
 	});
 
-	test("search from old.reddit.com when sending a cookie", async () => {
+	test("search communities from old.reddit.com's JSON when sending a cookie", async () => {
 		respond(listing([post("a")], "t3_a"));
 		const reddit = new Geddit();
-		const cookie = { authHeaders: { cookie: "reddit_session=abc" } };
 
-		expect(await reddit.searchSubmissions("gpu", {}, cookie)).toEqual({ after: "t3_a", items: [post("a")] });
-		await reddit.searchSubreddits("gpu", {}, cookie);
-		await reddit.searchAll("gpu", "buildapcsales", { restrict_sr: "on", type: "link" }, cookie);
+		expect(await reddit.searchSubreddits("gpu", {}, cookie)).toEqual({ after: "t3_a", items: [post("a")] });
 		await reddit.searchSubmissions("gpu", {}, { authHeaders: { authorization: "Bearer abc" } });
 		await reddit.searchSubmissions("gpu");
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
-			"https://old.reddit.com/search.json",
 			"https://old.reddit.com/subreddits/search.json",
-			"https://old.reddit.com/r/buildapcsales/search.json",
 			"https://www.reddit.com/search.json",
 			"https://www.reddit.com/search.json",
 		]);
-		expect(requests.slice(0, 3).every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
+		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
 	});
 
 	test("merge the community and post listings of a mixed search", async () => {
@@ -180,6 +204,146 @@ describe("search requests", () => {
 
 		expect(await new Geddit().searchAll("gpu")).toEqual({ after: "t3_a", items: [community, post("a")] });
 		expect(requests[0].url.searchParams.get("type")).toBe("sr,link,user");
+	});
+});
+
+describe("cookie listings from old reddit's pages", () => {
+	test("read a feed's page, then load its posts and their communities", async () => {
+		oldReddit({ "/r/all/new/": feedPage([["t3_a", "t5_x"], ["t3_b", "t5_y"]], "t3_b") }, [
+			thing("t3_a", { subreddit_id: "t5_x" }),
+			thing("t3_b", { subreddit_id: "t5_y" }),
+			thing("t5_x"),
+			thing("t5_y"),
+		]);
+
+		expect(await new Geddit().getSubmissions("new", "all", { sr_detail: true, after: "t3_z", count: 25 }, cookie)).toEqual({
+			after: "t3_b",
+			posts: [
+				thing("t3_a", { subreddit_id: "t5_x", sr_detail: thing("t5_x").data }),
+				thing("t3_b", { subreddit_id: "t5_y", sr_detail: thing("t5_y").data }),
+			],
+		});
+		expect(requests.map(({ url }) => url.href)).toEqual([
+			"https://old.reddit.com/r/all/new/?limit=20&include_over_18=true&after=t3_z&count=25",
+			"https://old.reddit.com/api/info.json?id=t3_a%2Ct3_b%2Ct5_x%2Ct5_y",
+		]);
+		expect(requests.every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
+		expect(requests.map(({ headers }) => headers.Accept)).toEqual(["text/html", "application/json"]);
+		expect(requests[0].redirect).toBe("manual");
+	});
+
+	test("keep the page's order and skip posts Reddit no longer returns", async () => {
+		oldReddit({ "/hot/": feedPage([["t3_a"], ["t3_gone"], ["t3_c"]]) }, [thing("t3_a"), thing("t3_c")]);
+
+		expect(await new Geddit().getSubmissions("hot", null, {}, cookie)).toEqual({
+			after: null,
+			posts: [thing("t3_a"), thing("t3_c")],
+		});
+		expect(requests[1].url.searchParams.get("id")).toBe("t3_a,t3_gone,t3_c");
+	});
+
+	test("load posts in batches of 100", async () => {
+		const names = Array.from({ length: 101 }, (_, i) => `t3_p${i}`);
+		oldReddit({ "/r/test/hot/": feedPage(names.map((name) => [name])) }, names.map((name) => thing(name)));
+
+		const listing = await new Geddit().getSubmissions("hot", "test", { limit: 101 }, cookie);
+
+		expect(listing.posts.map((item) => item.data.name)).toEqual(names);
+		expect(requests.slice(1).map(({ url }) => url.searchParams.get("id").split(",").length)).toEqual([100, 1]);
+	});
+
+	test("make no info request for an empty page", async () => {
+		oldReddit({ "/r/quiet/hot/": '<div id="siteTable"><p id="noresults" class="error">nothing here</p></div>' });
+
+		expect(await new Geddit().getSubmissions("hot", "quiet", {}, cookie)).toEqual({ after: null, posts: [] });
+		expect(requests).toHaveLength(1);
+	});
+
+	test("return null when Reddit refuses, redirects, or sends no listing", async () => {
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			const pages = [
+				() => new Response("<html>blocked</html>", { status: 403 }),
+				() => new Response(null, { status: 302, headers: { location: "https://old.reddit.com/subreddits/search?q=test" } }),
+				'<form id="login-form"></form>',
+			];
+			for (const page of pages) {
+				oldReddit({ "/r/test/hot/": page });
+				expect(await new Geddit().getSubmissions("hot", "test", {}, cookie)).toBeNull();
+				expect(requests).toHaveLength(1);
+			}
+			expect(warn.mock.calls).toEqual([
+				["Reddit refused a feed request", { host: "old.reddit.com", status: 403 }],
+				["Reddit refused a feed request", { host: "old.reddit.com", status: 302 }],
+				["Reddit sent a feed page without a listing", { host: "old.reddit.com", status: 200 }],
+			]);
+
+			warn.mockClear();
+			oldReddit({ "/r/test/hot/": feedPage([["t3_a"]]) }, [], () => new Response("<html>blocked</html>", { status: 403 }));
+			expect(await new Geddit().getSubmissions("hot", "test", {}, cookie)).toBeNull();
+			expect(warn.mock.calls).toEqual([["Reddit refused a feed request", { host: "old.reddit.com", status: 403 }]]);
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	test("search posts from the page, then load their communities", async () => {
+		oldReddit({ "/search": searchPage(["t3_a", "t3_b"], "t3_b") }, [
+			thing("t3_a", { subreddit_id: "t5_x" }),
+			thing("t3_b", { subreddit_id: "t5_x" }),
+			thing("t5_x"),
+		]);
+
+		expect(await new Geddit().searchSubmissions("gpu", { sr_detail: true, sort: "new" }, cookie)).toEqual({
+			after: "t3_b",
+			items: [
+				thing("t3_a", { subreddit_id: "t5_x", sr_detail: thing("t5_x").data }),
+				thing("t3_b", { subreddit_id: "t5_x", sr_detail: thing("t5_x").data }),
+			],
+		});
+		expect(requests.map(({ url }) => url.href)).toEqual([
+			"https://old.reddit.com/search?sort=new&q=gpu&type=link",
+			"https://old.reddit.com/api/info.json?id=t3_a%2Ct3_b",
+			"https://old.reddit.com/api/info.json?id=t5_x",
+		]);
+	});
+
+	test("keep search results when their communities fail to load", async () => {
+		oldReddit({ "/search": searchPage(["t3_a"]) }, [], (url) =>
+			url.searchParams.get("id") === "t3_a"
+				? Response.json(listing([thing("t3_a", { subreddit_id: "t5_x" })]))
+				: new Response("<html>blocked</html>", { status: 403 }),
+		);
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			expect(await new Geddit().searchSubmissions("gpu", { sr_detail: true }, cookie)).toEqual({
+				after: null,
+				items: [thing("t3_a", { subreddit_id: "t5_x" })],
+			});
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	test("search a community, or communities and posts, from the page", async () => {
+		oldReddit(
+			{
+				"/r/buildapcsales/search": searchPage(["t5_x", "t3_a"]),
+				"/search": searchPage(["t5_x", "t3_a"], "t3_a"),
+			},
+			[thing("t5_x"), thing("t3_a")],
+		);
+		const reddit = new Geddit();
+
+		expect(await reddit.searchAll("gpu", "buildapcsales", { restrict_sr: "on", type: "link" }, cookie)).toEqual({
+			after: null,
+			items: [thing("t3_a")],
+		});
+		expect(await reddit.searchAll("gpu", null, {}, cookie)).toEqual({ after: "t3_a", items: [thing("t5_x"), thing("t3_a")] });
+		expect(requests.filter(({ url }) => url.pathname !== "/api/info.json").map(({ url }) => url.href)).toEqual([
+			"https://old.reddit.com/r/buildapcsales/search?limit=25&include_over_18=true&type=link&restrict_sr=on&q=gpu",
+			"https://old.reddit.com/search?limit=25&include_over_18=true&type=sr%2Clink%2Cuser&q=gpu",
+		]);
 	});
 });
 

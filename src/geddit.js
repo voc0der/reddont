@@ -1,5 +1,6 @@
 const logger = require("./logger");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
+const { readListingPage } = require("./utils/redditPage");
 
 // www.reddit.com started answering signed-in cookies with its network-security
 // block page one endpoint at a time: /api/morechildren (2026-10-23), /r/all
@@ -7,7 +8,16 @@ const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
 // request reddont makes to the same cookie, with the same JSON (checked
 // 2026-10-31), so all cookie requests go there. Anonymous requests to
 // old.reddit.com redirect to its login page, so only cookie requests go there.
+//
+// On 2026-11-03 both hosts started blocking every sorted listing
+// (/r/x/hot.json, /hot.json) and search.json for cookie sessions, whatever the
+// client. Their HTML pages and /api/info.json still answer the cookie, so
+// cookie feeds and searches read the page for its order and next-page cursor,
+// then load those things from /api/info.json.
 const COOKIE_HOST = "https://old.reddit.com";
+// /api/info.json takes up to 100 fullnames.
+const INFO_BATCH_SIZE = 100;
+const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
 
 class Geddit {
 	constructor() {
@@ -103,6 +113,83 @@ class Geddit {
 		return response.json();
 	}
 
+	// Things by fullname, as listing JSON, keyed by fullname. Throws when
+	// Reddit refuses a batch.
+	async getThings(names, fetchOptions, request) {
+		const things = new Map();
+		for (let start = 0; start < names.length; start += INFO_BATCH_SIZE) {
+			const url = this.buildRedditUrl(
+				"/api/info.json",
+				{ id: names.slice(start, start + INFO_BATCH_SIZE).join(",") },
+				COOKIE_HOST,
+			);
+			const json = await this.readJson(await fetch(url, fetchOptions), url, request);
+			for (const thing of json.data.children) {
+				if (typeof thing?.data?.name === "string") things.set(thing.data.name, thing);
+			}
+		}
+		return things;
+	}
+
+	// A cookie listing or search: old reddit's page gives the order and next
+	// page, /api/info.json the things. `kinds` are the thing types to keep.
+	// sr_detail adds each post's community, as it does for a listing.
+	async getPageListing(pathname, params, fetchOptions, request, kinds) {
+		const { sr_detail: srDetail, ...query } = params;
+		const url = this.buildRedditUrl(pathname, query, COOKIE_HOST);
+		try {
+			const response = await fetch(url, {
+				...fetchOptions,
+				headers: { ...fetchOptions.headers, Accept: "text/html" },
+				// A missing community redirects to community search, and a
+				// signed-out cookie to the login page.
+				redirect: "manual",
+			});
+			if (!response.ok) {
+				logger.warn(`Reddit refused a ${request} request`, { host: url.hostname, status: response.status });
+				return null;
+			}
+			const page = await readListingPage(await response.text());
+			if (!page) {
+				logger.warn(`Reddit sent a ${request} page without a listing`, { host: url.hostname, status: response.status });
+				return null;
+			}
+
+			const names = page.names.filter((name) => kinds.includes(name.slice(0, 2)));
+			if (!names.length) return { after: page.after, items: [] };
+			const communities = srDetail
+				? names.map((name) => page.communities.get(name)).filter(Boolean)
+				: [];
+			const things = await this.getThings(
+				[...new Set([...names, ...communities])],
+				fetchOptions,
+				request,
+			);
+			const items = names.map((name) => things.get(name)).filter(Boolean);
+			if (srDetail) await this.addCommunities(items, things, fetchOptions, request);
+			return { after: page.after, items };
+		} catch {
+			return null;
+		}
+	}
+
+	// Search pages don't name a post's community, so those load separately;
+	// without them, posts just lack sr_detail.
+	async addCommunities(items, things, fetchOptions, request) {
+		const posts = items.filter((item) => item.kind === "t3");
+		const missing = [...new Set(posts.map((post) => post.data.subreddit_id))].filter(
+			(name) => typeof name === "string" && COMMUNITY_NAME.test(name) && !things.has(name),
+		);
+		if (missing.length) {
+			const more = await this.getThings(missing, fetchOptions, request).catch(() => null);
+			for (const [name, thing] of more || []) things.set(name, thing);
+		}
+		for (const post of posts) {
+			const community = things.get(post.data.subreddit_id);
+			if (community?.kind === "t5") post.data.sr_detail = community.data;
+		}
+	}
+
 	async getSubmissions(
 		sort = "hot",
 		subreddit = null,
@@ -119,9 +206,20 @@ class Geddit {
 		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
 		const subredditStr = encodedSubreddit ? `/r/${encodedSubreddit}` : "";
 		const fetchOptions = this.getFetchOptions(requestOptions);
+		const query = Object.assign({}, params, options);
+		if (fetchOptions.headers.Cookie) {
+			const listing = await this.getPageListing(
+				`${subredditStr}/${encodeURIComponent(safeSort)}/`,
+				query,
+				fetchOptions,
+				"feed",
+				["t3"],
+			);
+			return listing && { after: listing.after, posts: listing.items };
+		}
 		const url = this.buildRedditUrl(
 			`${subredditStr}/${encodeURIComponent(safeSort)}.json`,
-			Object.assign({}, params, options),
+			query,
 			this.getRequestHost(fetchOptions),
 		);
 
@@ -156,6 +254,9 @@ class Geddit {
 		options.q = query;
 		options.type = "link";
 		const fetchOptions = this.getFetchOptions(requestOptions);
+		if (fetchOptions.headers.Cookie) {
+			return await this.getPageListing("/search", options, fetchOptions, "search", ["t3"]);
+		}
 		const url = this.buildRedditUrl(
 			"/search.json",
 			options,
@@ -210,9 +311,15 @@ class Geddit {
 			type: "sr,link,user",
 		};
 		const fetchOptions = this.getFetchOptions(requestOptions);
+		Object.assign(params, options);
+		if (fetchOptions.headers.Cookie) {
+			// The page lists matching communities before posts; it has no users.
+			const kinds = String(params.type).split(",").includes("sr") ? ["t5", "t3"] : ["t3"];
+			return await this.getPageListing(`${subredditStr}/search`, params, fetchOptions, "search", kinds);
+		}
 		const url = this.buildRedditUrl(
 			`${subredditStr}/search.json`,
-			Object.assign(params, options),
+			params,
 			this.getRequestHost(fetchOptions),
 		);
 
