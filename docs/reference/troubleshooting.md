@@ -68,11 +68,15 @@ With a Reddit cookie, every request to Reddit goes to old.reddit.com instead
 of www.reddit.com; allow both hosts if outbound traffic is restricted. Reddit
 blocks its JSON feeds and post search for cookie sessions, so with a cookie a
 feed or search reads the order of posts from old reddit's page and loads the
-posts from `/api/info.json`. When Reddit refuses a feed, search, comments, or
-load-more request, the log shows `Reddit refused a feed request` (or `search`,
-`comments`, `load-more`) with the host and HTTP status. If Reddit answers with
-a page that holds no listing, the log shows
-`Reddit sent a feed page without a listing` (or `search`).
+posts from `/api/info.json`. old reddit redirects a feed of several
+communities, such as the home feed, to their canonical spelling; reddont
+follows that redirect and requests the canonical page directly afterwards.
+When Reddit refuses a feed, search, comments, or load-more request, the log
+shows `Reddit refused a feed request` (or `search`, `comments`, `load-more`)
+with the host and HTTP status, and for a redirect reddont doesn't follow, such
+as to the login page, its `location`. If Reddit answers with a page that holds
+no listing, the log shows `Reddit sent a feed page without a listing` (or
+`search`).
 
 The app's browser limit defaults to 100 requests per 15 minutes; the API
 defaults to 600. These are separate from upstream rate limits. Slower polling

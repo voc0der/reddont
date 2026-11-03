@@ -274,7 +274,10 @@ describe("cookie listings from old reddit's pages", () => {
 			}
 			expect(warn.mock.calls).toEqual([
 				["Reddit refused a feed request", { host: "old.reddit.com", status: 403 }],
-				["Reddit refused a feed request", { host: "old.reddit.com", status: 302 }],
+				[
+					"Reddit refused a feed request",
+					{ host: "old.reddit.com", status: 302, location: "https://old.reddit.com/subreddits/search" },
+				],
 				["Reddit sent a feed page without a listing", { host: "old.reddit.com", status: 200 }],
 			]);
 
@@ -285,6 +288,90 @@ describe("cookie listings from old reddit's pages", () => {
 		} finally {
 			warn.mockRestore();
 		}
+	});
+
+	test("follow a multi's redirect to its canonical spelling, and go there directly next time", async () => {
+		const canonical = "/r/linux+programming/hot/";
+		oldReddit(
+			{
+				"/r/Linux+Programming+gone/hot/": () =>
+					new Response(null, { status: 301, headers: { location: `${canonical}?limit=20&include_over_18=true` } }),
+				[canonical]: feedPage([["t3_a"]], "t3_a"),
+			},
+			[thing("t3_a")],
+		);
+		const reddit = new Geddit();
+
+		expect(await reddit.getSubmissions("hot", "Linux+Programming+gone", {}, cookie)).toEqual({
+			after: "t3_a",
+			posts: [thing("t3_a")],
+		});
+		expect(await reddit.getSubmissions("hot", "Linux+Programming+gone", { after: "t3_a", count: 25 }, cookie)).toEqual({
+			after: "t3_a",
+			posts: [thing("t3_a")],
+		});
+
+		expect(requests.map(({ url }) => `${url.pathname}${url.search}`)).toEqual([
+			"/r/Linux+Programming+gone/hot/?limit=20&include_over_18=true",
+			`${canonical}?limit=20&include_over_18=true`,
+			"/api/info.json?id=t3_a",
+			`${canonical}?limit=20&include_over_18=true&after=t3_a&count=25`,
+			"/api/info.json?id=t3_a",
+		]);
+		expect(requests.every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
+	});
+
+	test("refuse redirects to another kind of page, another host, or in a loop", async () => {
+		const redirect = (location) => () => new Response(null, { status: 302, headers: { location } });
+		oldReddit({
+			"/r/gone/hot/": redirect("https://old.reddit.com/subreddits/search?q=gone"),
+			"/r/signedout/hot/": redirect("/login/?dest=https%3A%2F%2Fold.reddit.com%2Fr%2Fsignedout%2Fhot%2F"),
+			"/r/elsewhere/hot/": redirect("https://www.reddit.com/r/elsewhere/hot/"),
+			"/r/loop/hot/": redirect("/r/Loop/hot/"),
+			"/r/Loop/hot/": redirect("/r/loop/hot/"),
+		});
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			const reddit = new Geddit();
+			for (const community of ["gone", "signedout", "elsewhere", "loop"]) {
+				expect(await reddit.getSubmissions("hot", community, {}, cookie)).toBeNull();
+			}
+
+			expect(warn.mock.calls.map(([, details]) => details.location)).toEqual([
+				"https://old.reddit.com/subreddits/search",
+				"https://old.reddit.com/login/",
+				"https://www.reddit.com/r/elsewhere/hot/",
+				"https://old.reddit.com/r/Loop/hot/",
+			]);
+			expect(requests.map(({ url }) => url.pathname)).toEqual([
+				"/r/gone/hot/",
+				"/r/signedout/hot/",
+				"/r/elsewhere/hot/",
+				"/r/loop/hot/",
+				"/r/Loop/hot/",
+				"/r/loop/hot/",
+			]);
+			expect(reddit.canonicalPages.size).toBe(0);
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	test("keep the canonical paths of the 100 most recently redirected pages", async () => {
+		respond((url) =>
+			url.pathname === "/api/info.json"
+				? Response.json(listing([]))
+				: url.pathname.startsWith("/r/A")
+					? new Response(null, { status: 301, headers: { location: url.pathname.toLowerCase() } })
+					: new Response(feedPage([]), { headers: { "content-type": "text/html" } }),
+		);
+		const reddit = new Geddit();
+
+		for (let i = 0; i <= 100; i++) await reddit.getSubmissions("hot", `A${i}`, {}, cookie);
+
+		expect(reddit.canonicalPages.size).toBe(100);
+		expect(reddit.canonicalPages.has("/r/A0/hot/")).toBe(false);
+		expect(reddit.canonicalPages.get("/r/A100/hot/")).toBe("/r/a100/hot/");
 	});
 
 	test("search posts from the page, then load their communities", async () => {
