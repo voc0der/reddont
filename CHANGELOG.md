@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **load more comments** failed with "Could not load comments. Try again." on
+  every thread when using a Reddit cookie: old.reddit.com now blocks
+  `/api/morechildren.json` for cookie sessions, so reddont requests
+  `/api/morechildren.api`, which returns the same comments
+
 ## [0.1.9] - 2026-11-03
 
 ### Fixed

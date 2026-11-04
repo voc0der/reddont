@@ -14,6 +14,10 @@ const { readListingPage } = require("./utils/redditPage");
 // client. Their HTML pages and /api/info.json still answer the cookie, so
 // cookie feeds and searches read the page for its order and next-page cursor,
 // then load those things from /api/info.json.
+//
+// On 2026-11-04 old.reddit.com started blocking /api/morechildren.json for
+// cookie sessions. /api/morechildren.api, Reddit's other JSON extension,
+// returns the same JSON and isn't blocked, so cookie load more uses it.
 const COOKIE_HOST = "https://old.reddit.com";
 // /api/info.json takes up to 100 fullnames.
 const INFO_BATCH_SIZE = 100;
@@ -418,15 +422,16 @@ class Geddit {
 		) return null;
 
 		const fetchOptions = this.getFetchOptions(requestOptions);
+		const host = this.getRequestHost(fetchOptions);
 		const url = this.buildRedditUrl(
-			"/api/morechildren.json",
+			host === COOKIE_HOST ? "/api/morechildren.api" : "/api/morechildren.json",
 			{
 				api_type: "json",
 				link_id: `t3_${id}`,
 				children: children.join(","),
 				sort: commentSort(sort),
 			},
-			this.getRequestHost(fetchOptions),
+			host,
 		);
 		try {
 			const response = await fetch(url, fetchOptions);
