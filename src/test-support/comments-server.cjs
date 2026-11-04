@@ -42,7 +42,7 @@ let failed = false;
 globalThis.fetch = async (input, options) => {
 	const url = new URL(input);
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ host: url.host, path: url.pathname, params: Object.fromEntries(url.searchParams), authenticated: options?.headers?.Authorization === "Bearer comments-test" || options?.headers?.Cookie === "reddit_session=comments-test" })}\n`);
-	if (url.pathname === "/api/morechildren.json") {
+	if (/^\/api\/morechildren\.(json|api)$/.test(url.pathname)) {
 		const ids = url.searchParams.get("children").split(",");
 		if (ids.length > 100 || url.searchParams.get("link_id") !== "t3_post1") throw new Error("Invalid batch");
 		if (ids[0] === "failure" && !failed) {

@@ -97,7 +97,7 @@ describe("load more comment routes", () => {
 		const response = await load({}, "application/json", `auth_token=${token}; csrf_token=${csrf}`);
 		expect(response.status).toBe(200);
 		expect((await response.json()).html).toContain('id="c0"');
-		expect(lastUpstreamRequest()).toMatchObject({ host: "old.reddit.com", path: "/api/morechildren.json", params: { children: "c0,c1" }, authenticated: true });
+		expect(lastUpstreamRequest()).toMatchObject({ host: "old.reddit.com", path: "/api/morechildren.api", params: { children: "c0,c1" }, authenticated: true });
 	});
 
 	test("keeps a large queue in the next form while limiting each upstream request", async () => {

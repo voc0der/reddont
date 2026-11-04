@@ -141,7 +141,7 @@ describe("comment threads", () => {
 		await reddit.getMoreComments("post1", ["c1"], "top", { authHeaders: { authorization: "Bearer abc" } });
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
-			"https://old.reddit.com/api/morechildren.json",
+			"https://old.reddit.com/api/morechildren.api",
 			"https://www.reddit.com/api/morechildren.json",
 		]);
 		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ api_type: "json", link_id: "t3_post1", children: "c1,c2", sort: "new" });
