@@ -19,44 +19,31 @@ Dark follows reddit's own dark theme.
 
 ## Reddit credentials
 
-The dashboard's **reddit authentication - burner account only** section can
-store a Reddit credential for requests made on your behalf. Use a separate
-account as indicated by the interface.
+Reddit blocks requests without a signed-in session. Give reddont a
+`reddit_session` cookie from a burner account:
 
-Choose one of the supported forms:
+1. In a private window, sign in to <https://www.reddit.com> with the burner
+   account.
+2. Open developer tools (F12), then **Application** in Chrome or Edge, or
+   **Storage** in Firefox.
+3. Under **Cookies**, select `https://www.reddit.com` and copy the value of
+   `reddit_session`. Close the window without signing out.
+4. In reddont, select your username. Under **reddit authentication**, set
+   **Credential Type** to **reddit_session cookie**, paste the value into
+   **Reddit Credential**, and choose **Save Preferences**.
 
-- **Auto-detect**: recognize a cookie or authorization header.
-- **Cookie header**: paste a full `Cookie: ...` header.
-- **reddit_session cookie**: supply that cookie's value.
-- **Bearer token**: supply a token or `Authorization: Bearer ...` header.
+The section then shows `Current: cookies (reddit_session)`. When the cookie
+expires, feeds fail again; repeat these steps.
 
-Paste the value into **Reddit Credential** and save. The status text reports
-whether a credential is configured. Leaving the field empty preserves the
-current value; use **Clear saved Reddit credential** to remove it.
+**Credential Type** also accepts a full `Cookie:` header or a bearer token.
+Saving with the field empty keeps the stored credential; **Clear saved Reddit
+credential** removes it.
 
-If a feed fails without authentication, a landing page links directly to this
-section so you can add a credential. Empty feeds that load successfully do not
-show this page.
-
-**Allow other users on this instance to fall back to my Reddit cookie** is off
-by default. Enable it and save to let signed-in users without their own Reddit
-authentication use your cookie for browser and API requests. Their requests
-run under your Reddit account, but the cookie value is never shown to them.
-Bearer tokens are not shared. If several users share cookies, the cookie from
-the oldest user account with a usable shared cookie is selected.
-
-A user's own saved credential always takes priority, including bearer tokens.
-To stop sharing, uncheck the option, clear the credential, or replace it with
-a bearer token. The change applies to subsequent requests.
-
-These credentials belong to Reddit. They are separate from your reddont
-password, SSO login, and personal API key. API requests reuse the key owner's
-saved Reddit credential, fall back to a shared cookie when none is saved, or
-request content anonymously when neither is available.
-
-Reddit credentials can expire. If feeds stop working, replace the saved
-credential or clear it and retry. The app does not provide an interactive
-Reddit login or automatically renew a supplied cookie or bearer token.
+**Allow other users on this instance to fall back to my Reddit cookie** lets
+signed-in users without their own credential use yours, including through
+their API keys. Their requests run under your Reddit account; they never see
+the cookie. With several shared cookies, the oldest account's is used. Bearer
+tokens are never shared.
 
 ## Personal API key
 

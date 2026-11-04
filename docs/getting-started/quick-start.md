@@ -62,10 +62,13 @@ The first registered account becomes an administrator. After that, new
 password accounts need an invite. Select your username to open the dashboard
 and choose **create invite** when you want to add another person.
 
-An account on reddont is separate from a Reddit account. You do not need a
-Reddit credential for the initial setup.
+## 4. Add a Reddit cookie
 
-## 4. Build your home feed
+Reddit blocks requests without a signed-in session, so
+[add a cookie from a burner account](../usage/preferences.md#reddit-credentials)
+before browsing.
+
+## 5. Build your home feed
 
 Open **subs**, use **++** to add community names, or subscribe from a
 community's page. Home combines your subscriptions. With none saved, it
