@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"test": "bun test",
-		"coverage": "bun run dev/test-coverage/run.mjs"
+		"coverage": "bun run dev/test-coverage/run.mjs",
+		"check:reddit": "bun run dev/reddit-live-check/run.mjs"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

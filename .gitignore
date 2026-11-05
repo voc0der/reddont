@@ -193,3 +193,6 @@ __pycache__/
 
 # Local development database directory
 /.local-data/
+
+# Reddit cookie for bun run check:reddit
+/reddit-cookie.txt

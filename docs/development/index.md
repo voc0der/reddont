@@ -49,6 +49,39 @@ back/forward cache, as a phone often does, so going back reloads the feed page.
 See [test coverage](coverage.md) for the README badge's scope, calculation,
 and the commands to reproduce and refresh it.
 
+### Live check against Reddit
+
+The tests above use simulated Reddit responses, so they can't show when
+Reddit starts refusing a request. To check Reddit itself with a signed-in
+cookie, save the cookie in `reddit-cookie.txt` at the repository root, which
+git ignores, and run:
+
+```sh
+bun run check:reddit
+```
+
+To read the cookie from another file, pass its path:
+`bun run check:reddit path/to/file`. The file can hold anything the
+dashboard accepts: a Cookie header, cookie pairs, or a `reddit_session` value.
+From a whole "Copy Request Headers" block, only the Cookie line is used. See
+[Reddit credentials](../usage/preferences.md#reddit-credentials) for how to
+copy one.
+
+Through reddont's own client and with the options its routes pass, the check
+sends each kind of request reddont makes with a cookie:
+
+- feeds, including a multi that old reddit redirects to its canonical
+  spelling and the next page
+- a community's about page
+- comments, load more, and a single comment thread
+- post search, search within a community, and community search
+
+For each check it prints the requests sent, with each status and, for a
+refusal, Reddit's block page or redirect. It exits with status 1 if any check
+fails. A run sends about 25 requests. Reddit allows a cookie session 100
+requests per window, and an instance that uses the same account shares that
+budget.
+
 ## Source map
 
 | Path | Responsibility |
