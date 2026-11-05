@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-05
+
 ### Fixed
 
 - Feeds and post searches failed again when using a Reddit cookie:
