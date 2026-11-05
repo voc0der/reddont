@@ -1,6 +1,6 @@
 // Old reddit's listing and search pages name their things in order and link
 // the next page. That is all reddont reads from a page: the things themselves
-// come from /api/info.json, as the same JSON a listing returns.
+// come from /api/info.api, as the same JSON a listing returns.
 const THING_NAME = /^t[35]_[a-z0-9]+$/;
 const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
 

@@ -32,12 +32,12 @@ const searchPage = (names, after = null) =>
 		.map((name) => `<div class=" search-result" data-fullname="${name}"></div>`)
 		.join("")}<span class="nextprev">${nextLink(after)}</span></div>`;
 
-// Serves old reddit pages by path, and /api/info.json from `things` in its
+// Serves old reddit pages by path, and /api/info.api from `things` in its
 // own order: reversed, so callers must restore the page's order.
 function oldReddit(pages, things = [], info = null) {
 	const byName = new Map(things.map((item) => [item.data.name, item]));
 	respond((url) => {
-		if (url.pathname === "/api/info.json") {
+		if (url.pathname === "/api/info.api") {
 			if (info) return info(url);
 			const names = url.searchParams.get("id").split(",");
 			return Response.json(listing(names.map((name) => byName.get(name)).filter(Boolean).reverse()));
@@ -225,7 +225,7 @@ describe("cookie listings from old reddit's pages", () => {
 		});
 		expect(requests.map(({ url }) => url.href)).toEqual([
 			"https://old.reddit.com/r/all/new/?limit=20&include_over_18=true&after=t3_z&count=25",
-			"https://old.reddit.com/api/info.json?id=t3_a%2Ct3_b%2Ct5_x%2Ct5_y",
+			"https://old.reddit.com/api/info.api?id=t3_a%2Ct3_b%2Ct5_x%2Ct5_y",
 		]);
 		expect(requests.every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
 		expect(requests.map(({ headers }) => headers.Accept)).toEqual(["text/html", "application/json"]);
@@ -314,9 +314,9 @@ describe("cookie listings from old reddit's pages", () => {
 		expect(requests.map(({ url }) => `${url.pathname}${url.search}`)).toEqual([
 			"/r/Linux+Programming+gone/hot/?limit=20&include_over_18=true",
 			`${canonical}?limit=20&include_over_18=true`,
-			"/api/info.json?id=t3_a",
+			"/api/info.api?id=t3_a",
 			`${canonical}?limit=20&include_over_18=true&after=t3_a&count=25`,
-			"/api/info.json?id=t3_a",
+			"/api/info.api?id=t3_a",
 		]);
 		expect(requests.every(({ headers }) => headers.Cookie === "reddit_session=abc")).toBe(true);
 	});
@@ -359,7 +359,7 @@ describe("cookie listings from old reddit's pages", () => {
 
 	test("keep the canonical paths of the 100 most recently redirected pages", async () => {
 		respond((url) =>
-			url.pathname === "/api/info.json"
+			url.pathname === "/api/info.api"
 				? Response.json(listing([]))
 				: url.pathname.startsWith("/r/A")
 					? new Response(null, { status: 301, headers: { location: url.pathname.toLowerCase() } })
@@ -390,8 +390,8 @@ describe("cookie listings from old reddit's pages", () => {
 		});
 		expect(requests.map(({ url }) => url.href)).toEqual([
 			"https://old.reddit.com/search?sort=new&q=gpu&type=link",
-			"https://old.reddit.com/api/info.json?id=t3_a%2Ct3_b",
-			"https://old.reddit.com/api/info.json?id=t5_x",
+			"https://old.reddit.com/api/info.api?id=t3_a%2Ct3_b",
+			"https://old.reddit.com/api/info.api?id=t5_x",
 		]);
 	});
 
@@ -427,7 +427,7 @@ describe("cookie listings from old reddit's pages", () => {
 			items: [thing("t3_a")],
 		});
 		expect(await reddit.searchAll("gpu", null, {}, cookie)).toEqual({ after: "t3_a", items: [thing("t5_x"), thing("t3_a")] });
-		expect(requests.filter(({ url }) => url.pathname !== "/api/info.json").map(({ url }) => url.href)).toEqual([
+		expect(requests.filter(({ url }) => url.pathname !== "/api/info.api").map(({ url }) => url.href)).toEqual([
 			"https://old.reddit.com/r/buildapcsales/search?limit=25&include_over_18=true&type=link&restrict_sr=on&q=gpu",
 			"https://old.reddit.com/search?limit=25&include_over_18=true&type=sr%2Clink%2Cuser&q=gpu",
 		]);

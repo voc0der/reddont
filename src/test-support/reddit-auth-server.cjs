@@ -24,9 +24,9 @@ globalThis.fetch = async (input, options) => {
 	const headers = options?.headers || {};
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, headers })}\n`);
 	// Cookie feeds and searches read old reddit's page, then load its posts
-	// from /api/info.json.
+	// from /api/info.api.
 	const listing = (children) =>
-		url.pathname.endsWith(".json")
+		/\.(json|api)$/.test(url.pathname)
 			? Response.json({ data: { children, after: null } })
 			: new Response(
 					`<div id="siteTable">${children.map(({ data }) => `<div class="thing" data-fullname="${data.name}"></div>`).join("")}</div>`,
