@@ -68,9 +68,10 @@ With a Reddit cookie, every request to Reddit goes to old.reddit.com instead
 of www.reddit.com; allow both hosts if outbound traffic is restricted. Reddit
 blocks its JSON feeds and post search for cookie sessions, so with a cookie a
 feed or search reads the order of posts from old reddit's page and loads the
-posts from `/api/info.json`. It blocks `/api/morechildren.json` too, so
-**load more comments** requests `/api/morechildren.api`, which returns the
-same JSON. old reddit redirects a feed of several
+posts from `/api/info.api`. Reddit also blocks `/api/info.json` and
+`/api/morechildren.json` for cookie sessions, so reddont requests their `.api`
+versions, which return the same JSON; **load more comments** uses
+`/api/morechildren.api`. old reddit redirects a feed of several
 communities, such as the home feed, to their canonical spelling; reddont
 follows that redirect and requests the canonical page directly afterwards.
 When Reddit refuses a feed, search, comments, or load-more request, the log

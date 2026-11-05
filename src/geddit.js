@@ -18,8 +18,11 @@ const { readListingPage } = require("./utils/redditPage");
 // On 2026-11-04 old.reddit.com started blocking /api/morechildren.json for
 // cookie sessions. /api/morechildren.api, Reddit's other JSON extension,
 // returns the same JSON and isn't blocked, so cookie load more uses it.
+//
+// On 2026-11-05 it blocked /api/info.json the same way. /api/info.api returns
+// the same listing, so cookie feeds and searches load their things from it.
 const COOKIE_HOST = "https://old.reddit.com";
-// /api/info.json takes up to 100 fullnames.
+// /api/info takes up to 100 fullnames.
 const INFO_BATCH_SIZE = 100;
 const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
 // old.reddit.com redirects a multi to its canonical spelling: each name in
@@ -135,7 +138,7 @@ class Geddit {
 		const things = new Map();
 		for (let start = 0; start < names.length; start += INFO_BATCH_SIZE) {
 			const url = this.buildRedditUrl(
-				"/api/info.json",
+				"/api/info.api",
 				{ id: names.slice(start, start + INFO_BATCH_SIZE).join(",") },
 				COOKIE_HOST,
 			);
@@ -148,7 +151,7 @@ class Geddit {
 	}
 
 	// A cookie listing or search: old reddit's page gives the order and next
-	// page, /api/info.json the things. `kinds` are the thing types to keep.
+	// page, /api/info.api the things. `kinds` are the thing types to keep.
 	// sr_detail adds each post's community, as it does for a listing.
 	async getPageListing(pathname, params, fetchOptions, request, kinds) {
 		const { sr_detail: srDetail, ...query } = params;
