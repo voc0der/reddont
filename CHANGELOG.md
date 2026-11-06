@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-05
+
 ### Added
 
 - **Reddit OAuth App ID** under the dashboard's Reddit authentication, as in
