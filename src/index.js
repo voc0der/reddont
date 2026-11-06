@@ -6,6 +6,8 @@ const https = require("https");
 const fs = require("fs");
 const logger = require("./logger");
 const oidc = require("./oidc");
+const { Geddit } = require("./geddit.js");
+const { getInstanceRedditAppId, isInstanceRedditOAuthOn } = require("./redditOAuth");
 
 const app = express();
 const hasher = new Bun.CryptoHasher("sha256", "secret-key");
@@ -87,7 +89,22 @@ function parseCookies(cookieHeader) {
 
 module.exports = { JWT_KEY };
 
+// teddit's USE_REDDIT_OAUTH. Like teddit, ask for the app's token at
+// startup, so a wrong REDDIT_APP_ID shows in the log right away.
+function startInstanceRedditOAuth() {
+	const appId = getInstanceRedditAppId();
+	if (appId) {
+		logger.info("Reddit OAuth app from REDDIT_APP_ID is on for every user");
+		new Geddit().authorize({ oauthAppId: appId }).then((fetchOptions) => {
+			if (fetchOptions) logger.info("Reddit granted the instance's OAuth app a token");
+		});
+	} else if (isInstanceRedditOAuthOn()) {
+		logger.warn("USE_REDDIT_OAUTH is on, but REDDIT_APP_ID isn't an installed app's ID; the instance's OAuth app is off");
+	}
+}
+
 async function bootstrap() {
+	startInstanceRedditOAuth();
 	// Initialize OIDC early so route priority behaves deterministically
 	try {
 		const initialized = await oidc.initializeOIDC({ jwtKey: JWT_KEY });

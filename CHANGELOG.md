@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Reddit refuses one, reddont repeats the request with the other. An app can
   be shared with users who have no Reddit authentication, like a cookie, and
   they get its owner's order
+- `USE_REDDIT_OAUTH=true` with `REDDIT_APP_ID`, teddit's settings, give the
+  whole instance an OAuth app: users without their own authentication use it
+  first, and everyone else falls back to it. reddont asks Reddit for its token
+  at startup and logs whether it got one. **Requests use** on the dashboard
+  lists the order a user's requests follow
 
 ### Fixed
 

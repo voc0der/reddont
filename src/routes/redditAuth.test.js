@@ -163,7 +163,7 @@ describe("shared Reddit cookies", () => {
 			expect(headers.Authorization).toBeUndefined();
 		}
 		const dashboard = await (await request("/dashboard")).text();
-		expect(dashboard).toContain("Shared Reddit authentication is being used");
+		expect(dashboard).toContain("Requests use a cookie another user shares.");
 		expect(dashboard).not.toContain("shared-secret");
 	});
 
@@ -290,7 +290,7 @@ describe("shared Reddit OAuth apps", () => {
 		expect((await request("/r/test")).status).toBe(200);
 		expect(new Set(sent())).toEqual(new Set(["oauth.reddit.com Bearer token-for-shared-app-id-1"]));
 		const dashboard = await (await request("/dashboard")).text();
-		expect(dashboard).toContain("Shared Reddit authentication is being used");
+		expect(dashboard).toContain("Requests use an OAuth app another user shares.");
 		expect(dashboard).not.toContain("shared-app-id-1");
 
 		credential(1, { cookie: "reddit_session=shared-secret" }, 1);

@@ -89,8 +89,27 @@ function forgetRedditOAuthToken(token) {
 	}
 }
 
+// teddit's instance-wide settings, with its names: USE_REDDIT_OAUTH=true
+// turns on the app REDDIT_APP_ID names, for every signed-in user.
+function isInstanceRedditOAuthOn(env = process.env) {
+	return /^(true|1)$/i.test(String(env.USE_REDDIT_OAUTH ?? "").trim());
+}
+
+// The instance's app ID, or null when USE_REDDIT_OAUTH is off or
+// REDDIT_APP_ID isn't an app ID.
+function getInstanceRedditAppId(env = process.env) {
+	if (!isInstanceRedditOAuthOn(env)) return null;
+	try {
+		return normalizeRedditAppId(env.REDDIT_APP_ID);
+	} catch {
+		return null;
+	}
+}
+
 module.exports = {
 	forgetRedditOAuthToken,
+	getInstanceRedditAppId,
 	getRedditOAuthToken,
+	isInstanceRedditOAuthOn,
 	normalizeRedditAppId,
 };

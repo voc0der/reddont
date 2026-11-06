@@ -31,6 +31,7 @@ const {
 	expandMoreComments,
 } = require("../utils/redditComments");
 const {
+	describeRedditAuthPlan,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
 	getRedditOAuthStatus,
@@ -776,10 +777,7 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		redditAuthStatus,
 		redditOAuthStatus: getRedditOAuthStatus(req.user.redditOAuthAppId),
 		redditAuthPrimary: normalizeRedditAuthPrimary(req.user.redditAuthPrimary),
-		usingSharedRedditAuth:
-			!req.user.redditAuthHeaders &&
-			!req.user.redditOAuthAppId &&
-			hasRedditAuth(getRedditRequestOptions(req.user)),
+		redditAuthPlan: describeRedditAuthPlan(req.user),
 		apiKey: req.user.apiKey || null,
 		apiWhitelist: describeApiWhitelist(),
 		message: req.query.message,

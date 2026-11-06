@@ -1,6 +1,7 @@
 const { describe, expect, test } = require("bun:test");
 const {
 	describeRedditAuthHeaders,
+	describeRedditAuthPlan,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
 	getRedditOAuthStatus,
@@ -10,7 +11,7 @@ const {
 	normalizeRedditAuthPrimary,
 	serializeRedditAuthHeaders,
 } = require("./redditAuth");
-const { normalizeRedditAppId } = require("./redditOAuth");
+const { getInstanceRedditAppId, isInstanceRedditOAuthOn, normalizeRedditAppId } = require("./redditOAuth");
 
 describe("normalizeRedditAuthInput", () => {
 	test("normalizes bearer authorization headers", () => {
@@ -249,6 +250,50 @@ describe("Reddit app IDs", () => {
 	test("reject anything that can't be an app ID", () => {
 		for (const input of ["short", "has space inside", "a".repeat(41), "id:secret_value", "line\nbreak-app-id"]) {
 			expect(() => normalizeRedditAppId(input)).toThrow("Reddit app ID is invalid");
+		}
+	});
+});
+
+describe("the instance's OAuth app", () => {
+	test("is on only with USE_REDDIT_OAUTH and a usable REDDIT_APP_ID, as in teddit", () => {
+		expect(getInstanceRedditAppId({ USE_REDDIT_OAUTH: "true", REDDIT_APP_ID: " instance-app-1 " })).toBe("instance-app-1");
+		expect(getInstanceRedditAppId({ USE_REDDIT_OAUTH: "1", REDDIT_APP_ID: "instance-app-1" })).toBe("instance-app-1");
+		for (const env of [
+			{ REDDIT_APP_ID: "instance-app-1" },
+			{ USE_REDDIT_OAUTH: "false", REDDIT_APP_ID: "instance-app-1" },
+			{ USE_REDDIT_OAUTH: "true" },
+			{ USE_REDDIT_OAUTH: "true", REDDIT_APP_ID: "not an app id" },
+		]) {
+			expect(getInstanceRedditAppId(env)).toBeNull();
+		}
+		expect(isInstanceRedditOAuthOn({ USE_REDDIT_OAUTH: "TRUE" })).toBe(true);
+		expect(isInstanceRedditOAuthOn({})).toBe(false);
+	});
+
+	test("backs up a user's own ways, and an app with its ID is tried once", () => {
+		const saved = { ...process.env };
+		Object.assign(process.env, { USE_REDDIT_OAUTH: "true", REDDIT_APP_ID: "instance-app-1" });
+		try {
+			const cookie = "reddit_session=own";
+			const reader = { id: 7, redditAuthHeaders: JSON.stringify({ cookie }) };
+			expect(getRedditRequestOptions(reader)).toEqual({
+				authHeaders: { cookie },
+				fallback: { oauthAppId: "instance-app-1" },
+			});
+			expect(describeRedditAuthPlan(reader)).toBe("your saved credential, then this instance's OAuth app");
+			const sameApp = { ...reader, redditOAuthAppId: "instance-app-1", redditAuthPrimary: "oauth" };
+			expect(getRedditRequestOptions(sameApp)).toEqual({
+				oauthAppId: "instance-app-1",
+				fallback: { authHeaders: { cookie } },
+			});
+			expect(describeRedditAuthPlan(sameApp)).toBe("your OAuth app, then your saved credential");
+			expect(getRedditRequestOptions(undefined)).toEqual({});
+			expect(describeRedditAuthPlan(undefined)).toBe("no Reddit authentication");
+		} finally {
+			for (const name of ["USE_REDDIT_OAUTH", "REDDIT_APP_ID"]) {
+				if (name in saved) process.env[name] = saved[name];
+				else delete process.env[name];
+			}
 		}
 	});
 });

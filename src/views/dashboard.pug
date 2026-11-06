@@ -47,8 +47,8 @@ html
               | If Reddit blocks your feed, add a cookie or bearer token from a signed-in burner account, a Reddit OAuth app, or both, and save your preferences. Leave a field blank to keep what you saved there.
             p.dashboard-help
               | Current: #{redditAuthStatus.description}
-            if usingSharedRedditAuth
-              p.dashboard-help Shared Reddit authentication is being used for your requests. Add your own credential or OAuth app to use it instead.
+            p.dashboard-help
+              | Requests use #{redditAuthPlan}.
 
             label(for="reddit-auth-type") Credential Type
             select(id="reddit-auth-type" name="redditAuthType")

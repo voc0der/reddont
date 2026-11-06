@@ -71,6 +71,22 @@ and [reverse proxies](../deployment/reverse-proxy.md).
 
 See [API and feeds](api.md).
 
+## Reddit
+
+`USE_REDDIT_OAUTH`
+:   `true` or `1` turns on the Reddit OAuth app that `REDDIT_APP_ID` names,
+    for every signed-in user, as in teddit. Default: off. Users with no cookie
+    or app of their own use it first, then what other users share; everyone
+    else falls back to it after their own. At startup, reddont asks Reddit for
+    the app's token and logs whether it got one.
+
+`REDDIT_APP_ID`
+:   The ID of an "installed app" from <https://old.reddit.com/prefs/apps/>, the
+    string under its name. No default. Used only with `USE_REDDIT_OAUTH`;
+    when it isn't an app ID, reddont logs a warning and leaves the app off.
+
+See [preferences and credentials](../usage/preferences.md#reddit-credentials).
+
 ## OpenID Connect
 
 `OIDC_ENABLED`

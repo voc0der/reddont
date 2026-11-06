@@ -74,6 +74,15 @@ back to what you share get your **Try First** order. With several sharers, the
 oldest account's shared cookie and app are used, and one it doesn't share
 comes from the next account that does.
 
+### The instance's OAuth app
+
+An administrator can give the whole instance an OAuth app with
+`USE_REDDIT_OAUTH` and `REDDIT_APP_ID`, teddit's settings (see
+[environment variables](../reference/environment.md#reddit)). Users without
+their own cookie or app use it first, then what other users share. Everyone
+else falls back to it after their own. **Requests use**, under **reddit
+authentication**, lists the order your requests follow.
+
 ## Personal API key
 
 Under **api key**, select **Generate key** to create a `reddont_` key. You can

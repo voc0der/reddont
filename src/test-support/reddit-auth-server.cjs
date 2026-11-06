@@ -41,8 +41,9 @@ globalThis.fetch = async (input, options) => {
 				);
 	if (url.pathname.startsWith("/r/broken/")) return new Response("Unavailable", { status: 503 });
 	if (url.pathname.startsWith("/r/empty/")) return listing([]);
-	// A community Reddit blocks for cookies only.
+	// Communities Reddit blocks for cookies only, or for tokens only.
 	if (url.pathname.startsWith("/r/cookieblocked/") && headers.Cookie) return new Response("Blocked", { status: 403 });
+	if (url.pathname.startsWith("/r/oauthblocked/") && headers.Authorization) return new Response("Blocked", { status: 403 });
 	if (!headers.Cookie && !headers.Authorization) return new Response("Blocked", { status: 403 });
 	if (url.searchParams.has("after")) return new Response("Blocked", { status: 403 });
 	if (/^\/subreddits\/search(\.json)?$/.test(url.pathname)) return listing([]);

@@ -63,7 +63,10 @@ authentication** on the landing page to open the dashboard's Reddit settings.
 Save a cookie or bearer token from a signed-in burner account, a Reddit OAuth
 app's ID, or both. A user can also share their cookie and app with other users
 on the instance who have neither; see
-[preferences and credentials](../usage/preferences.md#reddit-credentials).
+[preferences and credentials](../usage/preferences.md#reddit-credentials). An
+administrator can set one app for every user with `USE_REDDIT_OAUTH` and
+`REDDIT_APP_ID`; see [environment variables](environment.md#reddit). At
+startup the log then says whether Reddit granted that app a token.
 
 With an OAuth app or a bearer token, requests go to oauth.reddit.com, which
 serves the same JSON without the `.json` extension, and an app's token comes

@@ -1,4 +1,4 @@
-const { normalizeRedditAppId } = require("./redditOAuth");
+const { getInstanceRedditAppId, normalizeRedditAppId } = require("./redditOAuth");
 
 const MAX_REDDIT_AUTH_INPUT_LENGTH = 20000;
 const VALID_REDDIT_AUTH_TYPES = new Set([
@@ -307,28 +307,14 @@ function redditAuthMethods(user, { sharedOnly = false } = {}) {
 		if (appId) methods.set("oauth", { oauthAppId: appId });
 	}
 	const order = normalizeRedditAuthPrimary(user.redditAuthPrimary) === "oauth" ? ["oauth", "cookie"] : ["cookie", "oauth"];
-	return order.filter((kind) => methods.has(kind)).map((kind) => ({ kind, options: methods.get(kind) }));
+	const source = sharedOnly ? "shared" : "own";
+	return order.filter((kind) => methods.has(kind)).map((kind) => ({ kind, source, options: methods.get(kind) }));
 }
 
-// Geddit request options for methods in order: each later one is the
-// fallback of the one before.
-function chainRequestOptions(methods) {
-	return methods.reduceRight(
-		(fallback, { options }) => (fallback ? { ...options, fallback } : { ...options }),
-		null,
-	) || {};
-}
-
-function getRedditRequestOptions(user) {
-	// Only authenticated instance users may borrow shared authentication.
-	if (!user?.id) return {};
-	if (user.redditAuthHeaders || user.redditOAuthAppId) {
-		return chainRequestOptions(redditAuthMethods(user));
-	}
-
-	// A stable order keeps requests on the same accounts while they're shared:
-	// the first sharer's ways in their order, then a way they don't share from
-	// the next sharer who does.
+// What other users share, in a stable order so requests stay on the same
+// accounts: the first sharer's ways in their order, then a way they don't
+// share from the next sharer who does.
+function sharedRedditAuthMethods() {
 	const sharers = require("./db").db
 		.query(
 			"SELECT id, redditAuthHeaders, shareRedditCookie, redditOAuthAppId, shareRedditOAuth, redditAuthPrimary FROM users WHERE (shareRedditCookie = 1 AND redditAuthHeaders IS NOT NULL) OR (shareRedditOAuth = 1 AND redditOAuthAppId IS NOT NULL) ORDER BY id",
@@ -341,7 +327,55 @@ function getRedditRequestOptions(user) {
 		}
 		if (methods.length === 2) break;
 	}
-	return chainRequestOptions(methods);
+	return methods;
+}
+
+// The ways a signed-in user's requests reach Reddit, first one first. Their
+// own cookie and app lead, in their order, then the instance's app
+// (USE_REDDIT_OAUTH). Users with neither start with the instance's app, then
+// what other users share. An app already in the list isn't tried twice.
+function getRedditAuthPlan(user) {
+	// Only authenticated instance users may use shared or instance authentication.
+	if (!user?.id) return [];
+	const appId = getInstanceRedditAppId();
+	const instance = appId ? [{ kind: "oauth", source: "instance", options: { oauthAppId: appId } }] : [];
+	const methods =
+		user.redditAuthHeaders || user.redditOAuthAppId
+			? [...redditAuthMethods(user), ...instance]
+			: [...instance, ...sharedRedditAuthMethods()];
+	return methods.filter(
+		(method, index) =>
+			method.kind !== "oauth" ||
+			methods.findIndex(({ options }) => options.oauthAppId === method.options.oauthAppId) === index,
+	);
+}
+
+// Geddit request options for methods in order: each later one is the
+// fallback of the one before.
+function chainRequestOptions(methods) {
+	return methods.reduceRight(
+		(fallback, { options }) => (fallback ? { ...options, fallback } : { ...options }),
+		null,
+	) || {};
+}
+
+function getRedditRequestOptions(user) {
+	return chainRequestOptions(getRedditAuthPlan(user));
+}
+
+const PLAN_LABELS = {
+	"own cookie": "your saved credential",
+	"own oauth": "your OAuth app",
+	"shared cookie": "a cookie another user shares",
+	"shared oauth": "an OAuth app another user shares",
+	"instance oauth": "this instance's OAuth app",
+};
+
+// The plan in words, for the user's dashboard; values stay hidden.
+function describeRedditAuthPlan(user) {
+	const plan = getRedditAuthPlan(user);
+	if (!plan.length) return "no Reddit authentication";
+	return plan.map(({ kind, source }) => PLAN_LABELS[`${source} ${kind}`]).join(", then ");
 }
 
 // Whether request options authenticate with Reddit at all.
@@ -392,6 +426,7 @@ function getRedditAuthStatus(value) {
 
 module.exports = {
 	describeRedditAuthHeaders,
+	describeRedditAuthPlan,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
 	getRedditOAuthStatus,
