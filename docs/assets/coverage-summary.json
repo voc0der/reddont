@@ -10,7 +10,7 @@
     "failed": 0
   },
   "processes": 16,
-  "sourceSha256": "8046585262281d80062d1b8045350f1de9dcd9ab4f91577c0c61fc4b5ab27c55",
+  "sourceSha256": "2de6dc7a53475221d374128c3bde7f99e925747a6585e05d1aae3a239609a1f4",
   "files": {
     "src/apiAuth.js": {
       "covered": 118,
