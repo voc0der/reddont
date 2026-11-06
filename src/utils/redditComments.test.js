@@ -72,7 +72,7 @@ describe("morechildren requests", () => {
 		};
 		const result = await new Geddit().getMoreComments("post1", ["a", "b"], "new", { authHeaders: { authorization: "Bearer test" } });
 		expect(result).toHaveLength(2);
-		expect(request.url.pathname).toBe("/api/morechildren.json");
+		expect(`${request.url.origin}${request.url.pathname}`).toBe("https://oauth.reddit.com/api/morechildren");
 		expect(Object.fromEntries(request.url.searchParams)).toEqual({ api_type: "json", link_id: "t3_post1", children: "a,b", sort: "new" });
 		expect(request.options.headers.Authorization).toBe("Bearer test");
 	});

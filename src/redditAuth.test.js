@@ -3,10 +3,14 @@ const {
 	describeRedditAuthHeaders,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
+	getRedditOAuthStatus,
 	getRedditRequestOptions,
+	hasRedditAuth,
 	normalizeRedditAuthInput,
+	normalizeRedditAuthPrimary,
 	serializeRedditAuthHeaders,
 } = require("./redditAuth");
+const { normalizeRedditAppId } = require("./redditOAuth");
 
 describe("normalizeRedditAuthInput", () => {
 	test("normalizes bearer authorization headers", () => {
@@ -198,5 +202,53 @@ describe("stored credentials", () => {
 		});
 		expect(getRedditRequestOptions(undefined)).toEqual({});
 		expect(getRedditRequestOptions({ redditAuthHeaders: JSON.stringify({ authorization }) })).toEqual({});
+	});
+
+	test("chains a reader's credential and OAuth app in the order they chose", () => {
+		const cookie = "reddit_session=own";
+		const reader = { id: 7, redditAuthHeaders: JSON.stringify({ cookie }), redditOAuthAppId: "own-app-id-7" };
+		expect(getRedditRequestOptions(reader)).toEqual({
+			authHeaders: { cookie },
+			fallback: { oauthAppId: "own-app-id-7" },
+		});
+		expect(getRedditRequestOptions({ ...reader, redditAuthPrimary: "oauth" })).toEqual({
+			oauthAppId: "own-app-id-7",
+			fallback: { authHeaders: { cookie } },
+		});
+		expect(getRedditRequestOptions({ id: 7, redditOAuthAppId: "own-app-id-7", redditAuthPrimary: "cookie" })).toEqual({
+			oauthAppId: "own-app-id-7",
+		});
+		// A saved app ID that no longer validates is skipped, not borrowed around.
+		expect(getRedditRequestOptions({ ...reader, redditOAuthAppId: "bad id" })).toEqual({ authHeaders: { cookie } });
+		expect(getRedditRequestOptions({ id: 7, redditOAuthAppId: "bad id" })).toEqual({});
+	});
+
+	test("describes a saved OAuth app by the end of its ID", () => {
+		expect(getRedditOAuthStatus("H6-HjZ5pUPjaFQ")).toEqual({ configured: true, description: "app ID ending in jaFQ" });
+		expect(getRedditOAuthStatus(null)).toEqual({ configured: false, description: "not configured" });
+		expect(getRedditOAuthStatus("bad id")).toEqual({ configured: false, description: "not configured" });
+	});
+
+	test("knows when request options authenticate and which way goes first", () => {
+		expect(hasRedditAuth({})).toBe(false);
+		expect(hasRedditAuth(undefined)).toBe(false);
+		expect(hasRedditAuth({ oauthAppId: "own-app-id-7" })).toBe(true);
+		expect(hasRedditAuth({ authHeaders: { cookie: "a=b" } })).toBe(true);
+		expect(["oauth", "cookie", "bearer", undefined].map(normalizeRedditAuthPrimary)).toEqual(["oauth", "cookie", "cookie", "cookie"]);
+	});
+});
+
+describe("Reddit app IDs", () => {
+	test("accept an installed app's ID, trimmed and unquoted", () => {
+		expect(normalizeRedditAppId(" H6-HjZ5pUPjaFQ ")).toBe("H6-HjZ5pUPjaFQ");
+		expect(normalizeRedditAppId('"abcdefghij_KLMNOPQRSTU"')).toBe("abcdefghij_KLMNOPQRSTU");
+		expect(normalizeRedditAppId("")).toBeNull();
+		expect(normalizeRedditAppId(undefined)).toBeNull();
+	});
+
+	test("reject anything that can't be an app ID", () => {
+		for (const input of ["short", "has space inside", "a".repeat(41), "id:secret_value", "line\nbreak-app-id"]) {
+			expect(() => normalizeRedditAppId(input)).toThrow("Reddit app ID is invalid");
+		}
 	});
 });

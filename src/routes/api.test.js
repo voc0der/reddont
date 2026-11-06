@@ -91,7 +91,7 @@ beforeAll(async () => {
 		}
 
 		let body;
-		if (url.includes("/about.json")) {
+		if (/\/about(\.json)?(\?|$)/.test(url)) {
 			body = { data: { public_description: "pc sales" } };
 		} else if (url.includes("/comments/")) {
 			body = [

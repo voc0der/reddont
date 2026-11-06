@@ -44,11 +44,11 @@ html
           fieldset#reddit-authentication.dashboard-fieldset
             legend reddit authentication - burner account only
             p.dashboard-help
-              | If Reddit blocks your feed, add a cookie or bearer token from a signed-in burner account and save your preferences. Leave the credential field blank to keep your saved authentication.
+              | If Reddit blocks your feed, add a cookie or bearer token from a signed-in burner account, a Reddit OAuth app, or both, and save your preferences. Leave a field blank to keep what you saved there.
             p.dashboard-help
               | Current: #{redditAuthStatus.description}
-            if usingSharedRedditCookie
-              p.dashboard-help A shared cookie is being used for your requests. Add your own credential to use it instead.
+            if usingSharedRedditAuth
+              p.dashboard-help Shared Reddit authentication is being used for your requests. Add your own credential or OAuth app to use it instead.
 
             label(for="reddit-auth-type") Credential Type
             select(id="reddit-auth-type" name="redditAuthType")
@@ -71,6 +71,32 @@ html
               label(for="clear-reddit-auth")
                 input(type="checkbox" id="clear-reddit-auth" name="clearRedditAuth" value="1")
                 | &nbsp;Clear saved Reddit credential
+
+            label(for="reddit-oauth-app-id") Reddit OAuth App ID
+            input#reddit-oauth-app-id(type="text" name="redditOAuthAppId" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="reddit-oauth-app-id-help")
+            p#reddit-oauth-app-id-help.dashboard-help
+              | Like teddit's use_reddit_oauth: reddont asks Reddit for the app's token and reads oauth.reddit.com with it, signed in to no account. Create an "installed app" at #[a(href="https://old.reddit.com/prefs/apps/" target="_blank" rel="noopener noreferrer") old.reddit.com/prefs/apps] and paste the ID shown under its name.
+            p.dashboard-help
+              | Current app: #{redditOAuthStatus.description}
+
+            div
+              label(for="share-reddit-oauth")
+                input(type="checkbox" id="share-reddit-oauth" name="shareRedditOAuth" value="1" checked=(user.shareRedditOAuth === 1) aria-describedby="share-reddit-oauth-help")
+                | &nbsp;Allow other users on this instance to fall back to my OAuth app
+              p#share-reddit-oauth-help.dashboard-help
+                | Users without their own Reddit authentication will make requests with your app's token. The app ID stays hidden. Uncheck this option or clear your app to stop sharing.
+
+            if redditOAuthStatus.configured
+              label(for="clear-reddit-oauth")
+                input(type="checkbox" id="clear-reddit-oauth" name="clearRedditOAuth" value="1")
+                | &nbsp;Clear saved OAuth app
+
+            label(for="reddit-auth-primary") Try First
+            select(id="reddit-auth-primary" name="redditAuthPrimary" aria-describedby="reddit-auth-primary-help")
+              option(value="cookie" selected=(redditAuthPrimary === 'cookie')) Cookie or bearer token
+              option(value="oauth" selected=(redditAuthPrimary === 'oauth')) OAuth app
+            p#reddit-auth-primary-help.dashboard-help
+              | With both saved, reddont uses this one first and the other when Reddit refuses it. Users who fall back to what you share get the same order.
 
           button(type="submit" style="margin-top: 20px;") Save Preferences
 

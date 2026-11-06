@@ -134,6 +134,16 @@ runMigration("add-share-reddit-cookie-column", () => {
   `).run();
 });
 
+// A Reddit OAuth app (src/redditOAuth.js) beside the saved cookie or token:
+// which of the two goes first, and whether the app is shared like the cookie.
+runMigration("add-reddit-oauth-columns", () => {
+	db.transaction(() => {
+		db.query("ALTER TABLE users ADD COLUMN redditOAuthAppId TEXT").run();
+		db.query("ALTER TABLE users ADD COLUMN shareRedditOAuth INTEGER NOT NULL DEFAULT 0").run();
+		db.query("ALTER TABLE users ADD COLUMN redditAuthPrimary TEXT NOT NULL DEFAULT 'cookie'").run();
+	})();
+});
+
 runMigration("add-oidc-support", () => {
 	// Core OIDC fields
 	db.query(`

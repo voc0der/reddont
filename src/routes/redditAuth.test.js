@@ -41,7 +41,7 @@ beforeAll(async () => {
 }, 15000);
 
 beforeEach(() => {
-	db.query("UPDATE users SET redditAuthHeaders = NULL, shareRedditCookie = 0").run();
+	db.query("UPDATE users SET redditAuthHeaders = NULL, shareRedditCookie = 0, redditOAuthAppId = NULL, shareRedditOAuth = 0, redditAuthPrimary = 'cookie'").run();
 	fs.writeFileSync(path.join(dataDir, "requests.jsonl"), "");
 });
 
@@ -70,9 +70,27 @@ function credential(id, headers, shared = 0) {
 		.run(headers === null ? null : JSON.stringify(headers), shared, id);
 }
 
+function oauthApp(id, appId, { shared = 0, primary = "cookie" } = {}) {
+	db.query("UPDATE users SET redditOAuthAppId = ?, shareRedditOAuth = ?, redditAuthPrimary = ? WHERE id = ?")
+		.run(appId, shared, primary, id);
+}
+
 function requests() {
 	return fs.readFileSync(path.join(dataDir, "requests.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
 }
+
+function clearRequests() {
+	fs.writeFileSync(path.join(dataDir, "requests.jsonl"), "");
+}
+
+// Requests to Reddit's API, as "host credential", leaving out token requests.
+function sent(pathPattern = /./) {
+	return requests()
+		.filter(({ path }) => path !== "/api/v1/access_token" && pathPattern.test(path))
+		.map(({ host, headers }) => `${host} ${headers.Cookie || headers.Authorization || "signed out"}`);
+}
+
+const FEED_PAGE = /^\/r\/\w+\/hot\/?$/;
 
 describe("feed authentication landing page", () => {
 	test("links home, community, and multi feeds to the authentication settings", async () => {
@@ -145,7 +163,7 @@ describe("shared Reddit cookies", () => {
 			expect(headers.Authorization).toBeUndefined();
 		}
 		const dashboard = await (await request("/dashboard")).text();
-		expect(dashboard).toContain("A shared cookie is being used");
+		expect(dashboard).toContain("Shared Reddit authentication is being used");
 		expect(dashboard).not.toContain("shared-secret");
 	});
 
@@ -214,5 +232,101 @@ describe("cookie sharing preferences", () => {
 			expect(db.query("SELECT shareRedditCookie FROM users WHERE id = 1").get().shareRedditCookie).toBe(0);
 			expect((await request("/r/test")).status).toBe(502);
 		}
+	});
+});
+
+describe("Reddit OAuth apps", () => {
+	test("saves an app, keeps it when the field is left blank, and clears it", async () => {
+		expect((await request("/update-preferences", 2, { redditOAuthAppId: " own-app-id-1 " })).headers.get("location")).toBe("/dashboard");
+		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBe("own-app-id-1");
+		clearRequests();
+		expect((await request("/r/test")).status).toBe(200);
+		expect(new Set(sent())).toEqual(new Set(["oauth.reddit.com Bearer token-for-own-app-id-1"]));
+
+		const html = await (await request("/dashboard")).text();
+		expect(html).toContain("app ID ending in id-1");
+		expect(html).not.toContain("own-app-id-1");
+		await request("/update-preferences", 2, { redditOAuthAppId: "" });
+		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBe("own-app-id-1");
+		await request("/update-preferences", 2, { clearRedditOAuth: "1" });
+		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBeNull();
+		expect((await request("/r/test")).status).toBe(502);
+	});
+
+	test("rejects an invalid app ID and warns when Reddit refuses a new app a token", async () => {
+		let response = await request("/update-preferences", 2, { redditOAuthAppId: "not an app id" });
+		expect(decodeURIComponent(response.headers.get("location"))).toBe("/dashboard?message=Invalid Reddit app ID");
+		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBeNull();
+
+		response = await request("/update-preferences", 2, { redditOAuthAppId: "app-id-refused" });
+		expect(decodeURIComponent(response.headers.get("location"))).toContain("Reddit didn't grant it a token");
+		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBe("app-id-refused");
+		clearRequests();
+		expect((await request("/r/test")).status).toBe(502);
+		expect(sent()).toEqual([]);
+	});
+
+	test("try the way chosen to go first, then the other when Reddit refuses it", async () => {
+		credential(2, { cookie: "reddit_session=own" });
+		oauthApp(2, "own-app-id-2", { primary: "oauth" });
+		expect((await request("/r/test")).status).toBe(200);
+		expect(new Set(sent())).toEqual(new Set(["oauth.reddit.com Bearer token-for-own-app-id-2"]));
+
+		await request("/update-preferences", 2, { redditAuthPrimary: "cookie" });
+		expect(db.query("SELECT redditAuthPrimary FROM users WHERE id = 2").get().redditAuthPrimary).toBe("cookie");
+		expect(await (await request("/dashboard")).text()).toMatch(/<option value="cookie" selected/);
+		clearRequests();
+		expect((await request("/r/test")).status).toBe(200);
+		expect(new Set(sent())).toEqual(new Set(["old.reddit.com reddit_session=own"]));
+		clearRequests();
+		expect((await request("/r/cookieblocked")).status).toBe(200);
+		expect(sent(FEED_PAGE)).toEqual(["old.reddit.com reddit_session=own", "oauth.reddit.com Bearer token-for-own-app-id-2"]);
+	});
+});
+
+describe("shared Reddit OAuth apps", () => {
+	test("lend an app to users without their own authentication, in the sharer's order", async () => {
+		oauthApp(1, "shared-app-id-1", { shared: 1 });
+		expect((await request("/r/test")).status).toBe(200);
+		expect(new Set(sent())).toEqual(new Set(["oauth.reddit.com Bearer token-for-shared-app-id-1"]));
+		const dashboard = await (await request("/dashboard")).text();
+		expect(dashboard).toContain("Shared Reddit authentication is being used");
+		expect(dashboard).not.toContain("shared-app-id-1");
+
+		credential(1, { cookie: "reddit_session=shared-secret" }, 1);
+		clearRequests();
+		expect((await request("/r/cookieblocked")).status).toBe(200);
+		expect(sent(FEED_PAGE)).toEqual(["old.reddit.com reddit_session=shared-secret", "oauth.reddit.com Bearer token-for-shared-app-id-1"]);
+		oauthApp(1, "shared-app-id-1", { shared: 1, primary: "oauth" });
+		clearRequests();
+		expect((await request("/r/cookieblocked")).status).toBe(200);
+		expect(sent(FEED_PAGE)).toEqual(["oauth.reddit.com Bearer token-for-shared-app-id-1"]);
+	});
+
+	test("take a way the first sharer keeps private from the next sharer", async () => {
+		credential(1, { cookie: "reddit_session=first" }, 1);
+		oauthApp(1, "private-app-id-1", { primary: "oauth" });
+		oauthApp(3, "second-app-id-3", { shared: 1 });
+		expect((await request("/r/cookieblocked")).status).toBe(200);
+		expect(sent(FEED_PAGE)).toEqual(["old.reddit.com reddit_session=first", "oauth.reddit.com Bearer token-for-second-app-id-3"]);
+		expect(JSON.stringify(requests())).not.toContain("private-app-id-1");
+	});
+
+	test("save the sharing checkbox only with an app, and stop lending it when unchecked", async () => {
+		await request("/update-preferences", 1, { redditOAuthAppId: "shared-app-id-5", shareRedditOAuth: "1" });
+		expect(await (await request("/dashboard", 1)).text()).toMatch(/id="share-reddit-oauth"[^>]*checked/);
+		expect((await request("/r/test")).status).toBe(200);
+		// Their own authentication keeps a reader off what others share.
+		credential(2, { cookie: "reddit_session=own" });
+		clearRequests();
+		expect((await request("/r/cookieblocked")).status).toBe(502);
+		expect(JSON.stringify(requests())).not.toContain("shared-app-id-5");
+		credential(2, null);
+
+		await request("/update-preferences", 1, {});
+		expect(db.query("SELECT shareRedditOAuth FROM users WHERE id = 1").get().shareRedditOAuth).toBe(0);
+		expect((await request("/r/test")).status).toBe(502);
+		await request("/update-preferences", 3, { shareRedditOAuth: "1" });
+		expect(db.query("SELECT shareRedditOAuth FROM users WHERE id = 3").get().shareRedditOAuth).toBe(0);
 	});
 });

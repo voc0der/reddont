@@ -39,11 +39,40 @@ expires, feeds fail again; repeat these steps.
 Saving with the field empty keeps the stored credential; **Clear saved Reddit
 credential** removes it.
 
+### Reddit OAuth app
+
+Instead of a cookie, or beside one, reddont can use a Reddit OAuth app, as
+teddit's `use_reddit_oauth` does: it asks Reddit for the app's token, which
+isn't signed in to any account, and reads oauth.reddit.com with it.
+
+1. Signed in to Reddit, open <https://old.reddit.com/prefs/apps/> and choose
+   **create another app**. Select **installed app**, enter a name, and enter
+   any redirect URI, such as `http://localhost`; reddont doesn't use it.
+2. Copy the app's ID, the string under its name.
+3. In reddont, paste it into **Reddit OAuth App ID** under **reddit
+   authentication** and choose **Save Preferences**.
+
+The section then shows `Current app: app ID ending in` and the ID's last four
+characters. If Reddit doesn't grant the app a token, the dashboard says so
+after saving. Tokens last a day and are renewed before they expire. Saving with the
+field empty keeps the stored app; **Clear saved OAuth app** removes it.
+
+With a credential and an app both saved, **Try First** chooses which one
+requests use. When Reddit refuses it or sends nothing usable, reddont repeats
+the request with the other.
+
+### Sharing
+
 **Allow other users on this instance to fall back to my Reddit cookie** lets
-signed-in users without their own credential use yours, including through
-their API keys. Their requests run under your Reddit account; they never see
-the cookie. With several shared cookies, the oldest account's is used. Bearer
-tokens are never shared.
+signed-in users without their own credential or app use your cookie,
+including through their API keys. Their requests run under your Reddit
+account; they never see the cookie. Bearer tokens are never shared.
+
+**Allow other users on this instance to fall back to my OAuth app** does the
+same for your app, whose token belongs to no Reddit account. Users who fall
+back to what you share get your **Try First** order. With several sharers, the
+oldest account's shared cookie and app are used, and one it doesn't share
+comes from the next account that does.
 
 ## Personal API key
 

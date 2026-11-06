@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Reddit OAuth App ID** under the dashboard's Reddit authentication, as in
+  teddit's `use_reddit_oauth`: paste an installed app's ID and reddont reads
+  oauth.reddit.com with the app's token, renewing it before it expires. Save
+  it beside a cookie and choose which one goes first under **Try First**; when
+  Reddit refuses one, reddont repeats the request with the other. An app can
+  be shared with users who have no Reddit authentication, like a cookie, and
+  they get its owner's order
+
+### Fixed
+
+- A bearer token saved as the Reddit credential was sent to www.reddit.com,
+  which refuses bearer tokens; it now goes to oauth.reddit.com
+
 ## [0.1.11] - 2026-11-05
 
 ### Fixed
