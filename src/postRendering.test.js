@@ -212,6 +212,21 @@ function renderPostPage(overrides = {}) {
 	});
 }
 
+describe("links to a post's URL", () => {
+	test("keep http and https URLs, and drop any other scheme's href", () => {
+		const link = { is_self: false, domain: "example.com", post_hint: "link" };
+		for (const html of [renderPost({ ...link, url: "https://example.com/a?b=1" }, "card"), renderPostPage({ ...link, url: "https://example.com/a?b=1" })]) {
+			expect(html).toContain('href="https://example.com/a?b=1"');
+		}
+		for (const url of ["javascript:alert(1)", " JaVa\tScRiPt:alert(1)", "data:text/html,<script>alert(1)</script>", "vbscript:x"]) {
+			for (const html of [renderPost({ ...link, url }, "card"), renderPost({ ...link, url }), renderPostPage({ ...link, url })]) {
+				expect(html).not.toMatch(/href="\s*(javascript|data|vbscript):/i);
+				expect(html).not.toContain("alert(1)\"");
+			}
+		}
+	});
+});
+
 describe("gallery posts", () => {
 	test("render in a listing when the metadata leaves out an item", () => {
 		const html = renderPost(galleryPost());

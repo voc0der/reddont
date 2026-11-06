@@ -31,7 +31,7 @@
   function isPostImage(p) {
     p = getPostData(p);
     const imgRe = /\.(png|jpg|jpeg|gif|webp|bmp|tiff|svg)$/i;
-    return (p.post_hint == "image" && p.thumbnail && p.thumbnail != "self" && p.thumbnail != "default")
+    return (p.post_hint == "image" && p.thumbnail && p.thumbnail !== "self" && p.thumbnail !== "default")
       || imgRe.test(p.url);
   }
 -
@@ -121,6 +121,17 @@
     }
   }
 -
+  // A post's own link, as Reddit sent it, when it's an http or https URL. Any
+  // other scheme, such as javascript:, would run on this site when clicked, so
+  // the link gets no href. Browsers parse the URL as new URL does.
+  function safeExternalUrl(url) {
+    try {
+      return /^https?:$/.test(new URL(url).protocol) ? url : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function convertInlineImageLinks(html) {
     // Find all anchors that href to preview.redd.it, i.redd.it, i.imgur.com
     // and contain just a link to the same href

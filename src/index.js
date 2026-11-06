@@ -9,6 +9,9 @@ const oidc = require("./oidc");
 const { Geddit } = require("./geddit.js");
 const { getInstanceRedditAppId, isInstanceRedditOAuthOn } = require("./redditOAuth");
 
+// CSRF protection is reddont's own double-submit token check, below (the
+// csrf_token cookie against the form's _csrf field or X-CSRF-Token).
+// nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage
 const app = express();
 const hasher = new Bun.CryptoHasher("sha256", "secret-key");
 const JWT_KEY = process.env.JWT_SECRET_KEY || hasher.update(Math.random().toString()).digest("hex");

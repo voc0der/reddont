@@ -1,0 +1,21 @@
+# Semgrep's default ignores, which this file replaces.
+node_modules/
+build/
+dist/
+vendor/
+.env/
+.venv/
+.tox/
+*.min.js
+.npm/
+.yarn/
+test/
+tests/
+*_test.go
+.semgrep
+.semgrep_logs/
+
+# Tests sit beside the code here rather than in test/, which the defaults skip. They sign
+# tokens and start servers with fixed, disposable secrets by design.
+*.test.js
+src/test-support/
