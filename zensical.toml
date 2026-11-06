@@ -38,6 +38,7 @@ nav = [
     { "Local development" = "development/index.md" },
     { "Test coverage" = "development/coverage.md" },
     { "Publishing images" = "development/releases.md" },
+    { "Security scans" = "development/security.md" },
     { "Documentation" = "development/documentation.md" },
     { "Changelog" = "changelog.md" },
     { "License and credits" = "license.md" },
