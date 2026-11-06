@@ -16,6 +16,8 @@ fi
 # Change ownership of the application directory
 chown -R ${PUID}:${PGID} /data /home/bun/app
 
-# Switch to the new user and run command in the app directory
-# Using bash -c with proper argument passing
-exec gosu ${PUID}:${PGID} bash -c 'cd /home/bun/app && exec "$@"' bash "$@"
+# Switch to the new user and run command in the app directory, with that user's
+# groups and home directory, as gosu did. Using bash -c with proper argument passing
+HOME="$(getent passwd "${PUID}" | cut -d: -f6)"
+export HOME
+exec setpriv --reuid="${PUID}" --regid="${PGID}" --init-groups bash -c 'cd /home/bun/app && exec "$@"' bash "$@"

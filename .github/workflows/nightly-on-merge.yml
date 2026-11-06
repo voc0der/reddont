@@ -3,7 +3,7 @@ name: nightly-on-merge
 # Use trusted base-branch metadata so labeled merges from forks work too.
 # This workflow never checks out or executes pull request code.
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
     types: [closed]
     branches: [main]
 
