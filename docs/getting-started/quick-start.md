@@ -66,7 +66,9 @@ and choose **create invite** when you want to add another person.
 
 Reddit blocks requests without a signed-in session, so
 [add a cookie from a burner account](../usage/preferences.md#reddit-credentials)
-before browsing.
+or a [Reddit OAuth app](../usage/preferences.md#reddit-oauth-app) before
+browsing. To give every user an app, set
+[`USE_REDDIT_OAUTH` and `REDDIT_APP_ID`](../reference/environment.md#reddit).
 
 ## 5. Build your home feed
 

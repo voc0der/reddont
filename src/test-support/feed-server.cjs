@@ -28,10 +28,10 @@ let firstPageLoads = 0;
 globalThis.fetch = async (input) => {
 	const url = new URL(input);
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, params: Object.fromEntries(url.searchParams) })}\n`);
-	if (url.pathname === "/r/test/about.json") {
+	if (/^\/r\/test\/about(\.json)?$/.test(url.pathname)) {
 		return Response.json({ data: { display_name: "test", subscribers: 1200, public_description: "Feed fixture" } });
 	}
-	if (/^\/r\/test\/[a-z]+\.json$/.test(url.pathname)) {
+	if (/^\/r\/test\/[a-z]+(\.json)?$/.test(url.pathname)) {
 		const after = url.searchParams.get("after");
 		if (!after) firstPageLoads++;
 		const source = Array.from({ length: POST_COUNT }, (_, i) => post(i + 1));

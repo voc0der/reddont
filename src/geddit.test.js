@@ -8,7 +8,7 @@ let requests;
 function respond(body) {
 	requests = [];
 	globalThis.fetch = async (url, options) => {
-		requests.push({ url: new URL(url), headers: options?.headers, redirect: options?.redirect });
+		requests.push({ url: new URL(url), method: options?.method, headers: options?.headers, body: options?.body, redirect: options?.redirect });
 		return typeof body === "function" ? body(new URL(url)) : Response.json(body);
 	};
 }
@@ -65,7 +65,7 @@ describe("listing requests", () => {
 		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ limit: "20", include_over_18: "true", t: "week" });
 	});
 
-	test("keep bearer and signed-out feeds on www.reddit.com's JSON", async () => {
+	test("send bearer feeds to oauth.reddit.com and signed-out feeds to www.reddit.com's JSON", async () => {
 		respond(listing([post("a")], "t3_a"));
 		const reddit = new Geddit();
 
@@ -76,7 +76,7 @@ describe("listing requests", () => {
 		await reddit.getSubmissions("new", "all");
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
-			"https://www.reddit.com/r/all/new.json",
+			"https://oauth.reddit.com/r/all/new",
 			"https://www.reddit.com/r/all/new.json",
 		]);
 		expect(requests[0].headers.Authorization).toBe("Bearer abc");
@@ -92,6 +92,183 @@ describe("listing requests", () => {
 			"https://www.reddit.com/r/test/about.json",
 		]);
 		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
+	});
+
+	test("make no about request for a multi-reddit, which has no about page", async () => {
+		respond(listing([]));
+		expect(await new Geddit().getSubreddit("test+other", cookie)).toBeNull();
+		expect(requests).toEqual([]);
+	});
+});
+
+describe("OAuth apps", () => {
+	const TOKEN_PATH = "/api/v1/access_token";
+	const urls = () => requests.map(({ url }) => `${url.origin}${url.pathname}`);
+	// Grants a token per request, numbered, to the apps listed; refuses others.
+	function oauthReddit(apps, answer) {
+		let granted = 0;
+		respond((url) => {
+			if (url.pathname !== TOKEN_PATH) return answer(url, requests.at(-1));
+			const app = atob(requests.at(-1).headers.Authorization.replace("Basic ", "")).replace(/:$/, "");
+			return apps.includes(app)
+				? Response.json({ access_token: `token-${++granted}`, token_type: "bearer", expires_in: 86400, scope: "*" })
+				: Response.json({ message: "Unauthorized", error: 401 }, { status: 401 });
+		});
+	}
+
+	test("get an installed app's token once, then read oauth.reddit.com with it", async () => {
+		oauthReddit(["installed-app-1"], () => Response.json(listing([post("a")])));
+		const reddit = new Geddit();
+		const app = { oauthAppId: "installed-app-1" };
+
+		expect(await reddit.getSubmissions("new", "test", { t: "day" }, app)).toEqual({ after: null, posts: [post("a")] });
+		await reddit.searchSubmissions("gpu", {}, app);
+
+		expect(urls()).toEqual([
+			"https://www.reddit.com/api/v1/access_token",
+			"https://oauth.reddit.com/r/test/new",
+			"https://oauth.reddit.com/search",
+		]);
+		const [token, feed] = requests;
+		expect(token.method).toBe("POST");
+		expect(token.headers.Authorization).toBe(`Basic ${btoa("installed-app-1:")}`);
+		expect(Object.fromEntries(new URLSearchParams(token.body))).toEqual({
+			grant_type: "https://oauth.reddit.com/grants/installed_client",
+			device_id: "DO_NOT_TRACK_THIS_DEVICE",
+		});
+		expect(Object.fromEntries(feed.url.searchParams)).toEqual({ limit: "20", include_over_18: "true", t: "day" });
+		expect(feed.headers.Authorization).toBe("Bearer token-1");
+		expect(feed.headers.Cookie).toBeUndefined();
+	});
+
+	test("share one token request and renew the token before it expires", async () => {
+		let granted = 0;
+		respond((url) =>
+			url.pathname === TOKEN_PATH
+				? Response.json({ access_token: `token-${++granted}`, expires_in: 600 })
+				: Response.json(listing([])),
+		);
+		const reddit = new Geddit();
+		const app = { oauthAppId: "renewed-app-1" };
+
+		await Promise.all(["a", "b"].map((name) => reddit.getSubmissions("hot", name, {}, app)));
+		// Renewed 5 minutes early.
+		const clock = spyOn(Date, "now").mockReturnValue(Date.now() + 5 * 60 * 1000 + 1);
+		try {
+			await reddit.getSubmissions("hot", "c", {}, app);
+		} finally {
+			clock.mockRestore();
+		}
+
+		expect(requests.map(({ url, headers }) => (url.pathname === TOKEN_PATH ? "token" : `${url.pathname} ${headers.Authorization}`))).toEqual([
+			"token",
+			"/r/a/hot Bearer token-1",
+			"/r/b/hot Bearer token-1",
+			"token",
+			"/r/c/hot Bearer token-2",
+		]);
+	});
+
+	test("ask for a new token when oauth.reddit.com stops accepting one", async () => {
+		oauthReddit(["revoked-token-app"], (url, request) =>
+			request.headers.Authorization === "Bearer token-1"
+				? Response.json({ message: "Unauthorized", error: 401 }, { status: 401 })
+				: Response.json(listing([post("a")])),
+		);
+		const reddit = new Geddit();
+		const app = { oauthAppId: "revoked-token-app" };
+
+		expect(await reddit.getSubmissions("hot", "test", {}, app)).toBeNull();
+		expect(await reddit.getSubmissions("hot", "test", {}, app)).toEqual({ after: null, posts: [post("a")] });
+		expect(requests.map(({ headers }) => headers.Authorization)).toEqual([
+			`Basic ${btoa("revoked-token-app:")}`,
+			"Bearer token-1",
+			`Basic ${btoa("revoked-token-app:")}`,
+			"Bearer token-2",
+		]);
+	});
+
+	test("skip an app Reddit refuses, without asking again for a minute", async () => {
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			oauthReddit([], () => Response.json([listing([post("post1")]), listing([])]));
+			const reddit = new Geddit();
+			const options = { oauthAppId: "refused-app-1", fallback: cookie };
+
+			for (let i = 0; i < 2; i++) {
+				expect(await reddit.getSubmissionComments("post1", {}, options)).toEqual({ submission: post("post1"), comments: [] });
+			}
+			expect(await reddit.getSubmissionComments("post1", {}, { oauthAppId: "refused-app-1" })).toBeNull();
+
+			expect(urls()).toEqual([
+				"https://www.reddit.com/api/v1/access_token",
+				"https://old.reddit.com/comments/post1.json",
+				"https://old.reddit.com/comments/post1.json",
+			]);
+			expect(warn).toHaveBeenCalledWith("Reddit refused an OAuth token request", { status: 401 });
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
+	test("treat a token request that can't reach Reddit like a refusal", async () => {
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			respond(() => Promise.reject(new TypeError("fetch failed")));
+			expect(await new Geddit().getSubmissions("hot", "test", {}, { oauthAppId: "unreachable-app-1" })).toBeNull();
+			expect(requests.map(({ url }) => url.pathname)).toEqual(["/api/v1/access_token"]);
+			expect(warn).toHaveBeenCalledWith("Reddit OAuth token request failed", { error: "fetch failed" });
+		} finally {
+			warn.mockRestore();
+		}
+	});
+});
+
+describe("fallbacks", () => {
+	test("retry with the fallback when Reddit refuses the first way", async () => {
+		respond((url) => {
+			if (url.pathname === "/api/v1/access_token") return Response.json({ access_token: "fallback-token", expires_in: 86400 });
+			if (url.hostname === "old.reddit.com") return new Response("<html>blocked</html>", { status: 403 });
+			return Response.json([listing([post("post1")]), listing([])]);
+		});
+		const reddit = new Geddit();
+
+		expect(await reddit.getSubmissionComments("post1", {}, { ...cookie, fallback: { oauthAppId: "fallback-app-1" } })).toEqual({
+			submission: post("post1"),
+			comments: [],
+		});
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
+			"https://old.reddit.com/comments/post1.json",
+			"https://www.reddit.com/api/v1/access_token",
+			"https://oauth.reddit.com/comments/post1",
+		]);
+		expect(requests[2].headers).not.toHaveProperty("Cookie");
+	});
+
+	test("make one request when the first way works", async () => {
+		respond(listing([post("a")]));
+		const reddit = new Geddit();
+
+		expect(await reddit.getSubmissions("hot", "test", {}, { authHeaders: { authorization: "Bearer own" }, fallback: cookie })).not.toBeNull();
+		expect(requests.map(({ url }) => url.origin)).toEqual(["https://oauth.reddit.com"]);
+	});
+
+	test("search communities with the fallback when the first answer is empty", async () => {
+		respond((url) => Response.json(listing(url.hostname === "oauth.reddit.com" ? [thing("t5_a")] : [])));
+		const reddit = new Geddit();
+		const bearer = { authHeaders: { authorization: "Bearer abc" } };
+
+		expect(await reddit.searchSubreddits("gpu", {}, { ...cookie, fallback: bearer })).toEqual({ after: null, items: [thing("t5_a")] });
+		expect(await reddit.searchSubreddits("gpu", {}, { ...bearer, fallback: cookie })).toEqual({ after: null, items: [thing("t5_a")] });
+		// An empty answer beats a failed fallback.
+		respond((url) => (url.hostname === "oauth.reddit.com" ? new Response("blocked", { status: 403 }) : Response.json(listing([]))));
+		expect(await reddit.searchSubreddits("gpu", {}, { ...cookie, fallback: bearer })).toEqual({ after: null, items: [] });
+	});
+
+	test("return null when every way fails", async () => {
+		respond(() => new Response("<html>blocked</html>", { status: 403 }));
+		expect(await new Geddit().getSubmissionComments("post1", {}, { ...cookie, fallback: { authHeaders: { authorization: "Bearer abc" } } })).toBeNull();
+		expect(requests.map(({ url }) => url.origin)).toEqual(["https://old.reddit.com", "https://oauth.reddit.com"]);
 	});
 });
 
@@ -127,7 +304,7 @@ describe("comment threads", () => {
 		expect(requests.map(({ url }) => url.href)).toEqual([
 			"https://old.reddit.com/comments/post1.json?sort=new",
 			"https://old.reddit.com/comments/post1/comment/c1.json?sort=top",
-			"https://www.reddit.com/comments/post1.json?sort=new",
+			"https://oauth.reddit.com/comments/post1?sort=new",
 		]);
 		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
 	});
@@ -142,7 +319,7 @@ describe("comment threads", () => {
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
 			"https://old.reddit.com/api/morechildren.api",
-			"https://www.reddit.com/api/morechildren.json",
+			"https://oauth.reddit.com/api/morechildren",
 		]);
 		expect(Object.fromEntries(requests[0].url.searchParams)).toEqual({ api_type: "json", link_id: "t3_post1", children: "c1,c2", sort: "new" });
 		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");
@@ -192,7 +369,7 @@ describe("search requests", () => {
 
 		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([
 			"https://old.reddit.com/subreddits/search.json",
-			"https://www.reddit.com/search.json",
+			"https://oauth.reddit.com/search",
 			"https://www.reddit.com/search.json",
 		]);
 		expect(requests[0].headers.Cookie).toBe("reddit_session=abc");

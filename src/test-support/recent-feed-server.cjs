@@ -41,10 +41,10 @@ const stale = (i) => post(`expired${i}`, 8 * 86400);
 globalThis.fetch = async (input, options) => {
 	const url = new URL(input);
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, params: Object.fromEntries(url.searchParams), authorization: options?.headers?.Authorization })}\n`);
-	if (url.pathname.endsWith("/about.json")) {
+	if (/\/about(\.json)?$/.test(url.pathname)) {
 		return Response.json({ data: { display_name: "test", subscribers: 1200, public_description: "Feed tests" } });
 	}
-	const sort = url.pathname.match(/\/(hot|new|rising|controversial|top)\.json$/)?.[1];
+	const sort = url.pathname.match(/\/(hot|new|rising|controversial|top)(\.json)?$/)?.[1];
 	if (!sort) throw new Error(`Unexpected fixture request: ${url.pathname}`);
 	let source = [post("oldpin", 20 * 86400, { stickied: true })];
 	if (options?.headers?.Authorization === "Bearer sparse-feed-fixture" || url.pathname.startsWith("/r/sparse/")) {

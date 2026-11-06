@@ -165,7 +165,7 @@ describe("recent browser feeds", () => {
 
 	test("forwards normalized ranges and the reader's authentication on every page", () => {
 		const requests = fs.readFileSync(path.join(dataDir, "requests.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
-		for (const request of requests.filter((r) => !r.path.endsWith("/about.json"))) {
+		for (const request of requests.filter((r) => !/\/about(\.json)?$/.test(r.path))) {
 			// Home lists its subscriptions alphabetically as other+test.
 			if (/^\/r\/(all|popular|other\+test)\//i.test(request.path)) expect(request.params.t).toBe("week");
 			else expect(["all", "month", "year"]).toContain(request.params.t);

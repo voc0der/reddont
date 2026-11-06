@@ -23,6 +23,10 @@ services:
       RATE_LIMIT: "100"          # max requests per 15-minute window per IP (default: 100)
       REDDONT_THEME: ""           # optional; name of a CSS file in src/public without ".css" (default: unset)
 
+      # --- Reddit OAuth app for every user (teddit's settings) ---
+      USE_REDDIT_OAUTH: ""       # default: "false". Set to "true" to use REDDIT_APP_ID's app for every signed-in user
+      REDDIT_APP_ID: ""          # an "installed app" ID from https://old.reddit.com/prefs/apps/ (default: unset)
+
       # --- Authentication & security ---
       REDDONT_DISABLE_SSL: "false"  # default: "false". Set to "true" to disable the Secure cookie flag (needed for HTTP-only deployments)
       JWT_SECRET_KEY: ""         # auto-generated if unset; set to keep sessions valid across restarts

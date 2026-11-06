@@ -1,4 +1,5 @@
 const logger = require("./logger");
+const { forgetRedditOAuthToken, getRedditOAuthToken } = require("./redditOAuth");
 const { MORE_COMMENTS_LIMIT, commentSort } = require("./utils/redditComments");
 const { readListingPage } = require("./utils/redditPage");
 
@@ -22,6 +23,11 @@ const { readListingPage } = require("./utils/redditPage");
 // On 2026-11-05 it blocked /api/info.json the same way. /api/info.api returns
 // the same listing, so cookie feeds and searches load their things from it.
 const COOKIE_HOST = "https://old.reddit.com";
+// Bearer tokens, including those an OAuth app gets (src/redditOAuth.js), go
+// to oauth.reddit.com, which serves the same JSON without the .json
+// extension; www.reddit.com refuses them. On 2026-11-05 it answered every
+// request reddont makes to an app's token.
+const OAUTH_HOST = "https://oauth.reddit.com";
 // /api/info takes up to 100 fullnames.
 const INFO_BATCH_SIZE = 100;
 const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
@@ -121,7 +127,48 @@ class Geddit {
 	}
 
 	getRequestHost(fetchOptions) {
-		return fetchOptions.headers.Cookie ? COOKIE_HOST : this.host;
+		if (fetchOptions.headers.Cookie) return COOKIE_HOST;
+		return fetchOptions.headers.Authorization ? OAUTH_HOST : this.host;
+	}
+
+	// A JSON endpoint's path: oauth.reddit.com serves JSON without an
+	// extension, www and old reddit need .json.
+	jsonPath(pathname, host) {
+		return host === OAUTH_HOST ? pathname : `${pathname}.json`;
+	}
+
+	// Fetch options for one way of reaching Reddit: { authHeaders } (a cookie
+	// or bearer token), { oauthAppId }, or neither (signed out). Null when the
+	// OAuth app can't get a token.
+	async authorize(requestOptions = {}) {
+		if (!requestOptions.oauthAppId) return this.getFetchOptions(requestOptions);
+		const token = await getRedditOAuthToken(requestOptions.oauthAppId, this.headers["User-Agent"]);
+		return token ? this.getFetchOptions({ authHeaders: { authorization: `Bearer ${token}` } }) : null;
+	}
+
+	// Makes a request the way requestOptions names, then, while it fails,
+	// each requestOptions.fallback in turn. `isComplete` says whether a
+	// result is worth keeping without asking the fallback; when none is, the
+	// first result Reddit sent wins.
+	async withFallback(requestOptions, attempt, isComplete = () => true) {
+		let answer = null;
+		for (let options = requestOptions || {}; options; options = options.fallback) {
+			const fetchOptions = await this.authorize(options);
+			const result = fetchOptions ? ((await attempt(fetchOptions)) ?? null) : null;
+			if (result !== null && isComplete(result)) return result;
+			answer ??= result;
+		}
+		return answer;
+	}
+
+	// Every request to Reddit. An OAuth token Reddit stops accepting is
+	// dropped, so the next request gets a new one.
+	async request(url, init) {
+		const response = await fetch(url, init);
+		if (response.status === 401 && String(url).startsWith(`${OAUTH_HOST}/`)) {
+			forgetRedditOAuthToken(String(init.headers.Authorization || "").replace(/^Bearer\s+/i, ""));
+		}
+		return response;
 	}
 
 	// Callers turn a body that isn't JSON into null; the log keeps the status.
@@ -142,7 +189,7 @@ class Geddit {
 				{ id: names.slice(start, start + INFO_BATCH_SIZE).join(",") },
 				COOKIE_HOST,
 			);
-			const json = await this.readJson(await fetch(url, fetchOptions), url, request);
+			const json = await this.readJson(await this.request(url, fetchOptions), url, request);
 			for (const thing of json.data.children) {
 				if (typeof thing?.data?.name === "string") things.set(thing.data.name, thing);
 			}
@@ -201,7 +248,7 @@ class Geddit {
 		if (canonical) target.pathname = canonical;
 
 		for (let hop = 0; ; hop++) {
-			const response = await fetch(target, {
+			const response = await this.request(target, {
 				...fetchOptions,
 				headers: { ...fetchOptions.headers, Accept: "text/html" },
 				redirect: "manual",
@@ -259,72 +306,74 @@ class Geddit {
 		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
 		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
 		const subredditStr = encodedSubreddit ? `/r/${encodedSubreddit}` : "";
-		const fetchOptions = this.getFetchOptions(requestOptions);
 		const query = Object.assign({}, params, options);
-		if (fetchOptions.headers.Cookie) {
-			const listing = await this.getPageListing(
-				`${subredditStr}/${encodeURIComponent(safeSort)}/`,
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			if (fetchOptions.headers.Cookie) {
+				const listing = await this.getPageListing(
+					`${subredditStr}/${encodeURIComponent(safeSort)}/`,
+					query,
+					fetchOptions,
+					"feed",
+					["t3"],
+				);
+				return listing && { after: listing.after, posts: listing.items };
+			}
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(
+				this.jsonPath(`${subredditStr}/${encodeURIComponent(safeSort)}`, host),
 				query,
-				fetchOptions,
-				"feed",
-				["t3"],
+				host,
 			);
-			return listing && { after: listing.after, posts: listing.items };
-		}
-		const url = this.buildRedditUrl(
-			`${subredditStr}/${encodeURIComponent(safeSort)}.json`,
-			query,
-			this.getRequestHost(fetchOptions),
-		);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "feed"))
-			.then((json) => json.data)
-			.then((data) => ({
-				after: data.after,
-				posts: data.children,
-			}))
-			.catch((err) => null);
+			return await this.request(url, fetchOptions)
+				.then((res) => this.readJson(res, url, "feed"))
+				.then((json) => json.data)
+				.then((data) => ({
+					after: data.after,
+					posts: data.children,
+				}))
+				.catch((err) => null);
+		});
 	}
 
 	async getSubreddit(subreddit, requestOptions = {}) {
 		const safeSubreddit = this.sanitizeSubredditPath(subreddit);
-		if (!safeSubreddit) return null;
+		// Multi-reddits such as home have no about page: Reddit answers 404.
+		if (!safeSubreddit || safeSubreddit.includes("+")) return null;
 		const encodedSubreddit = this.encodeSubredditPath(safeSubreddit);
-		const fetchOptions = this.getFetchOptions(requestOptions);
 
-		// Refusals aren't logged: multi-reddits such as home have no about
-		// page, so this request 404s on every home page.
-		return await fetch(
-			`${this.getRequestHost(fetchOptions)}/r/${encodedSubreddit}/about.json`,
-			fetchOptions,
-		)
-			.then((res) => res.json())
-			.then((json) => json.data)
-			.catch((err) => null);
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			const host = this.getRequestHost(fetchOptions);
+			// Refusals aren't logged: a community that doesn't exist 404s.
+			return await this.request(
+				`${host}/r/${encodedSubreddit}/${this.jsonPath("about", host)}`,
+				fetchOptions,
+			)
+				.then((res) => res.json())
+				.then((json) => json.data)
+				.catch((err) => null);
+		});
 	}
 
 	async searchSubmissions(query, options = {}, requestOptions = {}) {
 		options.q = query;
 		options.type = "link";
-		const fetchOptions = this.getFetchOptions(requestOptions);
-		if (fetchOptions.headers.Cookie) {
-			return await this.getPageListing("/search", options, fetchOptions, "search", ["t3"]);
-		}
-		const url = this.buildRedditUrl(
-			"/search.json",
-			options,
-			this.getRequestHost(fetchOptions),
-		);
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			if (fetchOptions.headers.Cookie) {
+				return await this.getPageListing("/search", options, fetchOptions, "search", ["t3"]);
+			}
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(this.jsonPath("/search", host), options, host);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "search"))
-			.then((json) => json.data)
-			.then((data) => ({
-				after: data.after,
-				items: data.children,
-			}))
-			.catch((err) => null);
+			return await this.request(url, fetchOptions)
+				.then((res) => this.readJson(res, url, "search"))
+				.then((json) => json.data)
+				.then((data) => ({
+					after: data.after,
+					items: data.children,
+				}))
+				.catch((err) => null);
+		});
 	}
 
 	async searchSubreddits(query, options = {}, requestOptions = {}) {
@@ -334,21 +383,26 @@ class Geddit {
 			limit: 25,
 			include_over_18: false,
 		};
-		const fetchOptions = this.getFetchOptions(requestOptions);
-		const url = this.buildRedditUrl(
-			"/subreddits/search.json",
-			Object.assign(params, options),
-			this.getRequestHost(fetchOptions),
-		);
+		Object.assign(params, options);
+		// For a while on 2026-11-05 Reddit answered every cookie community
+		// search with an empty listing, so an empty result asks the fallback.
+		return this.withFallback(
+			requestOptions,
+			async (fetchOptions) => {
+				const host = this.getRequestHost(fetchOptions);
+				const url = this.buildRedditUrl(this.jsonPath("/subreddits/search", host), params, host);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "search"))
-			.then((json) => json.data)
-			.then((data) => ({
-				after: data.after,
-				items: data.children,
-			}))
-			.catch((err) => null);
+				return await this.request(url, fetchOptions)
+					.then((res) => this.readJson(res, url, "search"))
+					.then((json) => json.data)
+					.then((data) => ({
+						after: data.after,
+						items: data.children,
+					}))
+					.catch((err) => null);
+			},
+			(results) => results.items?.length > 0,
+		);
 	}
 
 	async searchAll(query, subreddit = null, options = {}, requestOptions = {}) {
@@ -364,33 +418,31 @@ class Geddit {
 			include_over_18: true,
 			type: "sr,link,user",
 		};
-		const fetchOptions = this.getFetchOptions(requestOptions);
 		Object.assign(params, options);
-		if (fetchOptions.headers.Cookie) {
-			// The page lists matching communities before posts; it has no users.
-			const kinds = String(params.type).split(",").includes("sr") ? ["t5", "t3"] : ["t3"];
-			return await this.getPageListing(`${subredditStr}/search`, params, fetchOptions, "search", kinds);
-		}
-		const url = this.buildRedditUrl(
-			`${subredditStr}/search.json`,
-			params,
-			this.getRequestHost(fetchOptions),
-		);
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			if (fetchOptions.headers.Cookie) {
+				// The page lists matching communities before posts; it has no users.
+				const kinds = String(params.type).split(",").includes("sr") ? ["t5", "t3"] : ["t3"];
+				return await this.getPageListing(`${subredditStr}/search`, params, fetchOptions, "search", kinds);
+			}
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(this.jsonPath(`${subredditStr}/search`, host), params, host);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "search"))
-			.then((json) =>
-				Array.isArray(json)
-					? {
-							after: json[1].data.after,
-							items: json[0].data.children.concat(json[1].data.children),
-						}
-					: {
-							after: json.data.after,
-							items: json.data.children,
-						},
-			)
-			.catch((err) => null);
+			return await this.request(url, fetchOptions)
+				.then((res) => this.readJson(res, url, "search"))
+				.then((json) =>
+					Array.isArray(json)
+						? {
+								after: json[1].data.after,
+								items: json[0].data.children.concat(json[1].data.children),
+							}
+						: {
+								after: json.data.after,
+								items: json.data.children,
+							},
+				)
+				.catch((err) => null);
+		});
 	}
 
 	async getSubmissionComments(
@@ -400,20 +452,22 @@ class Geddit {
 	) {
 		const safeId = this.sanitizeThingId(id);
 		if (!safeId) return null;
-		const fetchOptions = this.getFetchOptions(requestOptions);
-		const url = this.buildRedditUrl(
-			`/comments/${encodeURIComponent(safeId)}.json`,
-			options,
-			this.getRequestHost(fetchOptions),
-		);
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(
+				this.jsonPath(`/comments/${encodeURIComponent(safeId)}`, host),
+				options,
+				host,
+			);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "comments"))
-			.then((json) => ({
-				submission: json[0].data.children[0],
-				comments: json[1].data.children,
-			}))
-			.catch((err) => null);
+			return await this.request(url, fetchOptions)
+				.then((res) => this.readJson(res, url, "comments"))
+				.then((json) => ({
+					submission: json[0].data.children[0],
+					comments: json[1].data.children,
+				}))
+				.catch((err) => null);
+		});
 	}
 
 	async getMoreComments(id, children, sort, requestOptions = {}) {
@@ -424,35 +478,36 @@ class Geddit {
 			children.some((child) => typeof child !== "string" || !/^[a-z0-9]+$/i.test(child))
 		) return null;
 
-		const fetchOptions = this.getFetchOptions(requestOptions);
-		const host = this.getRequestHost(fetchOptions);
-		const url = this.buildRedditUrl(
-			host === COOKIE_HOST ? "/api/morechildren.api" : "/api/morechildren.json",
-			{
-				api_type: "json",
-				link_id: `t3_${id}`,
-				children: children.join(","),
-				sort: commentSort(sort),
-			},
-			host,
-		);
-		try {
-			const response = await fetch(url, fetchOptions);
-			if (!response.ok) {
-				logger.warn("Reddit refused a load-more request", { host: url.hostname, status: response.status });
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(
+				host === COOKIE_HOST ? "/api/morechildren.api" : this.jsonPath("/api/morechildren", host),
+				{
+					api_type: "json",
+					link_id: `t3_${id}`,
+					children: children.join(","),
+					sort: commentSort(sort),
+				},
+				host,
+			);
+			try {
+				const response = await this.request(url, fetchOptions);
+				if (!response.ok) {
+					logger.warn("Reddit refused a load-more request", { host: url.hostname, status: response.status });
+					return null;
+				}
+				const body = await response.json();
+				if (body.json?.errors?.length) return null;
+				const things = body.json?.data?.things;
+				if (!Array.isArray(things) || !things.every((thing) =>
+					["t1", "more"].includes(thing?.kind) && typeof thing.data?.id === "string",
+				)) return null;
+				return things;
+			} catch {
+				logger.warn("Reddit load-more request failed", { host: url.hostname });
 				return null;
 			}
-			const body = await response.json();
-			if (body.json?.errors?.length) return null;
-			const things = body.json?.data?.things;
-			if (!Array.isArray(things) || !things.every((thing) =>
-				["t1", "more"].includes(thing?.kind) && typeof thing.data?.id === "string",
-			)) return null;
-			return things;
-		} catch {
-			logger.warn("Reddit load-more request failed", { host: url.hostname });
-			return null;
-		}
+		});
 	}
 
 	async getSingleCommentThread(
@@ -464,20 +519,25 @@ class Geddit {
 		const safeParentId = this.sanitizeThingId(parent_id);
 		const safeChildId = this.sanitizeThingId(child_id);
 		if (!safeParentId || !safeChildId) return null;
-		const fetchOptions = this.getFetchOptions(requestOptions);
-		const url = this.buildRedditUrl(
-			`/comments/${encodeURIComponent(safeParentId)}/comment/${encodeURIComponent(safeChildId)}.json`,
-			options,
-			this.getRequestHost(fetchOptions),
-		);
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			const host = this.getRequestHost(fetchOptions);
+			const url = this.buildRedditUrl(
+				this.jsonPath(
+					`/comments/${encodeURIComponent(safeParentId)}/comment/${encodeURIComponent(safeChildId)}`,
+					host,
+				),
+				options,
+				host,
+			);
 
-		return await fetch(url, fetchOptions)
-			.then((res) => this.readJson(res, url, "comments"))
-			.then((json) => ({
-				submission: json[0].data.children[0],
-				comments: json[1].data.children,
-			}))
-			.catch((err) => null);
+			return await this.request(url, fetchOptions)
+				.then((res) => this.readJson(res, url, "comments"))
+				.then((json) => ({
+					submission: json[0].data.children[0],
+					comments: json[1].data.children,
+				}))
+				.catch((err) => null);
+		});
 	}
 }
 

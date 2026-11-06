@@ -60,9 +60,22 @@ replace it or clear it from the dashboard and retry.
 
 When a failed feed has no authentication available, use **Add Reddit
 authentication** on the landing page to open the dashboard's Reddit settings.
-Save a cookie or bearer token from a signed-in burner account. A user can also
-share their cookie with other users on the instance who have no credential;
-see [preferences and credentials](../usage/preferences.md#reddit-credentials).
+Save a cookie or bearer token from a signed-in burner account, a Reddit OAuth
+app's ID, or both. A user can also share their cookie and app with other users
+on the instance who have neither; see
+[preferences and credentials](../usage/preferences.md#reddit-credentials). An
+administrator can set one app for every user with `USE_REDDIT_OAUTH` and
+`REDDIT_APP_ID`; see [environment variables](environment.md#reddit). At
+startup the log then says whether Reddit granted that app a token.
+
+With an OAuth app or a bearer token, requests go to oauth.reddit.com, which
+serves the same JSON without the `.json` extension, and an app's token comes
+from `www.reddit.com/api/v1/access_token`; allow both hosts if outbound traffic
+is restricted. When Reddit won't grant an app a token, the log shows
+`Reddit refused an OAuth token request` with the status (401 for an ID that
+isn't an installed app's), and reddont waits a minute before asking again.
+With a credential and an app both saved, a request Reddit refuses one way is
+repeated the other way.
 
 With a Reddit cookie, every request to Reddit goes to old.reddit.com instead
 of www.reddit.com; allow both hosts if outbound traffic is restricted. Reddit

@@ -45,6 +45,20 @@ async function waitForLog(app, text) {
 }
 
 describe("server startup", () => {
+	test("warns, without asking Reddit, when USE_REDDIT_OAUTH has no usable REDDIT_APP_ID", async () => {
+		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
+		const app = startApp(dataDir, { USE_REDDIT_OAUTH: "true", REDDIT_APP_ID: "not an app id" });
+		try {
+			await waitForLog(app, "HTTP server started");
+			expect(app.log).toContain("USE_REDDIT_OAUTH is on, but REDDIT_APP_ID isn't an installed app's ID");
+			expect(app.log).not.toContain("is on for every user");
+		} finally {
+			app.kill();
+			await app.exited;
+			fs.rmSync(dataDir, { recursive: true, force: true });
+		}
+	});
+
 	test("stops instead of serving plain HTTP when the TLS files cannot be read", async () => {
 		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
 		try {

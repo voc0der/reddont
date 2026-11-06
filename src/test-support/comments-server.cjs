@@ -42,7 +42,7 @@ let failed = false;
 globalThis.fetch = async (input, options) => {
 	const url = new URL(input);
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ host: url.host, path: url.pathname, params: Object.fromEntries(url.searchParams), authenticated: options?.headers?.Authorization === "Bearer comments-test" || options?.headers?.Cookie === "reddit_session=comments-test" })}\n`);
-	if (/^\/api\/morechildren\.(json|api)$/.test(url.pathname)) {
+	if (/^\/api\/morechildren(\.(json|api))?$/.test(url.pathname)) {
 		const ids = url.searchParams.get("children").split(",");
 		if (ids.length > 100 || url.searchParams.get("link_id") !== "t3_post1") throw new Error("Invalid batch");
 		if (ids[0] === "failure" && !failed) {
@@ -58,7 +58,7 @@ globalThis.fetch = async (input, options) => {
 	}
 	if (url.pathname.startsWith("/comments/")) {
 		if (url.pathname.includes("unavailable")) return Response.json({ message: "Not Found", error: 404 }, { status: 404 });
-		const child = url.pathname.match(/\/comment\/([a-z0-9]+)\.json$/)?.[1];
+		const child = url.pathname.match(/\/comment\/([a-z0-9]+)(\.json)?$/)?.[1];
 		const comments = child ? [comment(child)] : [
 			comment("existing", "t3_post1", [more(["reply1", "reply2"], "t1_existing")]),
 			more(Array.from({ length: 205 }, (_, i) => `c${i}`)),

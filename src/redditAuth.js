@@ -1,3 +1,5 @@
+const { getInstanceRedditAppId, normalizeRedditAppId } = require("./redditOAuth");
+
 const MAX_REDDIT_AUTH_INPUT_LENGTH = 20000;
 const VALID_REDDIT_AUTH_TYPES = new Set([
 	"auto",
@@ -274,27 +276,111 @@ function readUserRedditAuthHeaders(user) {
 	}
 }
 
-function getRedditRequestOptions(user) {
-	// Only authenticated instance users may borrow an explicitly shared cookie.
-	if (!user?.id) return {};
-	if (user.redditAuthHeaders) {
-		const authHeaders = readUserRedditAuthHeaders(user);
-		return authHeaders ? { authHeaders } : {};
+function readUserRedditOAuthAppId(user) {
+	try {
+		return normalizeRedditAppId(user.redditOAuthAppId);
+	} catch {
+		require("./logger").warn("Ignoring invalid stored Reddit app ID", {
+			userId: user.id,
+		});
+		return null;
 	}
+}
 
-	// A stable order keeps requests on the same account while it is shared.
-	const sharedUsers = require("./db").db
+function normalizeRedditAuthPrimary(value) {
+	return value === "oauth" ? "oauth" : "cookie";
+}
+
+// A user's saved ways of reaching Reddit, the one they chose to try first
+// leading: "cookie" is the saved credential (a cookie or bearer token),
+// "oauth" the OAuth app. `sharedOnly` keeps what they share: the cookie, never
+// a bearer token, and the app.
+function redditAuthMethods(user, { sharedOnly = false } = {}) {
+	const methods = new Map();
+	if (user.redditAuthHeaders && (!sharedOnly || user.shareRedditCookie === 1)) {
+		const headers = readUserRedditAuthHeaders(user);
+		const used = sharedOnly ? headers?.cookie && { cookie: headers.cookie } : headers;
+		if (used) methods.set("cookie", { authHeaders: used });
+	}
+	if (user.redditOAuthAppId && (!sharedOnly || user.shareRedditOAuth === 1)) {
+		const appId = readUserRedditOAuthAppId(user);
+		if (appId) methods.set("oauth", { oauthAppId: appId });
+	}
+	const order = normalizeRedditAuthPrimary(user.redditAuthPrimary) === "oauth" ? ["oauth", "cookie"] : ["cookie", "oauth"];
+	const source = sharedOnly ? "shared" : "own";
+	return order.filter((kind) => methods.has(kind)).map((kind) => ({ kind, source, options: methods.get(kind) }));
+}
+
+// What other users share, in a stable order so requests stay on the same
+// accounts: the first sharer's ways in their order, then a way they don't
+// share from the next sharer who does.
+function sharedRedditAuthMethods() {
+	const sharers = require("./db").db
 		.query(
-			"SELECT id, redditAuthHeaders FROM users WHERE shareRedditCookie = 1 AND redditAuthHeaders IS NOT NULL ORDER BY id",
+			"SELECT id, redditAuthHeaders, shareRedditCookie, redditOAuthAppId, shareRedditOAuth, redditAuthPrimary FROM users WHERE (shareRedditCookie = 1 AND redditAuthHeaders IS NOT NULL) OR (shareRedditOAuth = 1 AND redditOAuthAppId IS NOT NULL) ORDER BY id",
 		)
 		.all();
-	for (const sharedUser of sharedUsers) {
-		const headers = readUserRedditAuthHeaders(sharedUser);
-		if (headers?.cookie) {
-			return { authHeaders: { cookie: headers.cookie } };
+	const methods = [];
+	for (const sharer of sharers) {
+		for (const method of redditAuthMethods(sharer, { sharedOnly: true })) {
+			if (!methods.some(({ kind }) => kind === method.kind)) methods.push(method);
 		}
+		if (methods.length === 2) break;
 	}
-	return {};
+	return methods;
+}
+
+// The ways a signed-in user's requests reach Reddit, first one first. Their
+// own cookie and app lead, in their order, then the instance's app
+// (USE_REDDIT_OAUTH). Users with neither start with the instance's app, then
+// what other users share. An app already in the list isn't tried twice.
+function getRedditAuthPlan(user) {
+	// Only authenticated instance users may use shared or instance authentication.
+	if (!user?.id) return [];
+	const appId = getInstanceRedditAppId();
+	const instance = appId ? [{ kind: "oauth", source: "instance", options: { oauthAppId: appId } }] : [];
+	const methods =
+		user.redditAuthHeaders || user.redditOAuthAppId
+			? [...redditAuthMethods(user), ...instance]
+			: [...instance, ...sharedRedditAuthMethods()];
+	return methods.filter(
+		(method, index) =>
+			method.kind !== "oauth" ||
+			methods.findIndex(({ options }) => options.oauthAppId === method.options.oauthAppId) === index,
+	);
+}
+
+// Geddit request options for methods in order: each later one is the
+// fallback of the one before.
+function chainRequestOptions(methods) {
+	return methods.reduceRight(
+		(fallback, { options }) => (fallback ? { ...options, fallback } : { ...options }),
+		null,
+	) || {};
+}
+
+function getRedditRequestOptions(user) {
+	return chainRequestOptions(getRedditAuthPlan(user));
+}
+
+const PLAN_LABELS = {
+	"own cookie": "your saved credential",
+	"own oauth": "your OAuth app",
+	"shared cookie": "a cookie another user shares",
+	"shared oauth": "an OAuth app another user shares",
+	"instance oauth": "this instance's OAuth app",
+};
+
+// The plan in words, for the user's dashboard; values stay hidden.
+function describeRedditAuthPlan(user) {
+	const plan = getRedditAuthPlan(user);
+	if (!plan.length) return "no Reddit authentication";
+	return plan.map(({ kind, source }) => PLAN_LABELS[`${source} ${kind}`]).join(", then ");
+}
+
+// Whether request options authenticate with Reddit at all.
+function hasRedditAuth(requestOptions) {
+	return Boolean(requestOptions?.authHeaders || requestOptions?.oauthAppId);
 }
 
 function describeRedditAuthHeaders(value) {
@@ -316,6 +402,18 @@ function describeRedditAuthHeaders(value) {
 	return parts.join(" and ");
 }
 
+// The saved app ID is shown only by its end, like cookies by their names.
+function getRedditOAuthStatus(value) {
+	let appId = null;
+	try {
+		appId = normalizeRedditAppId(value);
+	} catch {}
+	return {
+		configured: Boolean(appId),
+		description: appId ? `app ID ending in ${appId.slice(-4)}` : "not configured",
+	};
+}
+
 function getRedditAuthStatus(value) {
 	const headers = normalizeStoredRedditAuthHeaders(value);
 	return {
@@ -328,9 +426,13 @@ function getRedditAuthStatus(value) {
 
 module.exports = {
 	describeRedditAuthHeaders,
+	describeRedditAuthPlan,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
+	getRedditOAuthStatus,
 	getRedditRequestOptions,
+	hasRedditAuth,
 	normalizeRedditAuthInput,
+	normalizeRedditAuthPrimary,
 	serializeRedditAuthHeaders,
 };

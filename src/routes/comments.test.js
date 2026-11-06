@@ -89,7 +89,7 @@ describe("load more comment routes", () => {
 		expect(html).toContain('/comments/post1/comment/grandchild?sort=new');
 		expect(html).toContain('&lt;script&gt; stays text.');
 		expect(html).not.toContain('<script>');
-		expect(lastUpstreamRequest()).toMatchObject({ host: "www.reddit.com", path: "/api/morechildren.json", params: { children: "c0,c1", sort: "new", link_id: "t3_post1" }, authenticated: true });
+		expect(lastUpstreamRequest()).toMatchObject({ host: "oauth.reddit.com", path: "/api/morechildren", params: { children: "c0,c1", sort: "new", link_id: "t3_post1" }, authenticated: true });
 	});
 
 	test("loads groups through old.reddit.com for a cookie credential", async () => {

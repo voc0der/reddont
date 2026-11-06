@@ -31,12 +31,17 @@ const {
 	expandMoreComments,
 } = require("../utils/redditComments");
 const {
+	describeRedditAuthPlan,
 	getRedditAuthHeaders,
 	getRedditAuthStatus,
+	getRedditOAuthStatus,
 	getRedditRequestOptions,
+	hasRedditAuth,
 	normalizeRedditAuthInput,
+	normalizeRedditAuthPrimary,
 	serializeRedditAuthHeaders,
 } = require("../redditAuth");
+const { normalizeRedditAppId } = require("../redditOAuth");
 
 const router = express.Router();
 const G = new geddit.Geddit();
@@ -247,7 +252,7 @@ const commonRenderOptions = {
 
 function feedErrorOptions(req, redditRequestOptions, fragment = false) {
 	return {
-		missingRedditAuth: !redditRequestOptions.authHeaders,
+		missingRedditAuth: !hasRedditAuth(redditRequestOptions),
 		retryUrl: fragment
 			? getSafeRedirectTarget(req.query.currentUrl)
 			: getSafeRedirectTarget(req.originalUrl),
@@ -770,9 +775,9 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		isAdmin,
 		user: req.user,
 		redditAuthStatus,
-		usingSharedRedditCookie:
-			!req.user.redditAuthHeaders &&
-			Boolean(getRedditRequestOptions(req.user).authHeaders),
+		redditOAuthStatus: getRedditOAuthStatus(req.user.redditOAuthAppId),
+		redditAuthPrimary: normalizeRedditAuthPrimary(req.user.redditAuthPrimary),
+		redditAuthPlan: describeRedditAuthPlan(req.user),
 		apiKey: req.user.apiKey || null,
 		apiWhitelist: describeApiWhitelist(),
 		message: req.query.message,
@@ -815,6 +820,10 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		redditAuthType,
 		clearRedditAuth,
 		shareRedditCookie,
+		redditOAuthAppId,
+		clearRedditOAuth,
+		shareRedditOAuth,
+		redditAuthPrimary,
 	} = req.body;
 	const infiniteScrollValue = infiniteScroll === "1" ? 1 : 0;
 	const useClassicLayoutValue = useClassicLayout === "1" ? 1 : 0;
@@ -826,6 +835,10 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		redditAuthCredential.trim().length > 0;
 	let redditAuthHeadersUpdate;
 	let shareRedditCookieValue = 0;
+	// A blank app ID keeps the saved one, like a blank credential.
+	let redditOAuthAppIdUpdate;
+	let shareRedditOAuthValue = 0;
+	const redditAuthPrimaryValue = normalizeRedditAuthPrimary(redditAuthPrimary);
 
 	try {
 		if (clearRedditAuth === "1") {
@@ -851,6 +864,23 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		return res.redirect("/dashboard?message=Invalid Reddit credential");
 	}
 
+	try {
+		if (clearRedditOAuth === "1") {
+			redditOAuthAppIdUpdate = null;
+		} else if (typeof redditOAuthAppId === "string" && redditOAuthAppId.trim()) {
+			redditOAuthAppIdUpdate = normalizeRedditAppId(redditOAuthAppId);
+		}
+		const savedAppId =
+			redditOAuthAppIdUpdate !== undefined ? redditOAuthAppIdUpdate : req.user.redditOAuthAppId;
+		shareRedditOAuthValue = shareRedditOAuth === "1" && savedAppId ? 1 : 0;
+	} catch (err) {
+		logger.warn("Rejected invalid Reddit app ID", {
+			userId: req.user.id,
+			error: err?.message || String(err),
+		});
+		return res.redirect("/dashboard?message=Invalid Reddit app ID");
+	}
+
 	logger.debug("Received preferences:", {
 		infiniteScroll,
 		useClassicLayout,
@@ -871,9 +901,12 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 
 	try {
 		const redditAuthSql =
-			redditAuthHeadersUpdate !== undefined
+			(redditAuthHeadersUpdate !== undefined
 				? ", redditAuthHeaders = $redditAuthHeaders"
-				: "";
+				: "") +
+			(redditOAuthAppIdUpdate !== undefined
+				? ", redditOAuthAppId = $redditOAuthAppId"
+				: "");
 		const updateParams = {
 			infiniteScroll: infiniteScrollValue,
 			useClassicLayout: useClassicLayoutValue,
@@ -881,16 +914,21 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			highResThumbnails: highResThumbnailsValue,
 			showNsfwThumbnails: showNsfwThumbnailsValue,
 			shareRedditCookie: shareRedditCookieValue,
+			shareRedditOAuth: shareRedditOAuthValue,
+			redditAuthPrimary: redditAuthPrimaryValue,
 			id: req.user.id,
 		};
 
 		if (redditAuthHeadersUpdate !== undefined) {
 			updateParams.redditAuthHeaders = redditAuthHeadersUpdate;
 		}
+		if (redditOAuthAppIdUpdate !== undefined) {
+			updateParams.redditOAuthAppId = redditOAuthAppIdUpdate;
+		}
 
 		const result = db
 			.query(
-				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, shareRedditCookie = $shareRedditCookie${redditAuthSql} WHERE id = $id`,
+				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, shareRedditCookie = $shareRedditCookie, shareRedditOAuth = $shareRedditOAuth, redditAuthPrimary = $redditAuthPrimary${redditAuthSql} WHERE id = $id`,
 			)
 			.run(updateParams);
 
@@ -899,7 +937,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		// Verify the update
 		const updatedUser = db
 			.query(
-				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, redditAuthHeaders FROM users WHERE id = $id",
+				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, redditAuthHeaders, redditOAuthAppId FROM users WHERE id = $id",
 			)
 			.get({ id: req.user.id });
 		logger.debug("User after update:", {
@@ -909,8 +947,16 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			highResThumbnails: updatedUser?.highResThumbnails,
 			showNsfwThumbnails: updatedUser?.showNsfwThumbnails,
 			redditAuthConfigured: Boolean(updatedUser?.redditAuthHeaders),
+			redditOAuthConfigured: Boolean(updatedUser?.redditOAuthAppId),
 		});
 
+		// A new app is checked now, while its owner is looking: the token it
+		// gets is kept for their requests.
+		if (redditOAuthAppIdUpdate && !(await G.authorize({ oauthAppId: redditOAuthAppIdUpdate }))) {
+			return res.redirect(
+				"/dashboard?message=OAuth app saved, but Reddit didn't grant it a token. Check that the ID belongs to an installed app.",
+			);
+		}
 		return res.redirect("/dashboard");
 	} catch (err) {
 		logger.error("Error updating preferences:", err);
