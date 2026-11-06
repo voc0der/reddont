@@ -109,5 +109,10 @@ Run the relevant tests after changing routes, authentication, or rendering.
 For container changes, also validate `docker compose config` and build the
 Dockerfile.
 
+Pull requests also run the [security scans](security.md): CodeQL, Semgrep,
+dependency, credential and workflow audits, fuzz tests, and a ZAP scan of the
+built image. Each fails on findings; that page has their local commands and how
+to record a reviewed false positive.
+
 Update the corresponding documentation when changing an environment
 variable, route, or UI setting. See [working on the docs](documentation.md).

@@ -269,6 +269,9 @@ describe("refresh token storage", () => {
 		const altered = Buffer.from(ciphertext, "base64");
 		altered[0] ^= 1;
 		expect(() => oidc.decryptRefreshToken(`${iv}.${tag}.${altered.toString("base64")}`)).toThrow();
+		// A tag cut short is refused, though GCM alone would check only the bytes given.
+		const short = Buffer.from(tag, "base64").subarray(0, 4).toString("base64");
+		expect(oidc.decryptRefreshToken(`${iv}.${short}.${ciphertext}`)).toBeNull();
 
 		// The configured secret derives the same key after a restart; another secret cannot read it.
 		configure({ ...PROVIDER, JWT_SECRET_KEY: "first-key" });

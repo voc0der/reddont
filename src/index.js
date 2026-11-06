@@ -9,6 +9,9 @@ const oidc = require("./oidc");
 const { Geddit } = require("./geddit.js");
 const { getInstanceRedditAppId, isInstanceRedditOAuthOn } = require("./redditOAuth");
 
+// CSRF protection is reddont's own double-submit token check, below (the
+// csrf_token cookie against the form's _csrf field or X-CSRF-Token).
+// nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage
 const app = express();
 const hasher = new Bun.CryptoHasher("sha256", "secret-key");
 const JWT_KEY = process.env.JWT_SECRET_KEY || hasher.update(Math.random().toString()).digest("hex");
@@ -120,6 +123,20 @@ async function bootstrap() {
 
 	app.set("views", path.join(__dirname, "views"));
 	app.set("view engine", "pug");
+
+	// Browser security headers on every response, static files included. Other
+	// sites may not frame reddont, which holds Reddit credentials and one-click
+	// settings; links leave without the page's address; and a browser reads each
+	// file only as the type sent. ZAP's baseline scan checks these (dev/zap/).
+	app.disable("x-powered-by");
+	app.use((_req, res, next) => {
+		res.set({
+			"X-Content-Type-Options": "nosniff",
+			"X-Frame-Options": "DENY",
+			"Referrer-Policy": "same-origin",
+		});
+		next();
+	});
 
 	// CRITICAL: Set trust proxy BEFORE any cookie/session middleware
 	// This ensures Express correctly identifies HTTPS requests behind a reverse proxy

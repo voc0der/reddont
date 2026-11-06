@@ -67,7 +67,7 @@ html
                   +icon("external")
                   span Open on Reddit
                 if linkPost
-                  a.m-menu-item(href=post.url)
+                  a.m-menu-item(href=safeExternalUrl(post.url))
                     +icon("link")
                     span Open link
 
@@ -75,7 +75,7 @@ html
           div.thumbnail.d-only
             if thumbUrl
               if linkPost
-                a(href=post.url aria-label=`Open ${post.domain}`)
+                a(href=safeExternalUrl(post.url) aria-label=`Open ${post.domain}`)
                   img(src=thumbUrl alt="")
               else
                 img(src=thumbUrl alt="")
@@ -85,7 +85,7 @@ html
                   path(d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.75 3v-3A2.5 2.5 0 0 1 4 15V8a2.5 2.5 0 0 1 2.5-2.5Z")
                   path.self-post-icon-lines(d="M8 9h8M8 12h8M8 15h5")
             else if linkPost
-              a.link-preview(href=post.url aria-label=`Open ${post.domain}`)
+              a.link-preview(href=safeExternalUrl(post.url) aria-label=`Open ${post.domain}`)
                 +icon("link")
           if mediaPost
             button.expando-button.d-only(type="button" class=(isPostVideo(post) ? 'video' : isPostGallery(post) ? 'gallery' : 'image') onclick="togglePostMedia(this)" aria-controls="post-media" aria-expanded="true" aria-label="Collapse media")
@@ -93,6 +93,9 @@ html
           h2.post-title
             if flairLeft
               +linkFlair(post)
+            //- Reddit escapes <, > and & in its JSON unless asked for raw_json, which
+            //- reddont never does, so the title's entities show as text.
+            //- nosemgrep: javascript.express.security.audit.xss.pug.explicit-unescape.template-explicit-unescape
             span.title-text!= post.title
             if !flairLeft
               +linkFlair(post)
@@ -101,7 +104,7 @@ html
               if textPost
                 a(href=subHref) #{post.domain}
               else
-                a(href=post.url) #{post.domain}
+                a(href=safeExternalUrl(post.url)) #{post.domain}
               | )
           p.tagline.d-only
             | submitted #[time(datetime=isoTime(post.created) title=utcTime(post.created)) #{timeAgoLong(post.created)}]
@@ -153,9 +156,9 @@ html
               video.expanded-video(playsinline="" webkit-playsinline="" controls preload="metadata" onpointerdown=`initVideoPlayer(this, false)` onkeydown=`initVideoPlayer(this, false)` onplay=`initVideoPlayer(this, true)` src=(fallbackVideo || false) data-fallback-url=(fallbackVideo || false) data-hls-url=decodedVideos[0] data-dash-url=decodedVideos[1] poster=decodedVideos[4]).post-media
             else if linkPost
               if linkPreview
-                a.m-link-preview.m-only(href=post.url)
+                a.m-link-preview.m-only(href=safeExternalUrl(post.url))
                   img(src=linkPreview alt="" loading="lazy")
-              a.m-post-url.m-only(href=post.url) #{post.url}
+              a.m-post-url.m-only(href=safeExternalUrl(post.url)) #{post.url}
 
           if postMedia.selftext_html
             div.self-text

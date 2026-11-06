@@ -23,6 +23,7 @@ Use `docs` for documentation changes and `test` for changes limited to tests.
 - Check interface changes in a browser at desktop and mobile widths, including light and dark themes.
 - For documentation changes, follow the [documentation setup](docs/development/documentation.md), run `zensical build --clean --strict`, and preview the edited pages.
 - For container changes, validate `docker compose config` and build the Dockerfile. See the [development guide](docs/development/index.md) for packaging checks.
+- Pull requests run the [security scans](docs/development/security.md), and each fails on findings. Fix a finding where you can, or record a reviewed false positive the way that page describes.
 - Review the final diff for unrelated edits, generated output, and credentials.
 - Describe the problem, the resulting behavior, and how you verified the change. Note any checks you could not run.
 

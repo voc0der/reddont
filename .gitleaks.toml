@@ -1,0 +1,15 @@
+# Gitleaks: the default rules, plus reviewed false positives.
+[extend]
+useDefault = true
+
+# A finding is skipped only when both its file and its exact value match. Each list is
+# scoped to one rule: gitleaks 8.30 applies a global allowlist's paths to whole files in
+# `gitleaks dir`, ignoring its other conditions.
+[[allowlists]]
+description = "Settings named in the documentation"
+targetRules = ["generic-api-key"]
+condition = "AND"
+# "For HTTP-only access, `REDDONT_DISABLE_SSL=true` ..." reads as a key after the word
+# "access". It is a setting and its value, not a credential.
+paths = ['''^docs/.+\.md$''']
+regexes = ['''^REDDONT_DISABLE_SSL=true$''']

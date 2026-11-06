@@ -60,7 +60,7 @@ mixin post(p, currentUrl, rank)
                   +icon("external")
                   span Open on Reddit
                 if linkPost
-                  a.m-menu-item(href=p.url)
+                  a.m-menu-item(href=safeExternalUrl(p.url))
                     +icon("link")
                     span Open link
                 if creditCommunity
@@ -92,15 +92,15 @@ mixin post(p, currentUrl, rank)
             span.domain
               | (
               if linkPost
-                a.external-action(href=p.url) #{p.domain}
+                a.external-action(href=safeExternalUrl(p.url)) #{p.domain}
               else if textPost
                 a(href=subHref) #{p.domain}
               else
-                a(href=p.url) #{p.domain}
+                a(href=safeExternalUrl(p.url)) #{p.domain}
               | )
           +flair(p)
           if linkPost
-            a.m-post-url.m-only(href=p.url) #{p.url}
+            a.m-post-url.m-only(href=safeExternalUrl(p.url)) #{p.url}
           if (query.view == "card" && !isPostMedia(p) && selfTextHtml)
             div.self-text-overflow.card
               if contentIsSensitive
@@ -154,12 +154,12 @@ mixin post(p, currentUrl, rank)
             video.preview-video(playsinline="" webkit-playsinline="" muted="" loop="" preload="none" onclick=toggleCall onkeydown=onkeydown src=(videoSrc || false) data-preview-src=(videoSrc || false) data-preview-fallback-src=(alternateVideoSrc || false) poster=decodedVideos[4] tabindex="0" role="button" aria-label="Expand video")
           else if linkPost
             if linkThumb
-              a(href=p.url aria-label=`Open ${p.domain}`)
+              a(href=safeExternalUrl(p.url) aria-label=`Open ${p.domain}`)
                 img(src=postThumbnail(p, useHighRes, showNsfwThumbnails) loading="lazy")
                 span.m-thumb-badge.m-only(aria-hidden="true")
                   +icon("external")
             else
-              a.link-preview(href=p.url aria-label=`Open ${p.domain}`)
+              a.link-preview(href=safeExternalUrl(p.url) aria-label=`Open ${p.domain}`)
                 +icon("link")
           else if textPost
             a.self-post-link(href=commentsHref aria-label="Open discussion")
@@ -209,7 +209,7 @@ mixin post(p, currentUrl, rank)
               - var fallbackVideo = decodedVideos[2] || decodedVideos[3]
               video.expanded-video(playsinline="" webkit-playsinline="" controls="" muted="" preload="none" onpointerdown=`initVideoPlayer(this, false)` onkeydown=`initVideoPlayer(this, false)` onplay=`initVideoPlayer(this, true)` src=(fallbackVideo || false) data-fallback-url=(fallbackVideo || false) data-hls-url=decodedVideos[0] data-dash-url=decodedVideos[1] poster=decodedVideos[4])
             else if linkPost
-              a.expanded-link(href=p.url)
+              a.expanded-link(href=safeExternalUrl(p.url))
                 | Open #{p.domain} ↗
         if (query.view == "compact" && !textPost)
           button.close-media(type="button" onclick=toggleCall)

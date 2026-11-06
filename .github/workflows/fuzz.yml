@@ -1,0 +1,72 @@
+name: Fuzz
+
+# The fuzz tests, which assert security properties of the code that handles what
+# requests, Reddit and users' pasted credentials carry. A pull request that changes
+# that code runs each property briefly; the scheduled run, three nights a week, gives
+# each one minutes when main has changed since the previous run. The regular tests
+# run the same properties on a fixed set of inputs.
+on:
+  pull_request:
+    branches: [main]
+    paths: ['src/**/*.js', 'src/**/*.cjs', 'package.json', 'bun.lock', 'dev/fuzz/**', '.github/workflows/fuzz.yml']
+  schedule:
+    - cron: '41 4 * * 1,3,5'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: How long to run each property, as a duration such as 30s or 2m
+        default: 2m
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Properties
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Without a new commit there is nothing new to fuzz.
+      - name: Check for changes on main since the previous run
+        id: changed
+        if: github.event_name == 'schedule'
+        run: |
+          # Monday's run looks back to Friday's, the others two days.
+          days=2
+          [ "$(date -u +%u)" = 1 ] && days=3
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -lt $(( days * 86400 + 3600 )) ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "main has no commits since the previous run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        if: steps.changed.outputs.run != 'false'
+        with:
+          bun-version: latest
+          no-cache: true
+
+      - name: Install dependencies
+        if: steps.changed.outputs.run != 'false'
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Fuzz
+        if: steps.changed.outputs.run != 'false'
+        env:
+          FUZZTIME: ${{ github.event_name == 'pull_request' && '10s' || inputs.fuzztime || '2m' }}
+          FUZZ_FAILURES: ${{ runner.temp }}/fuzz-failures
+        run: bash dev/fuzz/run.sh
+
+      # Each failure's smallest input, with the seed and path that replay it.
+      - name: Keep the failing inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-failures
+          path: ${{ runner.temp }}/fuzz-failures/
+          retention-days: 14

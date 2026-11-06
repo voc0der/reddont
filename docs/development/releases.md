@@ -4,6 +4,9 @@ Container publishing follows two channels: `nightly` for selected development
 builds and `latest` for manually published releases. Both publish Linux amd64
 and arm64 images to `ghcr.io/voc0der/reddont`, plus Docker Hub when the
 `DOCKER_USERNAME` and `DOCKER_PASSWORD` repository secrets are configured.
+Before anything is pushed, Grype scans each platform's image, and a high or
+critical vulnerability with a fix stops the publish (see
+[security scans](security.md#container-scan)).
 
 ## Publish a nightly
 

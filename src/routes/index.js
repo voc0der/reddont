@@ -45,7 +45,7 @@ const { normalizeRedditAppId } = require("../redditOAuth");
 
 const router = express.Router();
 const G = new geddit.Geddit();
-const SAFE_REDIRECT_FALLBACK = "/";
+const { SAFE_REDIRECT_FALLBACK, getSafeRedirectTarget } = require("../utils/safeRedirect");
 
 function firstValue(value) {
 	if (Array.isArray(value)) return value[0];
@@ -98,23 +98,6 @@ function isTrustedRemoteHeaderSource(req) {
 	if (isLoopbackIp(remoteAddress)) return true;
 	const trustedProxyIps = getTrustedProxyIps();
 	return trustedProxyIps.includes(remoteAddress);
-}
-
-function getSafeRedirectTarget(value, fallback = SAFE_REDIRECT_FALLBACK) {
-	const raw = firstValue(value);
-	if (typeof raw !== "string") return fallback;
-	const trimmed = raw.trim();
-	if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//"))
-		return fallback;
-	if (trimmed.includes("\\") || trimmed.includes("\0")) return fallback;
-
-	try {
-		const parsed = new URL(trimmed, "http://localhost");
-		if (parsed.origin !== "http://localhost") return fallback;
-		return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-	} catch {
-		return fallback;
-	}
 }
 
 function getRequestedRedirect(req, fallback = SAFE_REDIRECT_FALLBACK) {

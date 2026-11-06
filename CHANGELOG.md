@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- Signing in could send a browser to another site: a `?redirect=` path with
+  dot segments, such as `/a/..//evil.com`, became `//evil.com` after it was
+  checked. Redirect targets are now checked as a browser reads them
+- An `API_WHITELIST` range with a malformed prefix length, such as
+  `10.0.0.0/` with the length left out, let every address of its family reach
+  the API. A malformed range now lets none through
+- A post whose link isn't an http or https URL, such as `javascript:`, no
+  longer gets a clickable link
+- Every response sends `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY` and `Referrer-Policy: same-origin`, and no
+  `X-Powered-By`. Other sites, dashboards included, can no longer show reddont
+  in a frame, and links to other sites no longer tell them the page they came
+  from
+- Stored OIDC refresh tokens decrypt only with GCM's full 16-byte tag, and
+  OIDC claim paths read only the claims' own properties
+
+### Changed
+
+- The image installs only runtime packages, without development or peer
+  dependencies or the install cache, takes Debian's security updates when it
+  is built, and drops privileges with util-linux's `setpriv` instead of `gosu`.
+  Publishing scans each image and stops on a high or critical vulnerability
+  that has a fix
+
+### Fixed
+
+- Saving a bearer token of nothing but quotes cleared the saved Reddit
+  credential; it is now refused. A pasted `Authorization:` line with another
+  scheme, such as Basic, is refused with a message instead of being saved
+  empty
+
 ## [0.1.12] - 2026-11-05
 
 ### Added

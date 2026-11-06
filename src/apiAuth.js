@@ -79,9 +79,12 @@ function ipv6ToBigInt(ip) {
 }
 
 function matchesCidr(ip, entry) {
-	const [network, bitsRaw] = entry.split("/");
+	const parts = entry.split("/");
+	// A malformed prefix length, such as the empty one in "10.0.0.0/", matches
+	// nothing: Number() would read it as 0 and allow every address.
+	if (parts.length !== 2 || !/^(0|[1-9][0-9]{0,2})$/.test(parts[1])) return false;
+	const [network, bitsRaw] = parts;
 	const bits = Number(bitsRaw);
-	if (!Number.isInteger(bits) || bits < 0) return false;
 
 	// An address and a range of different families never match.
 	if (network.includes(":") || ip.includes(":")) {

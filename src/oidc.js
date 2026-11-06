@@ -59,9 +59,14 @@ function _getClaimByPath(obj, path) {
     const key = m[1];
     const idx = m[2] !== undefined ? Number(m[2]) : null;
 
+    // Only the claims' own properties: a path like "__proto__" or "constructor"
+    // reads nothing. The walk only reads, so it can't pollute a prototype.
+    if (!Object.hasOwn(Object(cur), key)) return undefined;
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
     cur = cur[key];
     if (idx !== null) {
       if (!Array.isArray(cur) || cur.length <= idx) return undefined;
+      // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
       cur = cur[idx];
     }
   }
@@ -176,6 +181,8 @@ async function initializeOIDC({ jwtKey } = {}) {
   }
 }
 
+const GCM_TAG_LENGTH = 16;
+
 function encryptRefreshToken(refreshToken) {
   if (!refreshToken) return null;
   if (!_encryptionKey) {
@@ -203,8 +210,11 @@ function decryptRefreshToken(enc) {
   const iv = Buffer.from(ivB64, 'base64');
   const tag = Buffer.from(tagB64, 'base64');
   const ct = Buffer.from(ctB64, 'base64');
+  // encryptRefreshToken writes GCM's full 16-byte tag. Without a fixed length,
+  // decryption would also accept a tag cut short, which is far easier to forge.
+  if (tag.length !== GCM_TAG_LENGTH) return null;
 
-  const decipher = crypto.createDecipheriv('aes-256-gcm', _encryptionKey, iv);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', _encryptionKey, iv, { authTagLength: GCM_TAG_LENGTH });
   decipher.setAuthTag(tag);
   const plaintext = Buffer.concat([decipher.update(ct), decipher.final()]);
   return plaintext.toString('utf8');

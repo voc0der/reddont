@@ -146,8 +146,11 @@ function submissionEntry(post) {
 function commentContentHtml(comment, submissionTitle) {
 	const author = comment.author || "[deleted]";
 	const permalink = redditUrl(comment.permalink);
+	// Feed entries carry HTML: Reddit's own rendering of the comment, or its text
+	// escaped here, as every other value below is.
 	const bodyHtml = comment.body_html
 		? he.decode(comment.body_html)
+		// nosemgrep: javascript.express.security.injection.raw-html-format.raw-html-format
 		: `<div class="md"><p>${escapeHtml(comment.body || "")}</p></div>`;
 
 	return [

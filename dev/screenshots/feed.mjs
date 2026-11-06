@@ -51,7 +51,7 @@ function feedState(page, id) {
 
 async function openPost(page, id) {
   await page.locator('article.post', { has: page.locator(`#${id}`) }).locator('.title-container > a').click();
-  await page.waitForURL(new RegExp(`/comments/${id}\\?`));
+  await page.waitForURL((url) => url.pathname === `/comments/${id}` && url.search !== '');
 }
 
 async function back(page) {
