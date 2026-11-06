@@ -210,6 +210,18 @@ describe("OAuth apps", () => {
 			warn.mockRestore();
 		}
 	});
+
+	test("treat a token request that can't reach Reddit like a refusal", async () => {
+		const warn = spyOn(logger, "warn").mockImplementation(() => {});
+		try {
+			respond(() => Promise.reject(new TypeError("fetch failed")));
+			expect(await new Geddit().getSubmissions("hot", "test", {}, { oauthAppId: "unreachable-app-1" })).toBeNull();
+			expect(requests.map(({ url }) => url.pathname)).toEqual(["/api/v1/access_token"]);
+			expect(warn).toHaveBeenCalledWith("Reddit OAuth token request failed", { error: "fetch failed" });
+		} finally {
+			warn.mockRestore();
+		}
+	});
 });
 
 describe("fallbacks", () => {
