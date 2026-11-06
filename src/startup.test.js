@@ -45,6 +45,26 @@ async function waitForLog(app, text) {
 }
 
 describe("server startup", () => {
+	test("sends browser security headers on pages, static files and errors", async () => {
+		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
+		const app = startApp(dataDir, {});
+		try {
+			await waitForLog(app, "HTTP server started");
+			const base = `http://127.0.0.1:${app.log.match(/HTTP server started on port (\d+)/)[1]}`;
+			for (const route of ["/login", "/styles.css", "/vendor/dash.all.min.js", "/api/v1/health", "/missing-page"]) {
+				const response = await fetch(base + route, { redirect: "manual" });
+				expect(response.headers.get("x-content-type-options"), route).toBe("nosniff");
+				expect(response.headers.get("x-frame-options"), route).toBe("DENY");
+				expect(response.headers.get("referrer-policy"), route).toBe("same-origin");
+				expect(response.headers.has("x-powered-by"), route).toBe(false);
+			}
+		} finally {
+			app.kill();
+			await app.exited;
+			fs.rmSync(dataDir, { recursive: true, force: true });
+		}
+	});
+
 	test("warns, without asking Reddit, when USE_REDDIT_OAUTH has no usable REDDIT_APP_ID", async () => {
 		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
 		const app = startApp(dataDir, { USE_REDDIT_OAUTH: "true", REDDIT_APP_ID: "not an app id" });
