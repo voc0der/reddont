@@ -36,7 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Saving a bearer token of nothing but quotes cleared the saved Reddit
   credential; it is now refused. A pasted `Authorization:` line with another
-  scheme, such as Basic, is left out instead of being saved empty
+  scheme, such as Basic, is refused with a message instead of being saved
+  empty
 
 ## [0.1.12] - 2026-11-05
 

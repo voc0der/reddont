@@ -43,7 +43,8 @@ describe("Fuzz: Reddit credentials", () => {
 			if (headers.cookie !== undefined) expect(headers.cookie).toMatch(COOKIE);
 			if (headers.authorization !== undefined) expect(headers.authorization).toMatch(BEARER);
 		}), [
-			// An Authorization line with another scheme came back as authorization: null.
+			// An Authorization line with another scheme came back as authorization: null;
+			// it is now refused.
 			["Authorization:Cookie:\r\nCookie:Cookie:", "auto"],
 			["Authorization: Basic abc\nreddit_session=abc", "auto"],
 			// A bearer token of nothing but quotes came back as authorization: null.

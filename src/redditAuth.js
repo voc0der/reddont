@@ -50,7 +50,7 @@ function cleanHeaderValue(value) {
 	return cleaned;
 }
 
-function normalizeAuthorization(value, { allowBare = false } = {}) {
+function normalizeAuthorization(value, { allowBare = false, required = false } = {}) {
 	const cleaned = cleanHeaderValue(value);
 	const authorizationMatch = cleaned.match(/^Authorization\s*:\s*(.+)$/i);
 	const authValue = authorizationMatch ? authorizationMatch[1].trim() : cleaned;
@@ -61,7 +61,10 @@ function normalizeAuthorization(value, { allowBare = false } = {}) {
 			? authValue
 			: "";
 
-	if (!token) return null;
+	if (!token) {
+		if (required) throw new Error("Only a Bearer authorization header is supported");
+		return null;
+	}
 	if (/\s/.test(token)) {
 		throw new Error("Bearer token must not contain whitespace");
 	}
@@ -206,9 +209,8 @@ function normalizeRedditAuthInput(input, type = "auto") {
 
 		const authorizationMatch = trimmed.match(/^Authorization\s*:\s*(.+)$/i);
 		if (authorizationMatch) {
-			// Only a bearer token; another scheme, such as Basic, is left out.
-			const authorization = normalizeAuthorization(authorizationMatch[1]);
-			if (authorization) headers.authorization = authorization;
+			// Only a bearer token: another scheme, such as Basic, is refused.
+			headers.authorization = normalizeAuthorization(authorizationMatch[1], { required: true });
 			continue;
 		}
 

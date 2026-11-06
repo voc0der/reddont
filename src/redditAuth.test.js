@@ -161,6 +161,13 @@ describe("credential validation", () => {
 		});
 	});
 
+	test("refuses an Authorization header with a scheme other than Bearer", () => {
+		for (const input of ["Authorization: Basic abc", "Authorization: Basic abc\nreddit_session=def"]) {
+			expect(() => normalizeRedditAuthInput(input, "auto")).toThrow("Only a Bearer authorization header is supported");
+		}
+		expect(() => normalizeRedditAuthInput("''", "bearer")).toThrow("Bearer token is empty");
+	});
+
 	test("explains input that contains no credential", () => {
 		expect(() => normalizeRedditAuthInput("hello world", "auto")).toThrow("Paste a Bearer authorization header");
 		expect(() => normalizeRedditAuthInput("Domain: .reddit.com", "cookie")).toThrow("cookie name/value pairs");
