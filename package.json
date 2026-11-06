@@ -5,10 +5,13 @@
 	"type": "module",
 	"scripts": {
 		"test": "bun test",
-		"coverage": "bun run dev/test-coverage/run.mjs"
+		"coverage": "bun run dev/test-coverage/run.mjs",
+		"fuzz": "bash dev/fuzz/run.sh",
+		"scan:zap": "docker build -t reddont:local . && bash dev/zap/scan.sh reddont:local"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
+		"fast-check": "^4.10.2",
 		"pug-cli": "^1.0.0-alpha6"
 	},
 	"peerDependencies": {

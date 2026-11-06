@@ -171,7 +171,10 @@ function normalizeRedditAuthInput(input, type = "auto") {
 	const authType = VALID_REDDIT_AUTH_TYPES.has(type) ? type : "auto";
 
 	if (authType === "bearer") {
-		return { authorization: normalizeAuthorization(raw, { allowBare: true }) };
+		const authorization = normalizeAuthorization(raw, { allowBare: true });
+		// Only quotes, say, would otherwise save as no credential at all.
+		if (!authorization) throw new Error("Bearer token is empty");
+		return { authorization };
 	}
 
 	if (authType === "cookie") {
@@ -203,7 +206,9 @@ function normalizeRedditAuthInput(input, type = "auto") {
 
 		const authorizationMatch = trimmed.match(/^Authorization\s*:\s*(.+)$/i);
 		if (authorizationMatch) {
-			headers.authorization = normalizeAuthorization(authorizationMatch[1]);
+			// Only a bearer token; another scheme, such as Basic, is left out.
+			const authorization = normalizeAuthorization(authorizationMatch[1]);
+			if (authorization) headers.authorization = authorization;
 			continue;
 		}
 
