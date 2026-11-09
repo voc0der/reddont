@@ -27,6 +27,10 @@ globalThis.fetch = async (input) => {
 	const q = url.searchParams.get("q");
 	fs.appendFileSync(path.join(dataDir, "requests.jsonl"), `${JSON.stringify({ path: url.pathname, params: Object.fromEntries(url.searchParams) })}\n`);
 	if (q === "broken") return new Response("<html>unavailable</html>", { status: 503 });
+	// An image for MEDIA_PROXY to fetch.
+	if (url.hostname === "i.redd.it") {
+		return new Response("jpeg bytes", { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=604800" } });
+	}
 	if (url.pathname === "/subreddits/search.json") {
 		return Response.json(listing(q === "nothing" ? [] : [community("test"), community("Other")]));
 	}

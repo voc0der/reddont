@@ -149,11 +149,12 @@ describe("service worker lifecycle", () => {
 });
 
 describe("service worker requests", () => {
-	test("leaves writes, other origins, media streams, and extensions to the browser", () => {
+	test("leaves writes, other origins, proxied media, media streams, and extensions to the browser", () => {
 		const worker = startWorker();
 
 		expect(worker.fetch("/subscribe", { method: "POST" })).toBeUndefined();
 		expect(worker.fetch("https://i.redd.it/photo.jpg")).toBeUndefined();
+		expect(worker.fetch("/proxy/i.redd.it/photo.jpg")).toBeUndefined();
 		expect(worker.fetch("/media/clip.mp4", { destination: "video" })).toBeUndefined();
 		expect(worker.fetch("/vendor/dash.all.min.js", { headers: { Range: "bytes=0-" } })).toBeUndefined();
 		expect(worker.fetch("chrome-extension://abc/script.js")).toBeUndefined();

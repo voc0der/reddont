@@ -1,16 +1,16 @@
 {
   "metric": "JavaScript line coverage",
-  "covered": 2352,
-  "total": 2396,
-  "percent": 98.16,
+  "covered": 2539,
+  "total": 2584,
+  "percent": 98.26,
   "bunVersion": "1.4.4",
   "tests": {
-    "passed": 403,
+    "passed": 437,
     "skipped": 0,
     "failed": 0
   },
-  "processes": 17,
-  "sourceSha256": "7fcae1cc2a91fb2c9290b99792691a30d26972ea3ba38ff7d8bba9111fc51355",
+  "processes": 19,
+  "sourceSha256": "092535f3755dac800f65138ff328e14065519f45c178ee17bb7fbb51d2f7ea3f",
   "files": {
     "src/apiAuth.js": {
       "covered": 118,
@@ -25,12 +25,12 @@
       "total": 59
     },
     "src/geddit.js": {
-      "covered": 247,
-      "total": 247
+      "covered": 248,
+      "total": 248
     },
     "src/index.js": {
-      "covered": 127,
-      "total": 130
+      "covered": 143,
+      "total": 146
     },
     "src/invite.js": {
       "covered": 18,
@@ -39,6 +39,10 @@
     "src/logger.js": {
       "covered": 28,
       "total": 28
+    },
+    "src/mediaProxy.js": {
+      "covered": 170,
+      "total": 171
     },
     "src/oidc.js": {
       "covered": 212,

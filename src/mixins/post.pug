@@ -152,7 +152,7 @@ mixin post(p, currentUrl, rank)
           - var thumbLoading = query.view == "card" ? "lazy" : false
           if isPostGallery(p)
             - var item = (p.over_18 && !showNsfwThumbnails ? `/nsfw.svg` : p.spoiler ? `/spoiler.svg` : postGalleryItems(p)[0].url)
-            img(src=item loading=thumbLoading onclick=toggleCall onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand gallery")
+            img(src=mediaUrl(item) loading=thumbLoading onclick=toggleCall onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand gallery")
           else if isPostImage(p)
             - var url = postThumbnail(p, useHighRes, showNsfwThumbnails)
             img(src=url loading=thumbLoading onclick=toggleCall onkeydown=onkeydown tabindex="0" role="button" aria-label="Expand image")
@@ -207,12 +207,12 @@ mixin post(p, currentUrl, rank)
                 each item, index in galleryItems
                   div.gallery-item(class=(index === 0 ? 'is-current' : false))
                     a(href=`/media/${item.url}`)
-                      img(src=item.url loading="lazy")
+                      img(src=mediaUrl(item.url) loading="lazy")
                     div.gallery-item-idx
                       | #{`${item.idx}/${item.total}`}
             else if isPostImage(p)
               a(href=`/media/${p.url}`)
-                img(src=p.url loading="lazy")
+                img(src=mediaUrl(p.url) loading="lazy")
             else if isPostVideo(p)
               - var decodedVideos = decodePostVideoUrls(p)
               - var fallbackVideo = decodedVideos[2] || decodedVideos[3]

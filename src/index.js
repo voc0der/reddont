@@ -8,6 +8,13 @@ const logger = require("./logger");
 const oidc = require("./oidc");
 const { Geddit } = require("./geddit.js");
 const { getInstanceRedditAppId, isInstanceRedditOAuthOn } = require("./redditOAuth");
+const {
+	MEDIA_PROXY_PREFIX,
+	createMediaProxy,
+	mediaProxyConfig,
+	proxiedMediaUrl,
+	scheduleMediaCacheSweeps,
+} = require("./mediaProxy");
 
 // CSRF protection is reddont's own double-submit token check, below (the
 // csrf_token cookie against the form's _csrf field or X-CSRF-Token).
@@ -106,6 +113,29 @@ function startInstanceRedditOAuth() {
 	}
 }
 
+// Reddit's images and video through reddont when MEDIA_PROXY is set (#92).
+// It needs the parsed cookies to check the session, and it goes ahead of the
+// CSRF cookie, so a cached file carries no Set-Cookie, and ahead of the
+// browser rate limit, which one page of thumbnails would use up.
+function mountMediaProxy() {
+	const { authenticateToken } = require("./auth");
+	const { dataDir } = require("./db");
+	const config = mediaProxyConfig(process.env, dataDir);
+	for (const warning of config.warnings) logger.warn(warning);
+	const mediaProxy = createMediaProxy(config);
+	if (!mediaProxy) return;
+	if (config.mode === "disk") {
+		fs.mkdirSync(config.cacheDir, { recursive: true });
+		scheduleMediaCacheSweeps(config.cacheDir, config.cacheHours);
+		const kept = config.cacheHours > 0 ? `for ${config.cacheHours} hours` : "until deleted";
+		logger.info(`Media proxy: disk, keeping Reddit's media in ${config.cacheDir} ${kept}`);
+	} else {
+		logger.info("Media proxy: stream, passing Reddit's media through");
+	}
+	app.use(MEDIA_PROXY_PREFIX, authenticateToken, mediaProxy);
+	app.locals.mediaProxyUrl = proxiedMediaUrl;
+}
+
 async function bootstrap() {
 	startInstanceRedditOAuth();
 	// Initialize OIDC early so route priority behaves deterministically
@@ -182,6 +212,8 @@ async function bootstrap() {
 		req.cookies = parseCookies(req.headers.cookie);
 		next();
 	});
+
+	mountMediaProxy();
 
 	app.use((req, res, next) => {
 		let csrfToken = req.cookies?.[CSRF_COOKIE_NAME];

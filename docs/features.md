@@ -36,6 +36,8 @@ See [preferences and credentials](usage/preferences.md) and
 - OpenID Connect with PKCE and group-based access controls.
 - Remote header authentication through a trusted proxy.
 - HTTP or direct HTTPS, with configurable request limits.
+- An optional media proxy, so browsers load Reddit's images and video from
+  the instance instead of from Reddit.
 - Docker images for Linux amd64 and arm64.
 
 See [Docker and storage](deployment/docker.md),
@@ -56,6 +58,8 @@ are stored locally and do not synchronize with a Reddit account. It also depends
 Reddit being reachable: upstream restrictions, expired credentials, and
 rate limits can interrupt feeds or media.
 
-The client is not an anonymity proxy. Media, outbound links, and some assets
-can be fetched directly by your browser. The PWA's cache is not a complete
-offline archive.
+The client is not an anonymity proxy. Outbound links and media hosted outside
+Reddit, such as Imgur's, are fetched directly by your browser, and so is
+Reddit's own media unless the instance turns on the
+[media proxy](reference/environment.md#media). The PWA's cache is not a
+complete offline archive.

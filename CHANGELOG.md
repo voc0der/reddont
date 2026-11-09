@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-09
+
+### Added
+
+- An optional media proxy (#92). With `MEDIA_PROXY=stream`, browsers load
+  Reddit's images and video from reddont, under `/proxy/`, instead of from
+  Reddit, so Reddit sees only the instance. `MEDIA_PROXY=disk` also saves
+  each file in `MEDIA_CACHE_DIR` (default: `media-cache` in the data
+  directory) and serves the saved copy, deleting copies after
+  `MEDIA_CACHE_HOURS` (default: 24). Off by default
+
 ## [0.1.14] - 2026-11-09
 
 ### Added
