@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const express = require("express");
 const {
+	MEDIA_HOSTS,
 	createMediaProxy,
 	mediaContentType,
 	mediaProxyConfig,
@@ -139,6 +140,12 @@ describe("proxied URLs", () => {
 	});
 
 	test("lead back only to Reddit's media hosts", () => {
+		// Pages and the route agree on the hosts.
+		for (const host of MEDIA_HOSTS) {
+			expect(upstreamMediaUrl(proxiedMediaUrl(`https://${host}/a/b.png?s=1`).slice("/proxy".length))).toBe(
+				`https://${host}/a/b.png?s=1`,
+			);
+		}
 		expect(upstreamMediaUrl("/i.redd.it/abc.png?width=640&s=sig")).toBe("https://i.redd.it/abc.png?width=640&s=sig");
 		expect(upstreamMediaUrl("/I.Redd.It/abc.png")).toBe("https://i.redd.it/abc.png");
 		for (const requestUrl of ["/example.com/abc.png", "/i.redd.it", "//example.com/abc.png", "/i.redd.it.example.com/x", "/"]) {

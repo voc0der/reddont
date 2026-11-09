@@ -100,12 +100,35 @@ function proxiedMediaUrl(url) {
 }
 
 // The Reddit URL a request below /proxy stands for, or null for a host that
-// isn't in MEDIA_HOSTS. The host string comes from the list itself and a fixed
-// "/" follows it, so nothing in the request can change which server is asked.
+// isn't in MEDIA_HOSTS. Each origin is written out in full, up to the "/" that
+// ends its host, so nothing in the request can change which server is asked
+// (CodeQL's request-forgery check can't see that through a host variable).
 function upstreamMediaUrl(requestUrl) {
 	const match = /^\/([^/?#]+)\/([^#]*)$/.exec(String(requestUrl ?? ""));
-	const host = match && MEDIA_HOSTS.find((candidate) => candidate === match[1].toLowerCase());
-	return host ? `https://${host}/${match[2]}` : null;
+	if (!match) return null;
+	const rest = match[2];
+	switch (match[1].toLowerCase()) {
+		case "i.redd.it":
+			return `https://i.redd.it/${rest}`;
+		case "preview.redd.it":
+			return `https://preview.redd.it/${rest}`;
+		case "external-preview.redd.it":
+			return `https://external-preview.redd.it/${rest}`;
+		case "v.redd.it":
+			return `https://v.redd.it/${rest}`;
+		case "a.thumbs.redditmedia.com":
+			return `https://a.thumbs.redditmedia.com/${rest}`;
+		case "b.thumbs.redditmedia.com":
+			return `https://b.thumbs.redditmedia.com/${rest}`;
+		case "emoji.redditmedia.com":
+			return `https://emoji.redditmedia.com/${rest}`;
+		case "styles.redditmedia.com":
+			return `https://styles.redditmedia.com/${rest}`;
+		case "www.redditstatic.com":
+			return `https://www.redditstatic.com/${rest}`;
+		default:
+			return null;
+	}
 }
 
 function mediaContentType(contentType) {
