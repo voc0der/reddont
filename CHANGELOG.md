@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-09
+
 ### Added
 
 - An optional media proxy (#92). With `MEDIA_PROXY=stream`, browsers load
