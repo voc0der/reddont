@@ -1,5 +1,6 @@
 const { describe, expect, test } = require("bun:test");
 const pug = require("pug");
+const { proxiedMediaUrl } = require("./mediaProxy");
 
 function basePost() {
 	return {
@@ -19,13 +20,14 @@ function basePost() {
 	};
 }
 
-function renderPost(overrides = {}, view = "compact", subreddit) {
+function renderPost(overrides = {}, view = "compact", subreddit, locals = {}) {
 	return pug.renderFile("src/views/posts-partial.pug", {
 		posts: [{ data: { ...basePost(), ...overrides } }],
 		currentUrl: `/r/test?view=${view}`,
 		query: { view, sort: "hot" },
 		subreddit,
 		user: { highResThumbnails: 1, showNsfwThumbnails: 0 },
+		...locals,
 	});
 }
 
@@ -202,13 +204,14 @@ function galleryPost(overrides = {}) {
 	};
 }
 
-function renderPostPage(overrides = {}) {
+function renderPostPage(overrides = {}, locals = {}) {
 	return pug.renderFile("src/views/comments.pug", {
 		data: { post: { ...basePost(), ...overrides }, comments: [] },
 		isSubbed: false,
 		user: { username: "reader", highResThumbnails: 1, showNsfwThumbnails: 0 },
 		query: {},
 		navSubscriptions: () => ["test"],
+		...locals,
 	});
 }
 
@@ -252,5 +255,103 @@ describe("gallery posts", () => {
 		expect(listing).not.toContain('class="gallery"');
 		expect(listing).not.toContain("expando-button");
 		expect(page).not.toContain('class="gallery"');
+	});
+});
+
+describe("with the media proxy on", () => {
+	const proxied = { mediaProxyUrl: proxiedMediaUrl };
+	// An attribute or style that loads media from one of Reddit's hosts.
+	const directMedia =
+		/(?:src|poster|data-[a-z-]+)="https?:\/\/[^"]*(?:redd\.it|redditmedia\.com|redditstatic\.com)|url\((?:&quot;|")?https?:\/\/[^)]*(?:redd\.it|redditmedia\.com|redditstatic\.com)/;
+	const imagePost = {
+		is_self: false,
+		selftext_html: null,
+		post_hint: "image",
+		domain: "i.redd.it",
+		url: "https://i.redd.it/example.png",
+		thumbnail: "https://b.thumbs.redditmedia.com/example.jpg",
+		preview: {
+			images: [
+				{
+					source: { url: "https://preview.redd.it/example.png?width=1080&amp;s=big", width: 1080, height: 720 },
+					resolutions: [{ url: "https://preview.redd.it/example.png?width=640&amp;s=small", width: 640, height: 427 }],
+				},
+			],
+		},
+	};
+	const videoPost = {
+		is_self: false,
+		selftext_html: null,
+		post_hint: "hosted:video",
+		is_video: true,
+		domain: "v.redd.it",
+		url: "https://v.redd.it/clip",
+		secure_media: {
+			reddit_video: {
+				hls_url: "https://v.redd.it/clip/HLSPlaylist.m3u8?a=1&amp;v=1",
+				dash_url: "https://v.redd.it/clip/DASHPlaylist.mpd?a=1&amp;v=1",
+				fallback_url: "https://v.redd.it/clip/DASH_720.mp4?source=fallback",
+				scrubber_media_url: "https://v.redd.it/clip/DASH_96.mp4",
+				width: 1280,
+				height: 720,
+			},
+		},
+		preview: {
+			images: [{ source: { url: "https://external-preview.redd.it/poster.png?width=1280&amp;s=sig", width: 1280, height: 720 }, resolutions: [] }],
+		},
+	};
+
+	test("load images through reddont but keep the media page's link", () => {
+		for (const html of [
+			renderPost(imagePost, "compact", "test", proxied),
+			renderPost(imagePost, "card", "test", proxied),
+			renderPostPage(imagePost, proxied),
+		]) {
+			expect(html).toContain('src="/proxy/i.redd.it/example.png"');
+			expect(html).toContain('href="/media/https://i.redd.it/example.png"');
+			expect(html).not.toMatch(directMedia);
+		}
+		expect(renderPostPage(imagePost, proxied)).toContain('src="/proxy/preview.redd.it/example.png?width=640&amp;s=small"');
+		// Off, the same pages still load from Reddit.
+		expect(renderPost(imagePost, "card", "test")).toMatch(directMedia);
+		expect(renderPostPage(videoPost)).toMatch(directMedia);
+	});
+
+	test("load hosted video, its manifests and its poster through reddont", () => {
+		for (const html of [renderPost(videoPost, "card", "test", proxied), renderPostPage(videoPost, proxied)]) {
+			expect(html).toContain('data-dash-url="/proxy/v.redd.it/clip/DASHPlaylist.mpd?a=1&amp;v=1"');
+			expect(html).toContain('data-hls-url="/proxy/v.redd.it/clip/HLSPlaylist.m3u8?a=1&amp;v=1"');
+			expect(html).toContain('data-fallback-url="/proxy/v.redd.it/clip/DASH_720.mp4?source=fallback"');
+			expect(html).toContain('poster="/proxy/external-preview.redd.it/poster.png?width=1280&amp;s=sig"');
+			expect(html).not.toMatch(directMedia);
+		}
+	});
+
+	test("load galleries, avatars, community icons and inline images through reddont", () => {
+		const gallery = renderPost(galleryPost(), "card", "test", proxied);
+		expect(gallery).toContain('src="/proxy/i.redd.it/first.png"');
+		expect(gallery).toContain('src="/proxy/i.redd.it/second.jpg"');
+		expect(gallery).toContain('href="/media/https://i.redd.it/first.png"');
+		expect(gallery).toContain('src="/proxy/www.redditstatic.com/avatars/defaults/v2/avatar_default_');
+		expect(gallery).not.toMatch(directMedia);
+		expect(renderPostPage(galleryPost(), proxied)).not.toMatch(directMedia);
+
+		const icon = "https://styles.redditmedia.com/t5_x/styles/communityIcon_abc.png?width=256&amp;s=sig";
+		const mixedFeed = renderPost({ sr_detail: { community_icon: icon } }, "card", "all", proxied);
+		expect(mixedFeed).toContain('src="/proxy/styles.redditmedia.com/t5_x/styles/communityIcon_abc.png?width=256&amp;s=sig"');
+
+		const inline = "https://preview.redd.it/inline.png?width=640&amp;s=x";
+		const imgur = "https://i.imgur.com/elsewhere.png";
+		const text = renderPost({ selftext_html: `<p><a href="${inline}">${inline}</a> <a href="${imgur}">${imgur}</a></p>` }, "compact", "test", proxied);
+		expect(text).toContain('<a href="/proxy/preview.redd.it/inline.png?width=640&amp;s=x"><img class="inline" src="/proxy/preview.redd.it/inline.png?width=640&amp;s=x"');
+		expect(text).toContain(`<img class="inline" src="${imgur}"`);
+	});
+
+	test("show the full-size media page through reddont", () => {
+		const image = pug.renderFile("src/views/media.pug", { kind: "img", url: "https://i.redd.it/photo.JPG", ...proxied });
+		const video = pug.renderFile("src/views/media.pug", { kind: "video", url: "https://v.redd.it/clip/DASH_720.mp4", ...proxied });
+
+		expect(image).toContain('<img class="media-maximized" src="/proxy/i.redd.it/photo.JPG"');
+		expect(video).toContain('<video class="media-maximized" src="/proxy/v.redd.it/clip/DASH_720.mp4"');
 	});
 });

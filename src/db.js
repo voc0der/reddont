@@ -206,4 +206,4 @@ runMigration("add-api-key-column", () => {
   `).run();
 });
 
-module.exports = { db };
+module.exports = { db, dataDir };

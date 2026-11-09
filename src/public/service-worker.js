@@ -69,9 +69,12 @@ self.addEventListener('fetch', (event) => {
 
   // Let the browser handle third-party media and byte-range requests directly.
   // Treating a failed video request like a page navigation can return the
-  // cached offline HTML to the media decoder.
+  // cached offline HTML to the media decoder. Reddit's media proxied under
+  // /proxy/ is left to the HTTP cache too; the cache-first rule for images
+  // would otherwise keep every proxied picture until the next release.
   if (
     url.origin !== self.location.origin ||
+    url.pathname.startsWith('/proxy/') ||
     request.destination === 'video' ||
     request.headers.has('range')
   ) {

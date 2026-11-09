@@ -1,4 +1,5 @@
 include ../mixins/head
+include ../utils
 doctype html
 html
   +head("home")
@@ -15,6 +16,6 @@ html
   body.media-maximized
     div.media-maximized.container
       if kind == 'img'
-        img(src=url onclick=`toggleZoom(event)`).media-maximized
+        img(src=mediaUrl(url) onclick=`toggleZoom(event)`).media-maximized
       else
-        video(src=url controls).media-maximized
+        video(src=mediaUrl(url) controls).media-maximized

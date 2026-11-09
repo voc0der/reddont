@@ -87,6 +87,31 @@ See [API and feeds](api.md).
 
 See [preferences and credentials](../usage/preferences.md#reddit-credentials).
 
+## Media
+
+`MEDIA_PROXY`
+:   Where browsers load Reddit's images and video from. Unset, they load them
+    from Reddit's media servers (`i.redd.it`, `preview.redd.it`, `v.redd.it`
+    and others), which see each reader's address and what they look at.
+    `stream` passes each file through reddont as it arrives, so browsers
+    contact only reddont. `disk` also saves each file in `MEDIA_CACHE_DIR`
+    the first time it's asked for and serves the saved copy after that.
+    Default: unset. Pages then load media from `/proxy/<host>/<path>`, which
+    needs a signed-in session and doesn't count toward `RATE_LIMIT`. Every
+    image and video uses the instance's own bandwidth. Links to Reddit, and
+    media hosted elsewhere, such as Imgur, still load directly. To cache
+    `stream` mode's files, see
+    [caching proxied media](../deployment/reverse-proxy.md#caching-proxied-media).
+
+`MEDIA_CACHE_DIR`
+:   Where `MEDIA_PROXY=disk` saves files. Default: `media-cache` in the data
+    directory. Nothing limits its size, and video fills it quickly.
+
+`MEDIA_CACHE_HOURS`
+:   How long `MEDIA_PROXY=disk` keeps each saved file. Default: `24`. `0`
+    keeps files until you delete them. reddont checks every hour and deletes
+    only the files it saved.
+
 ## OpenID Connect
 
 `OIDC_ENABLED`

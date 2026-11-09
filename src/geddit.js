@@ -44,6 +44,10 @@ function pageKind(url) {
 	return url.pathname.replace(/^\/r\/[^/]+/, "").replace(/\/$/, "");
 }
 
+// Sent on every request to Reddit, the media proxy's included.
+const BROWSER_USER_AGENT =
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
+
 class Geddit {
 	constructor() {
 		this.host = "https://www.reddit.com";
@@ -55,8 +59,7 @@ class Geddit {
 			include_over_18: true,
 		};
 		this.headers = {
-			"User-Agent":
-				"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+			"User-Agent": BROWSER_USER_AGENT,
 			Accept: "application/json",
 		};
 	}
@@ -583,4 +586,4 @@ class Geddit {
 	}
 }
 
-export { Geddit };
+export { BROWSER_USER_AGENT, Geddit };

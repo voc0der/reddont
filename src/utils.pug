@@ -60,18 +60,25 @@
       .replace(/&amp;/g, '&');
   }
 -
+  // Where the page loads a piece of Reddit's media from. With MEDIA_PROXY on,
+  // the app passes mediaProxyUrl, which points Reddit's media hosts at
+  // reddont's /proxy route; otherwise the URL stays as Reddit sent it.
+  function mediaUrl(url) {
+    return typeof mediaProxyUrl === 'function' ? mediaProxyUrl(url) : url;
+  }
+-
   // reddit serves one of eight default snoo avatars to accounts without a
   // custom one; pick one deterministically per author.
   function defaultAvatar(name) {
     var hash = 0;
     var s = String(name || '');
     for (var i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
-    return `https://www.redditstatic.com/avatars/defaults/v2/avatar_default_${hash % 8}.png`;
+    return mediaUrl(`https://www.redditstatic.com/avatars/defaults/v2/avatar_default_${hash % 8}.png`);
   }
 -
   function safeImageUrl(url) {
     var u = decodeEntities(url);
-    return /^https:\/\/[^\s"'()\\]+$/i.test(u) ? u : '';
+    return /^https:\/\/[^\s"'()\\]+$/i.test(u) ? mediaUrl(u) : '';
   }
 -
   function safeColor(c) {

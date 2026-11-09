@@ -41,6 +41,34 @@ Restrict clients at the proxy when you need a client-specific network rule.
 `REVERSE_PROXY_WHITELIST` does not grant API access. See
 [API source addresses](../reference/api.md#source-addresses).
 
+## Caching proxied media
+
+With [`MEDIA_PROXY=stream`](../reference/environment.md#media), reddont
+fetches an image or video from Reddit every time a browser asks for one. A
+caching proxy can keep the files instead: they're all under `/proxy/`, their
+URLs never change, and they arrive with Reddit's caching headers. For nginx:
+
+```nginx
+# In the http block: up to 10 GB, dropping files nobody asked for in a week.
+proxy_cache_path /var/cache/nginx/reddont-media levels=1:2
+                 keys_zone=reddont_media:10m max_size=10g inactive=7d
+                 use_temp_path=off;
+
+# In the server block, beside the location that proxies to reddont.
+location /proxy/ {
+    proxy_pass http://reddont:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_cache reddont_media;
+    proxy_cache_lock on;
+}
+```
+
+nginx asks reddont for whole files and answers a video player's byte-range
+requests from its cache. It serves a cached file without asking reddont, so
+without checking the reader's session: anyone with the URL of a cached file
+can load it.
+
 ## Direct HTTPS
 
 Mount certificate and key files into the container and point reddont at
