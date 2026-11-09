@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-09
+
+### Added
+
+- Saved posts and comments (#87). Turn on **Enable saved posts and
+  comments** in the preferences, and posts and comments offer **save**
+  (beside **share** or **reddit** on desktop, in the **⋯** menu on a phone),
+  then **unsave** once saved. **saved** opens them, most recent first, each
+  comment under the title of its post. It sits between your username and
+  **preferences** on desktop, and in the navigation drawer and account menu
+  on a phone. Saves belong to the reddont account, not to Reddit, and
+  turning the preference off hides them without deleting them
+
 ## [0.1.13] - 2026-11-06
 
 ### Security

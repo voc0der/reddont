@@ -34,6 +34,13 @@ html
               | &nbsp;Don't hide thumbnails for 18+ content
 
           div(style="margin-top: 15px;")
+            label(for="pref-enable-saving")
+              input(type="checkbox" id="pref-enable-saving" name="enableSaving" value="1" checked=(user.enableSaving === 1) aria-describedby="pref-enable-saving-help")
+              | &nbsp;Enable saved posts and comments
+            p#pref-enable-saving-help.dashboard-help
+              | Adds save to posts and comments, and a saved page to your account links. Turning this off hides what you saved without deleting it.
+
+          div(style="margin-top: 15px;")
             label(for="pref-theme" style="display: block; margin-bottom: 5px;") Theme Preference:
             select(id="pref-theme" name="themePreference" style="padding: 5px; background-color: var(--bg-color-muted); color: var(--text-color); border: 1px solid var(--text-color-muted); border-radius: 4px;")
               option(value="auto" selected=(user.themePreference === 'auto')) Auto (system preference)

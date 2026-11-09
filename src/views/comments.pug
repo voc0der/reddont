@@ -42,6 +42,9 @@ html
     - var linkPreview = linkPost && !mediaPost && postMedia.preview && postMedia.preview.images && postMedia.preview.images.length ? postThumbnail(postMedia, useHighRes, showNsfwThumbnails) : ''
     - var thumbUrl = isPostGallery(post) ? (post.over_18 && !showNsfwThumbnails ? '/nsfw.svg' : post.spoiler ? '/spoiler.svg' : postGalleryItems(post)[0].url) : (mediaPost || hasPostThumbnail(post)) ? postThumbnail(postMedia, useHighRes, showNsfwThumbnails) : ''
     - var flairLeft = post.sr_detail && post.sr_detail.link_flair_position === 'left'
+    - var saveName = `t3_${post.id}`
+    - var canSave = user && user.enableSaving === 1
+    - var postSaved = canSave && typeof isSaved === 'function' && isSaved(saveName)
     - var headerPage = { name: post.subreddit, href: subHref, current: String(post.subreddit).toLowerCase(), subreddit: post.subreddit, tabs: [{ label: 'comments', href: `/comments/${post.id}?${sortQuery}&${viewQuery}`, selected: true }] }
     main#content
       +header(user, headerPage)
@@ -59,6 +62,8 @@ html
               if !isSubbed
                 +joinButton(post.subreddit, false, 'small')
               +overflowMenu("Post options")
+                if canSave
+                  +saveMenuItem(saveName, postSaved)
                 if from
                   a.m-menu-item(href=`${from}#${post.id}`)
                     +icon("arrow-up")
@@ -126,6 +131,9 @@ html
               a(href="#comments") #{post.num_comments} #{fmttxt(post.num_comments, 'comment')}
             li
               button(type="button" onclick="sharePost(this)" data-url=redditHref data-title=decodeEntities(post.title)) share
+            if canSave
+              li
+                +saveButton(saveName, postSaved)
             li
               a(href=redditHref) reddit
             if comments.length

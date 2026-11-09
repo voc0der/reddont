@@ -144,6 +144,26 @@ runMigration("add-reddit-oauth-columns", () => {
 	})();
 });
 
+// Saved posts and comments (issue #87) belong to the reddont account, not
+// to Reddit, and are off until the user turns saving on. Each is kept by
+// its fullname: t3_ for a post, t1_ for a comment. Saving again after
+// unsaving adds a new row, so the newest id is the most recent save.
+runMigration("add-saved-things", () => {
+	db.transaction(() => {
+		db.query("ALTER TABLE users ADD COLUMN enableSaving INTEGER NOT NULL DEFAULT 0").run();
+		db.query(`
+      CREATE TABLE saved_things (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        fullname TEXT NOT NULL,
+        saved_at INTEGER NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, fullname)
+      )
+    `).run();
+	})();
+});
+
 runMigration("add-oidc-support", () => {
 	// Core OIDC fields
 	db.query(`

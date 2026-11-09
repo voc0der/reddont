@@ -308,7 +308,7 @@ describe("preferences", () => {
 		const token = sessionFor("reader");
 		const response = await request("/update-preferences", {
 			token,
-			fields: { infiniteScroll: "1", useClassicLayout: "1", themePreference: "dark", highResThumbnails: "1", showNsfwThumbnails: "1" },
+			fields: { infiniteScroll: "1", useClassicLayout: "1", themePreference: "dark", highResThumbnails: "1", showNsfwThumbnails: "1", enableSaving: "1" },
 		});
 		expect(redirectTarget(response)).toEqual({ path: "/dashboard" });
 		expect(user("reader")).toMatchObject({
@@ -317,6 +317,7 @@ describe("preferences", () => {
 			themePreference: "dark",
 			highResThumbnails: 1,
 			showNsfwThumbnails: 1,
+			enableSaving: 1,
 		});
 
 		await request("/update-preferences", { token, fields: {} });
@@ -326,6 +327,7 @@ describe("preferences", () => {
 			themePreference: "auto",
 			highResThumbnails: 0,
 			showNsfwThumbnails: 0,
+			enableSaving: 0,
 		});
 	});
 

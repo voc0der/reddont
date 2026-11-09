@@ -417,6 +417,58 @@ details[open] > .m-icon-btn {
   height: 20px;
 }
 
+/* Save acts in place, so it's a button among the menu's links. */
+button.m-menu-item {
+  width: 100%;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.m-save-item[data-saved="1"] .icon {
+  fill: currentColor;
+}
+
+/* A saved comment on the saved page: the post it's on above the comment,
+   in a row like a post's. */
+.saved-comment {
+  padding: 12px 16px 8px;
+  border-top: 1px solid var(--r-border-weak);
+}
+
+.saved-comment-parent {
+  margin: 0 0 12px;
+  color: var(--r-text-weak);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.saved-comment-parent a,
+.saved-comment-parent a:visited {
+  color: var(--r-text-weak);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.saved-comment-parent .saved-comment-title,
+.saved-comment-parent .saved-comment-title:visited {
+  display: block;
+  margin: 0 0 2px;
+  color: var(--r-text-strong);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* A saved post Reddit no longer returns: unsave reads as a link. */
+.saved-unavailable .save-button {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--r-link);
+  font-weight: 400;
+}
+
 .m-menu-item:active,
 .sort-opts a:active,
 .view-opts a:active {

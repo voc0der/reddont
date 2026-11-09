@@ -1,0 +1,67 @@
+include ../mixins/post
+include ../mixins/comment
+include ../mixins/header
+include ../mixins/head
+
+- var viewQuery = query.view === 'card' ? 'card' : 'compact'
+//- old reddit numbers posts across pages through the count parameter.
+- var rankStart = query.count || 0
+- var posts = saves.filter((save) => save.thing && !save.comment)
+- var rankDigits = String(rankStart + saves.length).length
+- var scoreChars = Math.max(3, ...posts.map((save) => fmtscore(save.thing.score === undefined ? save.thing.ups : save.thing.score).length))
+- var imagesTab = viewQuery === 'card' ? { label: 'hide images', href: '/saved?view=compact' } : { label: 'show images', href: '/saved?view=card' }
+
+//- A saved comment as old reddit lists one: the post it's on, then the
+//- comment with its usual buttons, save among them.
+mixin savedComment(c)
+  - var postId = String(c.link_id || '').replace(/^t3_/, '')
+  - var postHref = `/comments/${postId}?view=${viewQuery}`
+  article.saved-comment
+    p.saved-comment-parent
+      a.saved-comment-title(href=postHref) #{c.link ? decodeEntities(c.link.title) : 'a post'}
+      |  in
+      |
+      a(href=`/r/${c.subreddit}?view=${viewQuery}`) r/#{c.subreddit}
+    +comment({ kind: 't1', data: c }, true, postId, null, null, 0)
+
+doctype html
+html
+  +head("saved")
+  body(data-theme=user.themePreference)
+    main#content
+      +header(user, { name: 'saved', href: `/saved?view=${viewQuery}`, tabs: [imagesTab] })
+      div.page-content
+        div.hero.feed-hero
+          div.m-feed-title.m-only Saved
+        div#posts-container(style=`--rank-digits:${rankDigits};--score-chars:${scoreChars}`)
+          each save, index in saves
+            if save.thing && save.comment
+              +savedComment(save.thing)
+            else if save.thing
+              +post(save.thing, currentUrl, rankStart + index + 1)
+            else
+              //- Reddit no longer returns it: deleted outright, or in a
+              //- community that went private.
+              article.post.saved-unavailable
+                p.search-message
+                  | Reddit no longer returns this saved #{save.comment ? 'comment' : 'post'}.
+                  |
+                  if !save.comment
+                    a(href=`/comments/${save.id}?view=${viewQuery}`) open it
+                    |  or
+                    |
+                  +saveButton(save.name, true)
+          if !saves.length
+            p.search-message
+              if rankStart
+                | Nothing more saved.
+              else
+                | Nothing saved yet. Save a post or comment and it shows up here.
+
+        if after
+          div.footer
+            div.footer-item
+              span.d-only view more:
+              a(href=`/saved?${encodeQueryParams({ view: viewQuery, after: after, count: rankStart + saves.length })}`)
+                span.m-only next ⟶
+                span.d-only next ›

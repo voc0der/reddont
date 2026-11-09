@@ -32,6 +32,10 @@ mixin post(p, currentUrl, rank)
   - var expandoKind = isPostVideo(p) ? 'video' : isPostGallery(p) ? 'gallery' : isPostImage(p) ? 'image' : (textPost && selfTextHtml ? 'selftext' : '')
   //- Within a subreddit, old reddit honours its flair-on-the-left setting.
   - var flairLeft = !creditCommunity && p.sr_detail && p.sr_detail.link_flair_position === 'left'
+  //- Saving is a preference, off until the user turns it on.
+  - var saveName = `t3_${p.id}`
+  - var canSave = user && user.enableSaving === 1
+  - var postSaved = canSave && typeof isSaved === 'function' && isSaved(saveName)
   article(class=`post`)
     div.post-container(class=`${query.view} ${p.stickied?"sticky":""}`)
       if rank
@@ -56,6 +60,8 @@ mixin post(p, currentUrl, rank)
               if showJoin
                 +joinButton(p.subreddit, false, 'small')
               +overflowMenu("Post options", true)
+                if canSave
+                  +saveMenuItem(saveName, postSaved)
                 a.m-menu-item(href=redditHref)
                   +icon("external")
                   span Open on Reddit
@@ -120,6 +126,9 @@ mixin post(p, currentUrl, rank)
               a.comments(href=commentsHref) #{p.num_comments > 0 ? `${p.num_comments} ${fmttxt(p.num_comments, 'comment')}` : 'comment'}
             li
               button(type="button" onclick="sharePost(this)" data-url=redditHref data-title=decodeEntities(p.title)) share
+            if canSave
+              li
+                +saveButton(saveName, postSaved)
             li
               a(href=redditHref) reddit
             if p.gilded > 0

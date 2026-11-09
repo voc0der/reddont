@@ -611,6 +611,69 @@ describe("cookie listings from old reddit's pages", () => {
 	});
 });
 
+describe("saved things", () => {
+	const community = thing("t5_c1", { display_name: "test" });
+	const things = [
+		thing("t3_a", { subreddit_id: "t5_c1", title: "A" }),
+		thing("t3_b", { subreddit_id: "t5_c1", title: "B" }),
+		thing("t1_x", { link_id: "t3_b" }),
+		thing("t1_y", { link_id: "t3_a" }),
+		community,
+	];
+	// Reddit answers in its own order, here reversed.
+	function info() {
+		const byName = new Map(things.map((item) => [item.data.name, item]));
+		respond((url) =>
+			Response.json(listing(url.searchParams.get("id").split(",").map((name) => byName.get(name)).filter(Boolean).reverse())),
+		);
+	}
+
+	test.each([
+		["a cookie", cookie, "https://old.reddit.com/api/info.api"],
+		["a token", { authHeaders: { authorization: "Bearer abc" } }, "https://oauth.reddit.com/api/info"],
+		["no credential", {}, "https://www.reddit.com/api/info.json"],
+	])("load posts and comments in the order asked, using %s", async (_, requestOptions, endpoint) => {
+		info();
+		const saved = await new Geddit().getSavedThings(["t1_x", "t3_a", "t3_gone", "t1_x", "t5_c1", "a", "t3_bad id"], requestOptions);
+		expect(saved.map((item) => item.data.name)).toEqual(["t1_x", "t3_a"]);
+		expect(saved[1].data.sr_detail).toEqual(community.data);
+		expect(saved[0].data.link).toEqual(things[1].data);
+		// The comment's post and the post's community come in one request.
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([endpoint, endpoint]);
+		expect(requests.map(({ url }) => url.searchParams.get("id"))).toEqual(["t1_x,t3_a,t3_gone", "t3_b,t5_c1"]);
+	});
+
+	test("ask only for the posts and communities not already loaded", async () => {
+		info();
+		const saved = await new Geddit().getSavedThings(["t1_y", "t3_a", "t5_c1"], {});
+		expect(saved.map((item) => item.data.name)).toEqual(["t1_y", "t3_a"]);
+		// The comment's post is saved too, so it's the same post.
+		expect(saved[0].data.link).toBe(saved[1].data);
+		expect(requests.map(({ url }) => url.searchParams.get("id"))).toEqual(["t1_y,t3_a", "t5_c1"]);
+	});
+
+	test("keep saved things when their posts and communities fail to load", async () => {
+		const byName = new Map(things.map((item) => [item.data.name, item]));
+		respond((url) => {
+			const names = url.searchParams.get("id").split(",");
+			if (names.includes("t5_c1")) return new Response("<html>blocked</html>", { status: 403 });
+			return Response.json(listing(names.map((name) => byName.get(name)).filter(Boolean)));
+		});
+		const saved = await new Geddit().getSavedThings(["t1_x", "t3_a"], {});
+		expect(saved.map((item) => item.data.name)).toEqual(["t1_x", "t3_a"]);
+		expect(saved[0].data.link).toBeUndefined();
+		expect(saved[1].data.sr_detail).toBeUndefined();
+	});
+
+	test("make no request without anything that can be saved", async () => {
+		respond(() => {
+			throw new Error("Unexpected request");
+		});
+		expect(await new Geddit().getSavedThings(["t5_c1", "a", "", 42, "t3_../x"])).toEqual([]);
+		expect(requests).toEqual([]);
+	});
+});
+
 describe("upstream failures", () => {
 	const calls = {
 		getSubmissions: (reddit) => reddit.getSubmissions("hot", "test"),
@@ -621,6 +684,7 @@ describe("upstream failures", () => {
 		searchSubmissions: (reddit) => reddit.searchSubmissions("gpu"),
 		searchSubreddits: (reddit) => reddit.searchSubreddits("gpu"),
 		searchAll: (reddit) => reddit.searchAll("gpu", "test"),
+		getSavedThings: (reddit) => reddit.getSavedThings(["t3_post1", "t1_c1"]),
 	};
 
 	test.each(Object.keys(calls))("%s returns null for network errors and block pages", async (name) => {

@@ -43,6 +43,25 @@ Subscribe from a community page (**join** in the desktop sidebar) or open
 These changes update only your reddont subscriptions. They do not subscribe
 or unsubscribe your account on Reddit.
 
+## Save posts and comments
+
+Turn on **Enable saved posts and comments** in your
+[preferences](preferences.md) to keep them for later. Posts then offer
+**save** beside **share** on desktop, and comments beside **reddit**. On a
+phone, **Save** is in the **⋯** menu of each post and comment. Once
+something is saved, it offers **unsave** instead.
+
+**saved**, between your username and **preferences** on desktop, opens what
+you saved, most recently saved first. On a phone, it's in the navigation
+drawer and the account menu. A saved comment shows under the title of the
+post it's on, which opens the discussion; **permalink** opens the comment's
+thread. Each visit loads everything from Reddit again, so scores and comment
+counts are current. Anything Reddit no longer returns, such as a post in a
+community that went private, keeps its place with **unsave**.
+
+Saves belong to your reddont account. They aren't saved to a Reddit account.
+Turning the preference off hides them without deleting them.
+
 ## Choose how posts look
 
 The desktop layout follows old reddit with Reddit Enhancement Suite. The tabs

@@ -63,14 +63,26 @@ mixin infoContainer(data)
       if children
         span.numchildren (#{children} #{children == 1 ? 'child' : 'children'})
 
+//- Whether this reader saves things, and whether they saved this comment.
+-
+  function commentSaving(data) {
+    var on = typeof user !== 'undefined' && user && user.enableSaving === 1;
+    var name = 't1_' + data.id;
+    return { on: on, name: name, saved: on && typeof isSaved === 'function' && isSaved(name) };
+  }
+
 mixin commentButtons(data, postId, next_id, prev_id)
   - var deleted = data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
   - var parentComment = typeof data.parent_id === 'string' && data.parent_id.startsWith('t1_') ? data.parent_id.slice(3) : ''
+  - var saving = commentSaving(data)
   ul.flat-list.buttons.d-only
     li
       a(href=`/comments/${postId}/comment/${data.id}`) permalink
     li
       a(href=`https://www.reddit.com${data.permalink}`) reddit
+    if saving.on
+      li
+        +saveButton(saving.name, saving.saved)
     if parentComment
       li
         a(href=`#${parentComment}`) parent
@@ -130,7 +142,10 @@ mixin commentActions(data, next_id, prev_id)
       span.m-pill-icon
         +icon("comment")
       span Reply
+    - var saving = commentSaving(data)
     +overflowMenu("Comment options", true)
+      if saving.on
+        +saveMenuItem(saving.name, saving.saved)
       if next_id
         a.m-menu-item(href=`#${next_id}`)
           +icon("arrow-down")

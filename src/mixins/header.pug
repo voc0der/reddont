@@ -8,6 +8,7 @@ mixin header(user, page)
   - var viewQuery = 'view=' + (query && query.view ? query.view : 'compact')
   - var headerPage = page || {}
   - var navSubs = user && typeof navSubscriptions === 'function' ? navSubscriptions() : []
+  - var savedLink = user && user.enableSaving === 1
   - var srLinks = [['home', '/'], ['popular', '/r/popular'], ['all', '/r/all'], ['subs', '/subs'], ['search', '/search']]
   header.header
     if user
@@ -71,6 +72,10 @@ mixin header(user, page)
           a.m-drawer-item(href=`/dashboard?${viewQuery}`)
             +icon("user")
             span #{user.username}
+          if savedLink
+            a.m-drawer-item(href=`/saved?${viewQuery}`)
+              +icon("save")
+              span Saved
           a.m-drawer-item(href='/logout')
             +icon("logout")
             span Log out
@@ -88,6 +93,9 @@ mixin header(user, page)
     if user
       div.header-item.account-nav
         a.account-link(href=`/dashboard?${viewQuery}`) #{user.username}
+        if savedLink
+          span.separator.d-only(aria-hidden="true") |
+          a.d-only(href=`/saved?${viewQuery}`) saved
         span.separator.d-only(aria-hidden="true") |
         a.d-only(href=`/dashboard?${viewQuery}`) preferences
         span.separator.d-only(aria-hidden="true") |
@@ -106,6 +114,10 @@ mixin header(user, page)
             a.m-menu-item(href=`/dashboard?${viewQuery}`)
               +icon("user")
               span #{user.username}
+            if savedLink
+              a.m-menu-item(href=`/saved?${viewQuery}`)
+                +icon("save")
+                span Saved
             a.m-menu-item(href=`/subs?${viewQuery}`)
               +icon("communities")
               span Subscriptions

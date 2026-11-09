@@ -12,6 +12,7 @@ a Reddit account is optional.
 - Home feed built from your subscriptions, with shortcuts to popular and all.
 - Subreddit and post search, sorting, and pagination.
 - Optional infinite scrolling.
+- Optional saved posts and comments, kept in your reddont account.
 - Inline text, image, gallery, and video previews, including crossposts.
 - Collapsible comments and single-comment thread views.
 - Hidden spoiler and adult-content previews, with an adult-thumbnail preference.
@@ -50,8 +51,8 @@ See the [API reference](reference/api.md).
 
 ## Boundaries
 
-reddont does not post, vote, or comment on Reddit. Subscriptions are stored
-locally and do not synchronize with a Reddit account. It also depends on
+reddont does not post, vote, or comment on Reddit. Subscriptions and saves
+are stored locally and do not synchronize with a Reddit account. It also depends on
 Reddit being reachable: upstream restrictions, expired credentials, and
 rate limits can interrupt feeds or media.
 

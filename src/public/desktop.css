@@ -1096,6 +1096,40 @@ body[data-theme="light"] .linkflairlabel.is-dark {
   text-decoration: underline;
 }
 
+/* A saved comment on the saved page: the post it's on, as old reddit's
+   profile pages show it, above the comment in its usual box. */
+.saved-comment {
+  padding: 0.4rem 0 0;
+}
+
+.saved-comment-parent {
+  margin: 0 0 0.4rem 1rem;
+  color: var(--o-muted);
+  font-size: 1.1rem;
+}
+
+.saved-comment-parent a,
+.saved-comment-parent a:visited {
+  color: var(--o-tagline-link);
+}
+
+.saved-comment-parent .saved-comment-title,
+.saved-comment-parent .saved-comment-title:visited {
+  color: var(--o-title);
+  font-size: 1.3rem;
+}
+
+/* A saved post Reddit no longer returns: unsave reads as a link. */
+.saved-unavailable .save-button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--o-link);
+  font: inherit;
+  cursor: pointer;
+}
+
 .buttons button.is-copied::after {
   content: " — link copied";
   font-weight: normal;
