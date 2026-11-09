@@ -417,6 +417,28 @@ details[open] > .m-icon-btn {
   height: 20px;
 }
 
+/* Save acts in place, so it's a button among the menu's links. */
+button.m-menu-item {
+  width: 100%;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.m-save-item[data-saved="1"] .icon {
+  fill: currentColor;
+}
+
+/* A saved post Reddit no longer returns: unsave reads as a link. */
+.saved-unavailable .save-button {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--r-link);
+  font-weight: 400;
+}
+
 .m-menu-item:active,
 .sort-opts a:active,
 .view-opts a:active {

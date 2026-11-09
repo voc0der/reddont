@@ -144,6 +144,25 @@ runMigration("add-reddit-oauth-columns", () => {
 	})();
 });
 
+// Saved posts (issue #87) belong to the reddont account, not to Reddit, and
+// are off until the user turns them on. A post saved again gets a new row,
+// so the newest id is the most recent save.
+runMigration("add-saved-posts", () => {
+	db.transaction(() => {
+		db.query("ALTER TABLE users ADD COLUMN savePosts INTEGER NOT NULL DEFAULT 0").run();
+		db.query(`
+      CREATE TABLE saved_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        post_id TEXT NOT NULL,
+        saved_at INTEGER NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, post_id)
+      )
+    `).run();
+	})();
+});
+
 runMigration("add-oidc-support", () => {
 	// Core OIDC fields
 	db.query(`

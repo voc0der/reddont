@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Saved posts, for the post half of #87. Turn on **Enable saved posts** in
+  the preferences, and posts offer **save** (beside **share** on desktop, in
+  the **⋯** menu on a phone) and **unsave** once saved. **saved** opens them,
+  most recent first; it sits between your username and **preferences** on
+  desktop, and in the navigation drawer and account menu on a phone. Saves
+  belong to the reddont account, not to Reddit, and turning the preference
+  off hides them without deleting them
+
 ## [0.1.13] - 2026-11-06
 
 ### Security

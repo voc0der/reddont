@@ -180,14 +180,17 @@ class Geddit {
 	}
 
 	// Things by fullname, as listing JSON, keyed by fullname. Throws when
-	// Reddit refuses a batch.
+	// Reddit refuses a batch. Cookies read /api/info.api, which old reddit
+	// still serves them; tokens and signed-out requests read /api/info.
 	async getThings(names, fetchOptions, request) {
 		const things = new Map();
+		const host = this.getRequestHost(fetchOptions);
+		const pathname = host === COOKIE_HOST ? "/api/info.api" : this.jsonPath("/api/info", host);
 		for (let start = 0; start < names.length; start += INFO_BATCH_SIZE) {
 			const url = this.buildRedditUrl(
-				"/api/info.api",
+				pathname,
 				{ id: names.slice(start, start + INFO_BATCH_SIZE).join(",") },
-				COOKIE_HOST,
+				host,
 			);
 			const json = await this.readJson(await this.request(url, fetchOptions), url, request);
 			for (const thing of json.data.children) {
@@ -333,6 +336,26 @@ class Geddit {
 					posts: data.children,
 				}))
 				.catch((err) => null);
+		});
+	}
+
+	// Posts by id, in the order given, each with its community as sr_detail.
+	// Posts Reddit doesn't return (a private community's, say) are left out;
+	// null when Reddit refuses.
+	async getPostsById(ids, requestOptions = {}) {
+		const names = [...new Set(ids.map((id) => this.sanitizeThingId(id)).filter(Boolean))].map(
+			(id) => `t3_${id}`,
+		);
+		if (!names.length) return [];
+		return this.withFallback(requestOptions, async (fetchOptions) => {
+			try {
+				const things = await this.getThings(names, fetchOptions, "saved posts");
+				const posts = names.map((name) => things.get(name)).filter((thing) => thing?.kind === "t3");
+				await this.addCommunities(posts, things, fetchOptions, "saved posts");
+				return posts;
+			} catch {
+				return null;
+			}
 		});
 	}
 

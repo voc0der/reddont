@@ -299,6 +299,36 @@ mixin head(title)
         }
       }
 
+      //- Save and unsave a post, then relabel every save control for it.
+      async function toggleSave(button) {
+        var id = button.dataset.savePost;
+        var thing = button.dataset.saved === '1' ? 'unsave' : 'save';
+        var csrf = document.querySelector('meta[name="csrf-token"]');
+        button.disabled = true;
+        try {
+          var response = await fetch('/' + thing, {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': csrf ? csrf.getAttribute('content') : '',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ id: id }),
+          });
+          if (!response.ok) throw new Error('Failed to ' + thing);
+          var saved = thing === 'save';
+          document.querySelectorAll('[data-save-post]').forEach(function (other) {
+            if (other.dataset.savePost !== id) return;
+            other.dataset.saved = saved ? '1' : '0';
+            var label = other.querySelector('.save-label') || other;
+            label.textContent = saved ? other.dataset.savedLabel : other.dataset.saveLabel;
+          });
+        } catch (error) {
+          console.error(error);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
       //- Menus are <details>; close them on outside clicks like reddit's.
       document.addEventListener('click', function (event) {
         var menus = window.matchMedia('(max-width: 767px)').matches

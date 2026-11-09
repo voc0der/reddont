@@ -138,6 +138,19 @@ function sanitizeThingId(value) {
 	return /^[A-Za-z0-9_]+$/.test(trimmed) ? trimmed : "";
 }
 
+// A post's base36 id, with or without its t3_ prefix. Reddit's ids are
+// lowercase, so a saved id matches the posts Reddit sends back.
+function sanitizePostId(value) {
+	const raw = firstValue(value);
+	if (typeof raw !== "string") return "";
+	const id = raw.trim().toLowerCase().replace(/^t3_/, "");
+	return /^[a-z0-9]{1,20}$/.test(id) ? id : "";
+}
+
+function savePostsEnabled(user) {
+	return user?.savePosts === 1;
+}
+
 function generateRandomPassword(length = 12) {
 	const bytes = crypto.randomBytes(length);
 	return bytes.toString("base64").slice(0, length); // Convert to base64 and slice to desired length
@@ -282,6 +295,19 @@ router.use((req, res, next) => {
 					.all({ id: req.user.id })
 					.map((s) => s.subreddit)
 			: [];
+	// Posts show "unsave" once saved. The ids load on the first post a page
+	// renders, and only for users who turned saving on.
+	let savedPostIds;
+	res.locals.isSavedPost = (id) => {
+		if (!savePostsEnabled(req.user)) return false;
+		savedPostIds ??= new Set(
+			db
+				.query("SELECT post_id FROM saved_posts WHERE user_id = $id")
+				.all({ id: req.user.id })
+				.map((row) => row.post_id),
+		);
+		return savedPostIds.has(String(id).toLowerCase());
+	};
 	next();
 });
 
@@ -710,6 +736,53 @@ router.get("/post-search", authenticateToken, async (req, res) => {
 	});
 });
 
+const SAVED_PAGE_SIZE = 25;
+
+// GET /saved - the account's saved posts, most recent save first. Pages
+// continue after a save's row id, so unsaving while paging skips nothing.
+router.get("/saved", authenticateToken, async (req, res) => {
+	if (!savePostsEnabled(req.user)) {
+		return res.redirect("/dashboard?message=Saved posts are turned off. Turn them on in your preferences.");
+	}
+	const cursor = Number.parseInt(firstValue(req.query.after), 10);
+	const before = Number.isSafeInteger(cursor) && cursor > 0 ? cursor : Number.MAX_SAFE_INTEGER;
+	const rows = db
+		.query(
+			"SELECT id, post_id FROM saved_posts WHERE user_id = $userId AND id < $before ORDER BY id DESC LIMIT $limit",
+		)
+		.all({ userId: req.user.id, before, limit: SAVED_PAGE_SIZE + 1 });
+	const saves = rows.slice(0, SAVED_PAGE_SIZE);
+	const query = {
+		view: firstValue(req.query.view) === "card" ? "card" : "compact",
+		count: before === Number.MAX_SAFE_INTEGER ? 0 : Math.max(0, Number.parseInt(firstValue(req.query.count), 10) || 0),
+	};
+
+	const redditRequestOptions = getRedditRequestOptions(req.user);
+	const posts = saves.length
+		? await G.getPostsById(saves.map((save) => save.post_id), redditRequestOptions)
+		: [];
+	if (!Array.isArray(posts)) {
+		return res.status(502).render("feed-error", {
+			...feedErrorOptions(req, redditRequestOptions),
+			errorTitle: "Saved posts unavailable",
+			errorSubject: "your saved posts",
+		});
+	}
+	posts.forEach(unescapeSelfText);
+	const postsById = new Map(posts.map((post) => [post.data.id, post.data]));
+
+	res.render("saved", {
+		// A post Reddit no longer returns keeps its place, so it can be unsaved.
+		saves: saves.map((save) => ({ id: save.post_id, post: postsById.get(save.post_id) || null })),
+		after: rows.length > SAVED_PAGE_SIZE ? saves[saves.length - 1].id : null,
+		query,
+		user: req.user,
+		subscribedSubs: getSubscribedSubs(req.user.id),
+		currentUrl: req.url,
+		...commonRenderOptions,
+	});
+});
+
 // GET /dashboard
 router.get("/dashboard", authenticateToken, async (req, res) => {
 	logger.debug("Dashboard - req.user from authenticateToken:", {
@@ -741,6 +814,7 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		themePreference: req.user.themePreference,
 		highResThumbnails: req.user.highResThumbnails,
 		showNsfwThumbnails: req.user.showNsfwThumbnails,
+		savePosts: req.user.savePosts,
 	});
 
 	let redditAuthStatus = { configured: false, description: "not configured" };
@@ -799,6 +873,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		themePreference,
 		highResThumbnails,
 		showNsfwThumbnails,
+		savePosts,
 		redditAuthCredential,
 		redditAuthType,
 		clearRedditAuth,
@@ -812,6 +887,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 	const useClassicLayoutValue = useClassicLayout === "1" ? 1 : 0;
 	const highResThumbnailsValue = highResThumbnails === "1" ? 1 : 0;
 	const showNsfwThumbnailsValue = showNsfwThumbnails === "1" ? 1 : 0;
+	const savePostsValue = savePosts === "1" ? 1 : 0;
 	const themeValue = themePreference || "auto";
 	const hasRedditAuthCredentialInput =
 		typeof redditAuthCredential === "string" &&
@@ -870,6 +946,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		themePreference,
 		highResThumbnails,
 		showNsfwThumbnails,
+		savePosts,
 		hasRedditAuthCredentialInput,
 		clearRedditAuth: clearRedditAuth === "1",
 		computed: {
@@ -878,6 +955,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			themeValue,
 			highResThumbnailsValue,
 			showNsfwThumbnailsValue,
+			savePostsValue,
 		},
 		userId: req.user.id,
 	});
@@ -896,6 +974,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			themePreference: themeValue,
 			highResThumbnails: highResThumbnailsValue,
 			showNsfwThumbnails: showNsfwThumbnailsValue,
+			savePosts: savePostsValue,
 			shareRedditCookie: shareRedditCookieValue,
 			shareRedditOAuth: shareRedditOAuthValue,
 			redditAuthPrimary: redditAuthPrimaryValue,
@@ -911,7 +990,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 
 		const result = db
 			.query(
-				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, shareRedditCookie = $shareRedditCookie, shareRedditOAuth = $shareRedditOAuth, redditAuthPrimary = $redditAuthPrimary${redditAuthSql} WHERE id = $id`,
+				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, savePosts = $savePosts, shareRedditCookie = $shareRedditCookie, shareRedditOAuth = $shareRedditOAuth, redditAuthPrimary = $redditAuthPrimary${redditAuthSql} WHERE id = $id`,
 			)
 			.run(updateParams);
 
@@ -920,7 +999,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		// Verify the update
 		const updatedUser = db
 			.query(
-				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, redditAuthHeaders, redditOAuthAppId FROM users WHERE id = $id",
+				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, savePosts, redditAuthHeaders, redditOAuthAppId FROM users WHERE id = $id",
 			)
 			.get({ id: req.user.id });
 		logger.debug("User after update:", {
@@ -929,6 +1008,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			themePreference: updatedUser?.themePreference,
 			highResThumbnails: updatedUser?.highResThumbnails,
 			showNsfwThumbnails: updatedUser?.showNsfwThumbnails,
+			savePosts: updatedUser?.savePosts,
 			redditAuthConfigured: Boolean(updatedUser?.redditAuthHeaders),
 			redditOAuthConfigured: Boolean(updatedUser?.redditOAuthAppId),
 		});
@@ -1392,6 +1472,47 @@ router.post("/login", async (req, res) => {
 router.get("/logout", (req, res) => {
 	clearAuthTokenCookie(res);
 	res.redirect("/login");
+});
+
+// POST /save and /unsave: a post in the state asked for is a success too,
+// so a page left open in another tab still ends up showing the right label.
+router.post("/save", authenticateToken, async (req, res) => {
+	if (!savePostsEnabled(req.user)) {
+		return res.status(403).send("Saved posts are turned off");
+	}
+	const postId = sanitizePostId(req.body?.id);
+	if (!postId) {
+		return res.status(400).send("Invalid post id");
+	}
+	try {
+		db.query(
+			"INSERT INTO saved_posts (user_id, post_id, saved_at) VALUES ($userId, $postId, $savedAt) ON CONFLICT(user_id, post_id) DO NOTHING",
+		).run({ userId: req.user.id, postId, savedAt: Math.floor(Date.now() / 1000) });
+		return res.status(200).send("Saved");
+	} catch (error) {
+		logger.error("Error saving post", { postId, error: error?.message || String(error) });
+		return res.status(500).send("Failed to save post");
+	}
+});
+
+router.post("/unsave", authenticateToken, async (req, res) => {
+	if (!savePostsEnabled(req.user)) {
+		return res.status(403).send("Saved posts are turned off");
+	}
+	const postId = sanitizePostId(req.body?.id);
+	if (!postId) {
+		return res.status(400).send("Invalid post id");
+	}
+	try {
+		db.query("DELETE FROM saved_posts WHERE user_id = $userId AND post_id = $postId").run({
+			userId: req.user.id,
+			postId,
+		});
+		return res.status(200).send("Unsaved");
+	} catch (error) {
+		logger.error("Error unsaving post", { postId, error: error?.message || String(error) });
+		return res.status(500).send("Failed to unsave post");
+	}
 });
 
 // POST /subscribe

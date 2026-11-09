@@ -1,0 +1,49 @@
+include ../mixins/post
+include ../mixins/header
+include ../mixins/head
+
+- var viewQuery = query.view === 'card' ? 'card' : 'compact'
+//- old reddit numbers posts across pages through the count parameter.
+- var rankStart = query.count || 0
+- var found = saves.filter((save) => save.post)
+- var rankDigits = String(rankStart + saves.length).length
+- var scoreChars = Math.max(3, ...found.map((save) => fmtscore(save.post.score === undefined ? save.post.ups : save.post.score).length))
+- var imagesTab = viewQuery === 'card' ? { label: 'hide images', href: '/saved?view=compact' } : { label: 'show images', href: '/saved?view=card' }
+doctype html
+html
+  +head("saved")
+  body(data-theme=user.themePreference)
+    main#content
+      +header(user, { name: 'saved', href: `/saved?view=${viewQuery}`, tabs: [imagesTab] })
+      div.page-content
+        div.hero.feed-hero
+          div.m-feed-title.m-only Saved
+        div#posts-container(style=`--rank-digits:${rankDigits};--score-chars:${scoreChars}`)
+          each save, index in saves
+            if save.post
+              +post(save.post, currentUrl, rankStart + index + 1)
+            else
+              //- Reddit no longer returns it: deleted outright, or in a
+              //- community that went private.
+              article.post.saved-unavailable
+                p.search-message
+                  | Reddit no longer returns this saved post.
+                  |
+                  a(href=`/comments/${save.id}?view=${viewQuery}`) open it
+                  |  or
+                  |
+                  +saveButton(save.id, true)
+          if !saves.length
+            p.search-message
+              if rankStart
+                | No more saved posts.
+              else
+                | Nothing saved yet. Save a post and it shows up here.
+
+        if after
+          div.footer
+            div.footer-item
+              span.d-only view more:
+              a(href=`/saved?${encodeQueryParams({ view: viewQuery, after: after, count: rankStart + saves.length })}`)
+                span.m-only next ⟶
+                span.d-only next ›

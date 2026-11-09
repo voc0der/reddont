@@ -611,6 +611,37 @@ describe("cookie listings from old reddit's pages", () => {
 	});
 });
 
+describe("posts by id", () => {
+	const community = thing("t5_c1", { display_name: "test" });
+	const things = [thing("t3_a", { subreddit_id: "t5_c1" }), thing("t3_b", { subreddit_id: "t5_c1" }), community];
+
+	test.each([
+		["a cookie", cookie, "https://old.reddit.com/api/info.api"],
+		["a token", { authHeaders: { authorization: "Bearer abc" } }, "https://oauth.reddit.com/api/info"],
+		["no credential", {}, "https://www.reddit.com/api/info.json"],
+	])("load posts in the order asked, with their communities, using %s", async (_, requestOptions, endpoint) => {
+		// Reddit answers in its own order, here reversed.
+		const byName = new Map(things.map((item) => [item.data.name, item]));
+		respond((url) =>
+			Response.json(listing(url.searchParams.get("id").split(",").map((name) => byName.get(name)).filter(Boolean).reverse())),
+		);
+
+		const posts = await new Geddit().getPostsById(["b", "gone", "bad id", "a", "b"], requestOptions);
+		expect(posts.map((post) => post.data.name)).toEqual(["t3_b", "t3_a"]);
+		expect(posts.map((post) => post.data.sr_detail)).toEqual([community.data, community.data]);
+		expect(requests.map(({ url }) => `${url.origin}${url.pathname}`)).toEqual([endpoint, endpoint]);
+		expect(requests.map(({ url }) => url.searchParams.get("id"))).toEqual(["t3_b,t3_gone,t3_a", "t5_c1"]);
+	});
+
+	test("make no request without a usable id", async () => {
+		respond(() => {
+			throw new Error("Unexpected request");
+		});
+		expect(await new Geddit().getPostsById(["bad id", ""])).toEqual([]);
+		expect(requests).toEqual([]);
+	});
+});
+
 describe("upstream failures", () => {
 	const calls = {
 		getSubmissions: (reddit) => reddit.getSubmissions("hot", "test"),
@@ -621,6 +652,7 @@ describe("upstream failures", () => {
 		searchSubmissions: (reddit) => reddit.searchSubmissions("gpu"),
 		searchSubreddits: (reddit) => reddit.searchSubreddits("gpu"),
 		searchAll: (reddit) => reddit.searchAll("gpu", "test"),
+		getPostsById: (reddit) => reddit.getPostsById(["post1"]),
 	};
 
 	test.each(Object.keys(calls))("%s returns null for network errors and block pages", async (name) => {

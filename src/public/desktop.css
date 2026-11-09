@@ -1096,6 +1096,17 @@ body[data-theme="light"] .linkflairlabel.is-dark {
   text-decoration: underline;
 }
 
+/* A saved post Reddit no longer returns: unsave reads as a link. */
+.saved-unavailable .save-button {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--o-link);
+  font: inherit;
+  cursor: pointer;
+}
+
 .buttons button.is-copied::after {
   content: " — link copied";
   font-weight: normal;

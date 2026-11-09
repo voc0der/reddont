@@ -25,7 +25,7 @@ const ENDPOINTS = [
 	/^\/subreddits\/search(\.json)?$/,
 	/^\/comments\/[A-Za-z0-9_]+(\/comment\/[A-Za-z0-9_]+)?(\.json)?$/,
 	/^\/api\/morechildren(\.json|\.api)?$/,
-	/^\/api\/info\.api$/,
+	/^\/api\/info(\.json|\.api)?$/,
 	/^\/api\/v1\/access_token$/,
 ];
 
@@ -70,9 +70,14 @@ describe("Fuzz: Reddit requests", () => {
 				await reddit.getSubmissionComments(postId, { sort: sortValue }, requestOptions);
 				await reddit.getSingleCommentThread(postId, commentId, { sort: sortValue }, requestOptions);
 				await reddit.getMoreComments(postId, children, sortValue, requestOptions);
+				await reddit.getPostsById([postId, ...children], requestOptions);
 				for (const url of urls) {
 					expect(HOSTS).toContain(url.origin);
 					expect(ENDPOINTS.some((endpoint) => endpoint.test(url.pathname)), url.href).toBe(true);
+					// Saved posts' ids go out in the query: fullnames only.
+					if (url.pathname.startsWith("/api/info")) {
+						expect(url.searchParams.get("id"), url.href).toMatch(/^t[0-9]_[A-Za-z0-9_]+(,t[0-9]_[A-Za-z0-9_]+)*$/);
+					}
 				}
 			},
 		), [
