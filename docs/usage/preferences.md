@@ -10,7 +10,7 @@ so other people on the same instance can use different settings.
 | Never Ending Reddit | Off | Load more feed posts and comments as you scroll. |
 | High Resolution Thumbnails | On | Request higher-quality preview images and video thumbnails. |
 | Don't hide thumbnails for 18+ content | Off | Reveal adult-content thumbnails by default. |
-| Enable saved posts | Off | Add **save** to posts and a **saved** page. See [saving posts](browsing.md#save-posts). |
+| Enable saved posts and comments | Off | Add **save** to posts and comments, and a **saved** page. See [saving](browsing.md#save-posts-and-comments). |
 | Theme Preference | Auto | Follow the system theme, or choose Light, Dark, or RES Night Mode. |
 
 Choose **Save Preferences** after editing. Disabling high-resolution

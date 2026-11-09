@@ -43,10 +43,10 @@ mixin joinButton(sub, joined, size)
   button.m-join(type="button" class=[size === 'small' ? 'm-join-sm' : '', joined ? 'is-joined' : ''] data-join-sub=sub data-joined=(joined ? '1' : '0') onclick="toggleJoin(this)")
     | #{joined ? 'Joined' : 'Join'}
 
-//- The Save item in a post's ⋯ menu, wired to the same toggleSave() as
-//- desktop's save link.
-mixin saveMenuItem(id, saved)
-  button.m-menu-item.m-save-item(type="button" data-save-post=id data-saved=(saved ? '1' : '0') data-save-label="Save" data-saved-label="Unsave" onclick="toggleSave(this)")
+//- The Save item in a post's or comment's ⋯ menu, wired to the same
+//- toggleSave() as desktop's save link.
+mixin saveMenuItem(name, saved)
+  button.m-menu-item.m-save-item(type="button" data-save-name=name data-saved=(saved ? '1' : '0') data-save-label="Save" data-saved-label="Unsave" onclick="toggleSave(this)")
     +icon("save")
     span.save-label #{saved ? 'Unsave' : 'Save'}
 

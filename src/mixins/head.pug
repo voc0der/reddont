@@ -299,9 +299,10 @@ mixin head(title)
         }
       }
 
-      //- Save and unsave a post, then relabel every save control for it.
+      //- Save or unsave a post or comment, then relabel every save control
+      //- for it.
       async function toggleSave(button) {
-        var id = button.dataset.savePost;
+        var name = button.dataset.saveName;
         var thing = button.dataset.saved === '1' ? 'unsave' : 'save';
         var csrf = document.querySelector('meta[name="csrf-token"]');
         button.disabled = true;
@@ -312,12 +313,12 @@ mixin head(title)
               'X-CSRF-Token': csrf ? csrf.getAttribute('content') : '',
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ id: id }),
+            body: JSON.stringify({ id: name }),
           });
           if (!response.ok) throw new Error('Failed to ' + thing);
           var saved = thing === 'save';
-          document.querySelectorAll('[data-save-post]').forEach(function (other) {
-            if (other.dataset.savePost !== id) return;
+          document.querySelectorAll('[data-save-name]').forEach(function (other) {
+            if (other.dataset.saveName !== name) return;
             other.dataset.saved = saved ? '1' : '0';
             var label = other.querySelector('.save-label') || other;
             label.textContent = saved ? other.dataset.savedLabel : other.dataset.saveLabel;

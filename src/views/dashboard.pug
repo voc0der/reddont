@@ -34,11 +34,11 @@ html
               | &nbsp;Don't hide thumbnails for 18+ content
 
           div(style="margin-top: 15px;")
-            label(for="pref-save-posts")
-              input(type="checkbox" id="pref-save-posts" name="savePosts" value="1" checked=(user.savePosts === 1) aria-describedby="pref-save-posts-help")
-              | &nbsp;Enable saved posts
-            p#pref-save-posts-help.dashboard-help
-              | Adds save to posts and a saved page to your account links. Turning this off hides your saved posts without deleting them.
+            label(for="pref-enable-saving")
+              input(type="checkbox" id="pref-enable-saving" name="enableSaving" value="1" checked=(user.enableSaving === 1) aria-describedby="pref-enable-saving-help")
+              | &nbsp;Enable saved posts and comments
+            p#pref-enable-saving-help.dashboard-help
+              | Adds save to posts and comments, and a saved page to your account links. Turning this off hides what you saved without deleting it.
 
           div(style="margin-top: 15px;")
             label(for="pref-theme" style="display: block; margin-bottom: 5px;") Theme Preference:

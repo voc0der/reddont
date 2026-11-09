@@ -53,11 +53,11 @@ mixin subscribeButton(sub, joined)
   button.subscribe-button(type="button" class=(joined ? 'is-joined' : false) data-join-sub=sub data-joined=(joined ? '1' : '0') data-join-label="join" data-joined-label="leave" onclick="toggleJoin(this)")
     | #{joined ? 'leave' : 'join'}
 
-//- old reddit's save link, which reads "unsave" once the post is saved.
-//- toggleSave() in head.pug flips every copy of it on the page, and the
-//- mobile menu's Save item.
-mixin saveButton(id, saved)
-  button.save-button(type="button" data-save-post=id data-saved=(saved ? '1' : '0') data-save-label="save" data-saved-label="unsave" onclick="toggleSave(this)") #{saved ? 'unsave' : 'save'}
+//- old reddit's save link for a post or comment, by fullname; it reads
+//- "unsave" once saved. toggleSave() in head.pug flips every copy of it on
+//- the page, and the mobile menu's Save item.
+mixin saveButton(name, saved)
+  button.save-button(type="button" data-save-name=name data-saved=(saved ? '1' : '0') data-save-label="save" data-saved-label="unsave" onclick="toggleSave(this)") #{saved ? 'unsave' : 'save'}
 
 //- The sidebar's community box. descriptionHtml is the decoded sidebar
 //- markdown from about.json; without it the short public description shows.

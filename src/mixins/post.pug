@@ -33,8 +33,9 @@ mixin post(p, currentUrl, rank)
   //- Within a subreddit, old reddit honours its flair-on-the-left setting.
   - var flairLeft = !creditCommunity && p.sr_detail && p.sr_detail.link_flair_position === 'left'
   //- Saving is a preference, off until the user turns it on.
-  - var canSave = user && user.savePosts === 1
-  - var postSaved = canSave && typeof isSavedPost === 'function' && isSavedPost(p.id)
+  - var saveName = `t3_${p.id}`
+  - var canSave = user && user.enableSaving === 1
+  - var postSaved = canSave && typeof isSaved === 'function' && isSaved(saveName)
   article(class=`post`)
     div.post-container(class=`${query.view} ${p.stickied?"sticky":""}`)
       if rank
@@ -60,7 +61,7 @@ mixin post(p, currentUrl, rank)
                 +joinButton(p.subreddit, false, 'small')
               +overflowMenu("Post options", true)
                 if canSave
-                  +saveMenuItem(p.id, postSaved)
+                  +saveMenuItem(saveName, postSaved)
                 a.m-menu-item(href=redditHref)
                   +icon("external")
                   span Open on Reddit
@@ -127,7 +128,7 @@ mixin post(p, currentUrl, rank)
               button(type="button" onclick="sharePost(this)" data-url=redditHref data-title=decodeEntities(p.title)) share
             if canSave
               li
-                +saveButton(p.id, postSaved)
+                +saveButton(saveName, postSaved)
             li
               a(href=redditHref) reddit
             if p.gilded > 0

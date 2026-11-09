@@ -31,6 +31,9 @@ const OAUTH_HOST = "https://oauth.reddit.com";
 // /api/info takes up to 100 fullnames.
 const INFO_BATCH_SIZE = 100;
 const COMMUNITY_NAME = /^t5_[a-z0-9]+$/;
+const POST_NAME = /^t3_[a-z0-9]+$/;
+// What can be saved: a post or a comment.
+const SAVED_NAME = /^t[13]_[a-z0-9]+$/;
 // old.reddit.com redirects a multi to its canonical spelling: each name in
 // its community's case, missing communities dropped (seen 2026-11-03).
 const MAX_PAGE_REDIRECTS = 2;
@@ -339,20 +342,36 @@ class Geddit {
 		});
 	}
 
-	// Posts by id, in the order given, each with its community as sr_detail.
-	// Posts Reddit doesn't return (a private community's, say) are left out;
-	// null when Reddit refuses.
-	async getPostsById(ids, requestOptions = {}) {
-		const names = [...new Set(ids.map((id) => this.sanitizeThingId(id)).filter(Boolean))].map(
-			(id) => `t3_${id}`,
-		);
-		if (!names.length) return [];
+	// Saved posts and comments by fullname, in the order given. Posts get
+	// their community as sr_detail, and comments their post as `link`:
+	// /api/info sends a comment without its post's title (checked
+	// 2026-11-09). Both load in one more request. Things Reddit doesn't
+	// return (a private community's, say) are left out; null when Reddit
+	// refuses.
+	async getSavedThings(names, requestOptions = {}) {
+		const wanted = [...new Set(names)].filter((name) => typeof name === "string" && SAVED_NAME.test(name));
+		if (!wanted.length) return [];
 		return this.withFallback(requestOptions, async (fetchOptions) => {
 			try {
-				const things = await this.getThings(names, fetchOptions, "saved posts");
-				const posts = names.map((name) => things.get(name)).filter((thing) => thing?.kind === "t3");
-				await this.addCommunities(posts, things, fetchOptions, "saved posts");
-				return posts;
+				const things = await this.getThings(wanted, fetchOptions, "saved");
+				const items = wanted.map((name) => things.get(name)).filter((thing) => thing?.kind === "t3" || thing?.kind === "t1");
+				const comments = items.filter((item) => item.kind === "t1");
+				const missing = [
+					...new Set([
+						...comments.map((comment) => comment.data.link_id).filter((name) => POST_NAME.test(name)),
+						...items.filter((item) => item.kind === "t3").map((post) => post.data.subreddit_id).filter((name) => COMMUNITY_NAME.test(name)),
+					]),
+				].filter((name) => !things.has(name));
+				if (missing.length) {
+					const more = await this.getThings(missing, fetchOptions, "saved").catch(() => null);
+					for (const [name, thing] of more || []) things.set(name, thing);
+				}
+				for (const comment of comments) {
+					const post = things.get(comment.data.link_id);
+					if (post?.kind === "t3") comment.data.link = post.data;
+				}
+				await this.addCommunities(items, things, fetchOptions, "saved");
+				return items;
 			} catch {
 				return null;
 			}
