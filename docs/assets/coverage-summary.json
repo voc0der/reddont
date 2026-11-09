@@ -1,16 +1,16 @@
 {
   "metric": "JavaScript line coverage",
-  "covered": 2544,
-  "total": 2589,
+  "covered": 2539,
+  "total": 2584,
   "percent": 98.26,
   "bunVersion": "1.4.4",
   "tests": {
-    "passed": 436,
+    "passed": 437,
     "skipped": 0,
     "failed": 0
   },
   "processes": 19,
-  "sourceSha256": "12987913d764cee9f15af711958e4e3a3fce9c5283e15fab588e04ca91163f87",
+  "sourceSha256": "092535f3755dac800f65138ff328e14065519f45c178ee17bb7fbb51d2f7ea3f",
   "files": {
     "src/apiAuth.js": {
       "covered": 118,
@@ -41,8 +41,8 @@
       "total": 28
     },
     "src/mediaProxy.js": {
-      "covered": 175,
-      "total": 176
+      "covered": 170,
+      "total": 171
     },
     "src/oidc.js": {
       "covered": 212,

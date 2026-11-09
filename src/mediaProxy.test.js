@@ -156,6 +156,16 @@ describe("proxied URLs", () => {
 		}
 	});
 
+	test("keep Reddit's percent-encoding and encode what a name can't hold", () => {
+		expect(upstreamMediaUrl("/preview.redd.it/%E6%97%A5%E6%9C%AC-v0-abc.png?width=640&s=sig")).toBe(
+			"https://preview.redd.it/%E6%97%A5%E6%9C%AC-v0-abc.png?width=640&s=sig",
+		);
+		expect(upstreamMediaUrl("/i.redd.it/a%3Fb%23c.png")).toBe("https://i.redd.it/a%3Fb%23c.png");
+		expect(upstreamMediaUrl("/i.redd.it/@x.png")).toBe("https://i.redd.it/%40x.png");
+		expect(upstreamMediaUrl("/i.redd.it/abc.png?")).toBe("https://i.redd.it/abc.png?");
+		expect(upstreamMediaUrl("/i.redd.it/%E6%97.png")).toBeNull();
+	});
+
 	test("keep media types and send anything else as a download", () => {
 		expect(mediaContentType("image/webp")).toBe("image/webp");
 		expect(mediaContentType("Video/MP4; codecs=avc1")).toBe("video/mp4");

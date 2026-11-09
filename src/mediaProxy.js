@@ -100,35 +100,27 @@ function proxiedMediaUrl(url) {
 }
 
 // The Reddit URL a request below /proxy stands for, or null for a host that
-// isn't in MEDIA_HOSTS. Each origin is written out in full, up to the "/" that
-// ends its host, so nothing in the request can change which server is asked
-// (CodeQL's request-forgery check can't see that through a host variable).
+// isn't in MEDIA_HOSTS. The host comes from the list itself. Each path
+// segment is decoded and encoded again, so a "/", "?", "#" or "@" from the
+// request reaches Reddit only as part of a name, while Reddit's own
+// percent-encoding (a non-ASCII preview slug's, say) comes through as it was.
+// The query keeps its literal "?". CodeQL's request-forgery check accepts
+// exactly these two forms of request text in a URL.
 function upstreamMediaUrl(requestUrl) {
-	const match = /^\/([^/?#]+)\/([^#]*)$/.exec(String(requestUrl ?? ""));
-	if (!match) return null;
-	const rest = match[2];
-	switch (match[1].toLowerCase()) {
-		case "i.redd.it":
-			return `https://i.redd.it/${rest}`;
-		case "preview.redd.it":
-			return `https://preview.redd.it/${rest}`;
-		case "external-preview.redd.it":
-			return `https://external-preview.redd.it/${rest}`;
-		case "v.redd.it":
-			return `https://v.redd.it/${rest}`;
-		case "a.thumbs.redditmedia.com":
-			return `https://a.thumbs.redditmedia.com/${rest}`;
-		case "b.thumbs.redditmedia.com":
-			return `https://b.thumbs.redditmedia.com/${rest}`;
-		case "emoji.redditmedia.com":
-			return `https://emoji.redditmedia.com/${rest}`;
-		case "styles.redditmedia.com":
-			return `https://styles.redditmedia.com/${rest}`;
-		case "www.redditstatic.com":
-			return `https://www.redditstatic.com/${rest}`;
-		default:
-			return null;
+	const match = /^\/([^/?#]+)\/([^?#]*)(?:\?([^#]*))?$/.exec(String(requestUrl ?? ""));
+	const host = match && MEDIA_HOSTS.find((candidate) => candidate === match[1].toLowerCase());
+	if (!host) return null;
+	let path;
+	try {
+		path = match[2]
+			.split("/")
+			.map((segment) => encodeURIComponent(decodeURIComponent(segment)))
+			.join("/");
+	} catch {
+		return null;
 	}
+	const base = `https://${host}/${path}`;
+	return match[3] === undefined ? base : `${base}?${match[3]}`;
 }
 
 function mediaContentType(contentType) {
