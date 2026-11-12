@@ -36,7 +36,3 @@ docker compose up -d
 ## Contributing
 
 Issues and pull requests for bugs or improvements are welcome. Review the [development guide](https://voc0der.github.io/reddont/development/) before making changes. Release history is in the [changelog](CHANGELOG.md).
-
-## License
-
-[MIT](LICENSE). Based on [Akshay Oppiliappan](https://github.com/oppiliappan)'s Reddit client, with thanks for their work.
