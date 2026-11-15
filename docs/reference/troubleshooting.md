@@ -6,7 +6,11 @@ which page or request fails. Remove credentials from logs before sharing them.
 
 ## Login returns to the login screen
 
-- On HTTP, set `REDDONT_DISABLE_SSL=true` and recreate the container.
+- On HTTP, set `REDDONT_DISABLE_SSL=true` and recreate the container. Without
+  it, signing in over plain HTTP answers **Invalid CSRF token**: the browser
+  drops the secure cookies.
+- **Too many failed sign-ins** clears 15 minutes after the first failure; see
+  [failed sign-ins](../administration/accounts.md#failed-sign-ins).
 - On HTTPS, keep secure cookies enabled and verify the public scheme and proxy headers.
 - Set a persistent `JWT_SECRET_KEY` if sessions disappear after restarts.
 - Clear stale site cookies after changing the public address or authentication setup.

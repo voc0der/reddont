@@ -338,8 +338,10 @@ async function handleCallback(req, { state, nonce, code_verifier } = {}) {
     }
   }
 
-  // Merge userinfo into claims (userinfo takes precedence for overlapping keys)
-  const mergedClaims = { ...claims, ...userinfo };
+  // Userinfo isn't signed. openid-client checks that it describes the ID
+  // token's subject; it then only fills in what the ID token leaves out, such
+  // as groups, and never overrides a signed claim.
+  const mergedClaims = { ...userinfo, ...claims };
   logger.debug(`[OIDC] Merged claim keys: ${Object.keys(mergedClaims).join(', ')}`);
 
   return { tokenSet, claims: mergedClaims };
@@ -386,14 +388,24 @@ function isAdminFromClaims(claims, groups) {
   return isAdmin;
 }
 
+function _claimText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+// Some providers send email_verified as the string "true".
+function _claimTrue(value) {
+  return value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'true');
+}
+
+// The username for an OIDC identity, which can also link it to an existing
+// account of that name. Anyone can type an email address, so it counts only
+// when the provider has verified it; a display name (`name`) never counts.
 function resolveUsernameFromClaims(claims) {
-  // Keep this deterministic and provider-friendly.
   return (
-    claims?.preferred_username ||
-    claims?.email ||
-    claims?.upn ||
-    claims?.name ||
-    claims?.sub
+    _claimText(claims?.preferred_username) ||
+    (_claimTrue(claims?.email_verified) ? _claimText(claims?.email) : undefined) ||
+    _claimText(claims?.upn) ||
+    _claimText(claims?.sub)
   );
 }
 

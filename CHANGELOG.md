@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- An OIDC sign-in can no longer take over an account linked to another OIDC
+  identity by having the same username; it's refused. A username comes from
+  `email` only when the provider marks the address verified, and never from
+  the display name (`name`). Claims in the signed ID token take precedence
+  over userinfo, which only fills in what the token leaves out
+- Failed password sign-ins are limited per address (30) and per address and
+  username (10) in 15 minutes, and logged as warnings
+- `X-Forwarded-For` and `X-Forwarded-Proto` count only from a trusted proxy:
+  those in `REVERSE_PROXY_WHITELIST`, now in every login mode. Without the
+  list, OIDC and header login trust loopback and private-network addresses
+  rather than whoever connects, who could name their own address to get
+  round rate limits
+- Over HTTPS the session, CSRF and OIDC cookies take the `__Host-` prefix, so
+  a site on another subdomain can't set them. Everyone signs in again once
+- The sign-in page and the dashboard show only their own messages: `?message=`
+  names one by code, and any other text is left out
+
 ## [0.1.16] - 2026-11-15
 
 ### Added
