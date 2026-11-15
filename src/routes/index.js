@@ -46,6 +46,28 @@ const { normalizeRedditAppId } = require("../redditOAuth");
 const router = express.Router();
 const G = new geddit.Geddit();
 const { SAFE_REDIRECT_FALLBACK, getSafeRedirectTarget } = require("../utils/safeRedirect");
+const { dashboardMessage, loginMessage } = require("../utils/pageMessages");
+const {
+	clearLoginFailures,
+	isLoginBlocked,
+	recordLoginFailure,
+} = require("../loginLimits");
+const {
+	OIDC_COOKIE_PATH,
+	OIDC_NONCE_COOKIE,
+	OIDC_REDIRECT_COOKIE,
+	OIDC_STATE_COOKIE,
+	OIDC_VERIFIER_COOKIE,
+} = require("../cookieNames");
+
+// The OIDC sign-in in flight. Always Secure, as before; SameSite=Lax so the
+// provider's redirect back to the callback carries them.
+const OIDC_COOKIE_OPTIONS = {
+	httpOnly: true,
+	secure: true,
+	sameSite: "Lax",
+	path: OIDC_COOKIE_PATH,
+};
 
 function firstValue(value) {
 	if (Array.isArray(value)) return value[0];
@@ -744,7 +766,7 @@ const SAVED_PAGE_SIZE = 25;
 // skips nothing.
 router.get("/saved", authenticateToken, async (req, res) => {
 	if (!savingEnabled(req.user)) {
-		return res.redirect("/dashboard?message=Saving is turned off. Turn it on in your preferences.");
+		return res.redirect("/dashboard?message=saving-off");
 	}
 	const cursor = Number.parseInt(firstValue(req.query.after), 10);
 	const before = Number.isSafeInteger(cursor) && cursor > 0 ? cursor : Number.MAX_SAFE_INTEGER;
@@ -848,7 +870,7 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		redditAuthPlan: describeRedditAuthPlan(req.user),
 		apiKey: req.user.apiKey || null,
 		apiWhitelist: describeApiWhitelist(),
-		message: req.query.message,
+		message: dashboardMessage(req.query.message),
 		query: req.query,
 		...commonRenderOptions,
 	});
@@ -858,10 +880,10 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 router.post("/api-key/regenerate", authenticateToken, async (req, res) => {
 	try {
 		setUserApiKey(req.user.id);
-		return res.redirect("/dashboard?message=API key regenerated");
+		return res.redirect("/dashboard?message=api-key-regenerated");
 	} catch (err) {
 		logger.error("Failed to regenerate API key", err);
-		return res.redirect("/dashboard?message=Failed to regenerate API key");
+		return res.redirect("/dashboard?message=api-key-regenerate-failed");
 	}
 });
 
@@ -869,10 +891,10 @@ router.post("/api-key/regenerate", authenticateToken, async (req, res) => {
 router.post("/api-key/revoke", authenticateToken, async (req, res) => {
 	try {
 		clearUserApiKey(req.user.id);
-		return res.redirect("/dashboard?message=API key revoked");
+		return res.redirect("/dashboard?message=api-key-revoked");
 	} catch (err) {
 		logger.error("Failed to revoke API key", err);
-		return res.redirect("/dashboard?message=Failed to revoke API key");
+		return res.redirect("/dashboard?message=api-key-revoke-failed");
 	}
 });
 
@@ -933,7 +955,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			userId: req.user.id,
 			error: err?.message || String(err),
 		});
-		return res.redirect("/dashboard?message=Invalid Reddit credential");
+		return res.redirect("/dashboard?message=reddit-credential-invalid");
 	}
 
 	try {
@@ -950,7 +972,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			userId: req.user.id,
 			error: err?.message || String(err),
 		});
-		return res.redirect("/dashboard?message=Invalid Reddit app ID");
+		return res.redirect("/dashboard?message=reddit-app-id-invalid");
 	}
 
 	logger.debug("Received preferences:", {
@@ -1033,14 +1055,12 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		// A new app is checked now, while its owner is looking: the token it
 		// gets is kept for their requests.
 		if (redditOAuthAppIdUpdate && !(await G.authorize({ oauthAppId: redditOAuthAppIdUpdate }))) {
-			return res.redirect(
-				"/dashboard?message=OAuth app saved, but Reddit didn't grant it a token. Check that the ID belongs to an installed app.",
-			);
+			return res.redirect("/dashboard?message=reddit-app-no-token");
 		}
 		return res.redirect("/dashboard");
 	} catch (err) {
 		logger.error("Error updating preferences:", err);
-		return res.redirect("/dashboard?message=Failed to update preferences");
+		return res.redirect("/dashboard?message=preferences-failed");
 	}
 });
 
@@ -1155,7 +1175,7 @@ router.get("/auth/oidc/login", async (req, res) => {
 
 	if (!oidc.isOIDCEnabled()) {
 		logger.warn("[OIDC] OIDC not enabled, redirecting to login with bypass");
-		return res.redirect("/login?bypass_oidc=true&message=OIDC not configured");
+		return res.redirect("/login?bypass_oidc=true&message=oidc-not-configured");
 	}
 
 	const redirectAfterLogin = getSafeRedirectTarget(req.query.redirect, "/");
@@ -1181,38 +1201,35 @@ router.get("/auth/oidc/login", async (req, res) => {
 
 		// IMPORTANT: SameSite must be Lax (not Strict) so cookies are sent on the cross-site callback redirect.
 		const cookieOptions = {
-			httpOnly: true,
-			secure: true,
-			sameSite: "Lax",
+			...OIDC_COOKIE_OPTIONS,
 			maxAge: 10 * 60 * 1000, // 10 minutes
-			path: "/auth/oidc",
 		};
 
-		res.cookie("oidc_state", state, cookieOptions);
-		res.cookie("oidc_nonce", nonce, cookieOptions);
-		res.cookie("oidc_verifier", code_verifier, cookieOptions);
-		res.cookie("oidc_redirect", ra, cookieOptions);
+		res.cookie(OIDC_STATE_COOKIE, state, cookieOptions);
+		res.cookie(OIDC_NONCE_COOKIE, nonce, cookieOptions);
+		res.cookie(OIDC_VERIFIER_COOKIE, code_verifier, cookieOptions);
+		res.cookie(OIDC_REDIRECT_COOKIE, ra, cookieOptions);
 
 		logger.debug("[OIDC] Redirecting to IdP authorization URL");
 		res.redirect(authorizationUrl);
 	} catch (err) {
 		logger.error("[OIDC] Failed to start OIDC login:", err);
 		return res.redirect(
-			"/login?bypass_oidc=true&message=Failed to start OIDC login",
+			"/login?bypass_oidc=true&message=oidc-start-failed",
 		);
 	}
 });
 
 router.get("/auth/oidc/callback", async (req, res) => {
 	if (!oidc.isOIDCEnabled()) {
-		return res.redirect("/login?bypass_oidc=true&message=OIDC not configured");
+		return res.redirect("/login?bypass_oidc=true&message=oidc-not-configured");
 	}
 
-	const state = req.cookies?.oidc_state;
-	const nonce = req.cookies?.oidc_nonce;
-	const code_verifier = req.cookies?.oidc_verifier;
+	const state = req.cookies?.[OIDC_STATE_COOKIE];
+	const nonce = req.cookies?.[OIDC_NONCE_COOKIE];
+	const code_verifier = req.cookies?.[OIDC_VERIFIER_COOKIE];
 	const redirectAfterLogin = getSafeRedirectTarget(
-		req.cookies?.oidc_redirect,
+		req.cookies?.[OIDC_REDIRECT_COOKIE],
 		"/",
 	);
 
@@ -1228,10 +1245,10 @@ router.get("/auth/oidc/callback", async (req, res) => {
 	}
 
 	// Clear transient cookies regardless
-	res.clearCookie("oidc_state", { path: "/auth/oidc" });
-	res.clearCookie("oidc_nonce", { path: "/auth/oidc" });
-	res.clearCookie("oidc_verifier", { path: "/auth/oidc" });
-	res.clearCookie("oidc_redirect", { path: "/auth/oidc" });
+	res.clearCookie(OIDC_STATE_COOKIE, OIDC_COOKIE_OPTIONS);
+	res.clearCookie(OIDC_NONCE_COOKIE, OIDC_COOKIE_OPTIONS);
+	res.clearCookie(OIDC_VERIFIER_COOKIE, OIDC_COOKIE_OPTIONS);
+	res.clearCookie(OIDC_REDIRECT_COOKIE, OIDC_COOKIE_OPTIONS);
 
 	try {
 		if (!state || !nonce || !code_verifier) {
@@ -1244,7 +1261,7 @@ router.get("/auth/oidc/callback", async (req, res) => {
 				!!code_verifier,
 			);
 			return res.redirect(
-				"/login?bypass_oidc=true&message=OIDC session expired, try again",
+				"/login?bypass_oidc=true&message=oidc-session-expired",
 			);
 		}
 
@@ -1261,7 +1278,7 @@ router.get("/auth/oidc/callback", async (req, res) => {
 		const groups = oidc.extractGroupsFromClaims(claims);
 		if (!oidc.isAllowedByGroups(groups)) {
 			return res.redirect(
-				"/login?bypass_oidc=true&message=Not allowed (missing required group)",
+				"/login?bypass_oidc=true&message=oidc-group-missing",
 			);
 		}
 
@@ -1301,6 +1318,18 @@ router.get("/auth/oidc/callback", async (req, res) => {
 					username: desiredUsername,
 				});
 
+			// An account linked to another OIDC identity stays its own: a new
+			// identity with the same username (someone given a former user's
+			// name at the provider, say) can't take it over.
+			if (existingByUsername?.oidc_sub) {
+				logger.warn(
+					`[OIDC] Refused sub ${sub}: the username '${desiredUsername}' belongs to an account linked to another OIDC identity`,
+				);
+				return res.redirect(
+					"/login?bypass_oidc=true&message=oidc-name-taken",
+				);
+			}
+
 			if (existingByUsername) {
 				// Link existing password account to OIDC
 				logger.info(
@@ -1329,7 +1358,7 @@ router.get("/auth/oidc/callback", async (req, res) => {
 			// No existing user - create new if auto-register enabled
 			if (!autoRegister) {
 				return res.redirect(
-					"/login?bypass_oidc=true&message=Account not registered",
+					"/login?bypass_oidc=true&message=oidc-not-registered",
 				);
 			}
 
@@ -1379,7 +1408,7 @@ router.get("/auth/oidc/callback", async (req, res) => {
 		return res.redirect(redirectAfterLogin);
 	} catch (err) {
 		logger.error("OIDC callback failed", err);
-		return res.redirect("/login?bypass_oidc=true&message=OIDC login failed");
+		return res.redirect("/login?bypass_oidc=true&message=oidc-failed");
 	}
 });
 
@@ -1389,7 +1418,7 @@ router.get("/login", async (req, res, next) => {
 	const bypassOidc =
 		String(req.query.bypass_oidc || "").toLowerCase() === "true" ||
 		req.query.bypass_oidc === "1";
-	let message = req.query.message;
+	let message = loginMessage(req.query.message);
 
 	const session = getAuthSession(req);
 	if (session.status === "ok") {
@@ -1399,7 +1428,7 @@ router.get("/login", async (req, res, next) => {
 	if (session.status === "expired") {
 		clearAuthTokenCookie(res);
 		if (!message) {
-			message = "Session expired";
+			message = loginMessage("session-expired");
 		}
 	} else if (session.status === "invalid") {
 		logger.warn("Ignoring invalid auth token on /login", session.error);
@@ -1411,12 +1440,12 @@ router.get("/login", async (req, res, next) => {
 		);
 		clearAuthTokenCookie(res);
 		if (!message) {
-			message = "User not found.";
+			message = loginMessage("user-not-found");
 		}
 	} else if (session.status === "db_error") {
 		logger.error("Failed to validate auth token on /login:", session.error);
 		return res.render("login", {
-			message: message || "Database error.",
+			message: message || loginMessage("database-error"),
 			oidcEnabled: oidc.isOIDCEnabled(),
 			redirect: redirectTo,
 			bypassOidc: true,
@@ -1458,9 +1487,28 @@ router.get("/login", async (req, res, next) => {
 router.post("/login", async (req, res) => {
 	const { username, password } = req.body;
 
-	if (!username || !password) {
+	if (
+		typeof username !== "string" ||
+		typeof password !== "string" ||
+		!username ||
+		!password
+	) {
 		return res.render("login", {
 			message: "Both username and password are required.",
+		});
+	}
+
+	// req.ip is the client's own address only behind a trusted proxy (see
+	// REVERSE_PROXY_WHITELIST); otherwise it's the direct peer's.
+	const address = req.ip || req.socket?.remoteAddress || "unknown";
+	// Logged as typed, up to a point: a failed sign-in's name is the sender's.
+	const loggedName = JSON.stringify(username.slice(0, 100));
+	if (isLoginBlocked(address, username)) {
+		logger.warn(
+			`Refused sign-in for user ${loggedName} from ${address}: too many failed sign-ins`,
+		);
+		return res.status(429).render("login", {
+			message: "Too many failed sign-ins. Try again in 15 minutes.",
 		});
 	}
 
@@ -1469,6 +1517,7 @@ router.post("/login", async (req, res) => {
 		.get({ username });
 
 	if (user && (await Bun.password.verify(password, user.password_hash))) {
+		clearLoginFailures(address, username);
 		try {
 			setAuthTokenCookie(res, username, user.id);
 			const redirectTo = getRequestedRedirect(req);
@@ -1480,7 +1529,8 @@ router.post("/login", async (req, res) => {
 			});
 		}
 	} else {
-		// Invalid credentials
+		recordLoginFailure(address, username);
+		logger.warn(`Failed sign-in for user ${loggedName} from ${address}`);
 		res.render("login", { message: "Invalid credentials, try again." });
 	}
 });

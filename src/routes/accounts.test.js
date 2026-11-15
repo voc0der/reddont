@@ -169,6 +169,54 @@ describe("password login", () => {
 		}
 	});
 
+	test("stops checking a username's password after ten failed sign-ins from one address", async () => {
+		db.query("INSERT INTO users (username, password_hash) VALUES ('guarded', ?)").run(
+			await Bun.password.hash("guarded-password"),
+		);
+		for (let guess = 0; guess < 10; guess += 1) {
+			const response = await request("/login", { fields: { username: "guarded", password: `guess-${guess}` } });
+			expect(response.status).toBe(200);
+			expect(await response.text()).toContain("Invalid credentials, try again.");
+		}
+
+		// Past the limit even the right password goes unchecked.
+		const refused = await request("/login", { fields: { username: "guarded", password: "guarded-password" } });
+		expect(refused.status).toBe(429);
+		expect(await refused.text()).toContain("Too many failed sign-ins. Try again in 15 minutes.");
+		expect(responseCookies(refused).auth_token).toBeUndefined();
+
+		// Other accounts still sign in from the same address.
+		expect((await request("/login", { fields: owner })).headers.get("location")).toBe("/");
+		await server.waitForLog('[WARN] Failed sign-in for user "guarded" from 127.0.0.1');
+		await server.waitForLog('[WARN] Refused sign-in for user "guarded" from 127.0.0.1: too many failed sign-ins');
+	});
+
+	test("takes a client's address from X-Forwarded-For only from a listed proxy", async () => {
+		const failFrom = (peer, forwardedFor) =>
+			request("/login", {
+				fields: { username: "proxied", password: "wrong" },
+				headers: { "X-Test-Peer": peer, "X-Forwarded-For": forwardedFor },
+			});
+
+		expect((await failFrom("203.0.113.10", "198.51.100.7")).status).toBe(200);
+		await server.waitForLog('Failed sign-in for user "proxied" from 198.51.100.7');
+		expect((await failFrom("192.0.2.50", "198.51.100.8")).status).toBe(200);
+		await server.waitForLog('Failed sign-in for user "proxied" from 192.0.2.50');
+		expect(server.log()).not.toContain("198.51.100.8");
+	});
+
+	test("ignores form fields that aren't text", async () => {
+		const response = await realFetch(`${server.baseUrl}/login`, {
+			method: "POST",
+			headers: { Cookie: `csrf_token=${csrf}`, "Content-Type": "application/x-www-form-urlencoded" },
+			body: `_csrf=${csrf}&username[]=owner&password[]=owner-password`,
+			redirect: "manual",
+		});
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain("Both username and password are required.");
+		expect(responseCookies(response).auth_token).toBeUndefined();
+	});
+
 	test("sends a signed-in reader home and signs them out", async () => {
 		expect(redirectTarget(await request("/login", { token: sessionFor("owner") }))).toEqual({ path: "/" });
 
@@ -183,7 +231,7 @@ describe("sessions", () => {
 		const token = jwt.sign({ id: user("owner").id, exp: Math.floor(Date.now() / 1000) - 60 }, secret);
 		for (const route of ["/subs", "/create-invite"]) {
 			const response = await request(route, { token });
-			expect(redirectTarget(response)).toEqual({ path: "/login", redirect: route, message: "Session expired" });
+			expect(redirectTarget(response)).toEqual({ path: "/login", redirect: route, message: "session-expired" });
 			expect(responseCookies(response).auth_token.value).toBe("");
 		}
 		const login = await request("/login", { token });
@@ -208,12 +256,12 @@ describe("sessions", () => {
 		expect(redirectTarget(await request("/subs", { token }))).toEqual({
 			path: "/login",
 			redirect: "/subs",
-			message: "User not found.",
+			message: "user-not-found",
 		});
 		expect(redirectTarget(await request("/create-invite", { token }))).toEqual({
 			path: "/login",
 			redirect: "/create-invite",
-			message: "Admin user not found.",
+			message: "user-not-found",
 		});
 		expect(await (await request("/login", { token })).text()).toContain("User not found.");
 	});
@@ -344,7 +392,7 @@ describe("preferences", () => {
 			token: sessionFor("reader"),
 			fields: { themePreference: "light", redditAuthCredential: "not a credential", redditAuthType: "auto" },
 		});
-		expect(redirectTarget(response)).toEqual({ path: "/dashboard", message: "Invalid Reddit credential" });
+		expect(redirectTarget(response)).toEqual({ path: "/dashboard", message: "reddit-credential-invalid" });
 		expect(user("reader")).toMatchObject({ themePreference: "auto", redditAuthHeaders: null });
 	});
 
@@ -367,12 +415,15 @@ describe("API keys", () => {
 		const token = sessionFor("reader");
 		expect(redirectTarget(await request("/api-key/regenerate", { token, fields: {} }))).toEqual({
 			path: "/dashboard",
-			message: "API key regenerated",
+			message: "api-key-regenerated",
 		});
 		const first = user("reader").apiKey;
 		expect(first).toStartWith("reddont_");
 		expect(await (await whoami(first)).json()).toMatchObject({ username: "reader", isAdmin: false });
 		expect(await (await request("/dashboard", { token })).text()).toContain(`value="${first}"`);
+		expect(await (await request("/dashboard?message=api-key-regenerated", { token })).text()).toContain(
+			"API key regenerated",
+		);
 
 		await request("/api-key/regenerate", { token, fields: {} });
 		const second = user("reader").apiKey;
@@ -382,7 +433,7 @@ describe("API keys", () => {
 
 		expect(redirectTarget(await request("/api-key/revoke", { token, fields: {} }))).toEqual({
 			path: "/dashboard",
-			message: "API key revoked",
+			message: "api-key-revoked",
 		});
 		expect(user("reader").apiKey).toBeNull();
 		expect((await whoami(second)).status).toBe(401);
@@ -415,12 +466,30 @@ describe("request handling", () => {
 		expect(user("owner").themePreference).toBe("auto");
 	});
 
+	test("pages show only their own notes, named by code, never text from the address", async () => {
+		const token = sessionFor("owner");
+		const login = await (await request("/login?message=oidc-failed")).text();
+		expect(login).toContain("OIDC login failed");
+		expect(login).not.toContain("oidc-failed");
+
+		for (const message of ["Your session ended. Sign in again at elsewhere.example", "constructor", "__proto__"]) {
+			const query = `?message=${encodeURIComponent(message)}`;
+			for (const html of [
+				await (await request(`/login${query}`)).text(),
+				await (await request(`/dashboard${query}`, { token })).text(),
+			]) {
+				expect(html).not.toContain(message);
+				expect(html).not.toContain("error-message");
+			}
+		}
+	});
+
 	test("explains that single sign-on is not configured", async () => {
 		for (const route of ["/auth/oidc/login", "/auth/oidc/callback?code=code&state=state"]) {
 			expect(redirectTarget(await request(route))).toEqual({
 				path: "/login",
 				bypass_oidc: "true",
-				message: "OIDC not configured",
+				message: "oidc-not-configured",
 			});
 		}
 	});
@@ -432,7 +501,7 @@ describe("database failures", () => {
 		await withLockedDatabase(server.dataDir, async () => {
 			for (const route of ["/subs", "/create-invite"]) {
 				const response = await request(route, { token });
-				expect(redirectTarget(response)).toEqual({ path: "/login", message: "Database error." });
+				expect(redirectTarget(response)).toEqual({ path: "/login", message: "database-error" });
 				expect(responseCookies(response).auth_token).toBeUndefined();
 			}
 			const login = await request("/login", { token });
@@ -453,9 +522,9 @@ describe("database failures", () => {
 
 		await withFailingWrites(server.dataDir, "UPDATE", "users", async () => {
 			for (const [route, message] of [
-				["/api-key/regenerate", "Failed to regenerate API key"],
-				["/api-key/revoke", "Failed to revoke API key"],
-				["/update-preferences", "Failed to update preferences"],
+				["/api-key/regenerate", "api-key-regenerate-failed"],
+				["/api-key/revoke", "api-key-revoke-failed"],
+				["/update-preferences", "preferences-failed"],
 			]) {
 				const response = await request(route, { token, fields: { themePreference: "dark" } });
 				expect(redirectTarget(response)).toEqual({ path: "/dashboard", message });

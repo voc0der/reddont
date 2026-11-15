@@ -149,9 +149,9 @@ describe("sign-in", () => {
 		expect(new URL(authorizationUrl).searchParams.get("scope")).toBe("openid groups offline_access");
 	});
 
-	test("exchanges the code and lets userinfo claims take precedence", async () => {
+	test("exchanges the code and fills in claims the ID token leaves out from userinfo", async () => {
 		const { auth, claims, tokenSet } = await signIn({
-			claims: { sub: "user-1", preferred_username: "reader", groups: ["readers"] },
+			claims: { sub: "user-1", preferred_username: "reader" },
 			userinfo: { sub: "user-1", email: "reader@example.com", groups: ["readers", "admin"] },
 			refreshToken: "rotate-1",
 		});
@@ -168,6 +168,15 @@ describe("sign-in", () => {
 			code_verifier: auth.code_verifier,
 			redirect_uri: "https://reddont.test/auth/oidc/callback",
 		});
+	});
+
+	test("never lets userinfo override a signed ID token claim", async () => {
+		const { claims } = await signIn({
+			claims: { sub: "user-1", preferred_username: "reader", email_verified: false, groups: ["readers"] },
+			userinfo: { sub: "user-1", preferred_username: "owner", email_verified: true, groups: ["readers", "admin"] },
+		});
+
+		expect(claims).toMatchObject({ preferred_username: "reader", email_verified: false, groups: ["readers"] });
 	});
 
 	test("keeps the ID token claims when userinfo fails or names another subject", async () => {
@@ -235,13 +244,29 @@ describe("claims", () => {
 	});
 
 	test("choose the most specific username available", () => {
-		const claims = { sub: "s", name: "n", upn: "u", email: "e", preferred_username: "p" };
+		const claims = { sub: "s", name: "n", upn: "u", email: "e", email_verified: true, preferred_username: "p" };
 		const order = [];
-		for (const claim of ["preferred_username", "email", "upn", "name", "sub"]) {
+		for (const claim of ["preferred_username", "email", "upn", "sub"]) {
 			order.push(oidc.resolveUsernameFromClaims(claims));
 			delete claims[claim];
 		}
-		expect(order).toEqual(["p", "e", "u", "n", "s"]);
+		expect(order).toEqual(["p", "e", "u", "s"]);
+	});
+
+	test("name an account by email only when the provider has verified it", () => {
+		for (const verified of [true, "true", " TRUE "]) {
+			expect(oidc.resolveUsernameFromClaims({ sub: "s", email: "e", email_verified: verified })).toBe("e");
+		}
+		for (const verified of [undefined, false, "false", "yes", 1]) {
+			expect(oidc.resolveUsernameFromClaims({ sub: "s", email: "e", email_verified: verified })).toBe("s");
+		}
+	});
+
+	test("never name an account by display name or a claim that isn't text", () => {
+		expect(oidc.resolveUsernameFromClaims({ sub: "s", name: "owner" })).toBe("s");
+		expect(oidc.resolveUsernameFromClaims({ sub: "s", preferred_username: { name: "owner" } })).toBe("s");
+		expect(oidc.resolveUsernameFromClaims({ sub: "s", preferred_username: "  " })).toBe("s");
+		expect(oidc.resolveUsernameFromClaims({ sub: "s", preferred_username: " reader " })).toBe("reader");
 	});
 
 	test("compute token expiry from expires_at or expires_in", () => {

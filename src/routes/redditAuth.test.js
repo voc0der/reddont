@@ -255,11 +255,11 @@ describe("Reddit OAuth apps", () => {
 
 	test("rejects an invalid app ID and warns when Reddit refuses a new app a token", async () => {
 		let response = await request("/update-preferences", 2, { redditOAuthAppId: "not an app id" });
-		expect(decodeURIComponent(response.headers.get("location"))).toBe("/dashboard?message=Invalid Reddit app ID");
+		expect(response.headers.get("location")).toBe("/dashboard?message=reddit-app-id-invalid");
 		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBeNull();
 
 		response = await request("/update-preferences", 2, { redditOAuthAppId: "app-id-refused" });
-		expect(decodeURIComponent(response.headers.get("location"))).toContain("Reddit didn't grant it a token");
+		expect(response.headers.get("location")).toBe("/dashboard?message=reddit-app-no-token");
 		expect(db.query("SELECT redditOAuthAppId FROM users WHERE id = 2").get().redditOAuthAppId).toBe("app-id-refused");
 		clearRequests();
 		expect((await request("/r/test")).status).toBe(502);

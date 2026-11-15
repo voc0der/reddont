@@ -7,6 +7,16 @@ const fs = require("fs");
 const logger = require("./logger");
 const oidc = require("./oidc");
 const { Geddit } = require("./geddit.js");
+const { PRIVATE_NETWORKS, trustProxySetting } = require("./proxyTrust");
+const {
+	AUTH_COOKIE,
+	CSRF_COOKIE,
+	OIDC_NONCE_COOKIE,
+	OIDC_REDIRECT_COOKIE,
+	OIDC_STATE_COOKIE,
+	OIDC_VERIFIER_COOKIE,
+	SECURE_COOKIES,
+} = require("./cookieNames");
 const { getInstanceRedditAppId, isInstanceRedditOAuthOn } = require("./redditOAuth");
 const {
 	MEDIA_PROXY_PREFIX,
@@ -22,9 +32,7 @@ const {
 const app = express();
 const hasher = new Bun.CryptoHasher("sha256", "secret-key");
 const JWT_KEY = process.env.JWT_SECRET_KEY || hasher.update(Math.random().toString()).digest("hex");
-const trustedProxyIPs = (process.env.REVERSE_PROXY_WHITELIST || "").split(",").map((ip) => ip.trim());
 const httpBinding = process.env.HTTP_BINDING || "0.0.0.0";
-const CSRF_COOKIE_NAME = "csrf_token";
 
 function generateCsrfToken() {
 	return crypto.randomBytes(32).toString("hex");
@@ -43,25 +51,28 @@ function isSafeCookieName(name) {
 	return !["__proto__", "prototype", "constructor"].includes(name);
 }
 
+// Only reddont's own cookies, by their current names (see cookieNames.js).
+// Over HTTPS that's the __Host- names: a bare "auth_token" could have been set
+// by another subdomain, so it's ignored.
 function setKnownCookie(cookies, name, value) {
 	switch (name) {
-		case "auth_token":
-			cookies.auth_token = value;
+		case AUTH_COOKIE:
+			cookies[AUTH_COOKIE] = value;
 			break;
-		case "oidc_state":
-			cookies.oidc_state = value;
+		case OIDC_STATE_COOKIE:
+			cookies[OIDC_STATE_COOKIE] = value;
 			break;
-		case "oidc_nonce":
-			cookies.oidc_nonce = value;
+		case OIDC_NONCE_COOKIE:
+			cookies[OIDC_NONCE_COOKIE] = value;
 			break;
-		case "oidc_verifier":
-			cookies.oidc_verifier = value;
+		case OIDC_VERIFIER_COOKIE:
+			cookies[OIDC_VERIFIER_COOKIE] = value;
 			break;
-		case "oidc_redirect":
-			cookies.oidc_redirect = value;
+		case OIDC_REDIRECT_COOKIE:
+			cookies[OIDC_REDIRECT_COOKIE] = value;
 			break;
-		case CSRF_COOKIE_NAME:
-			cookies[CSRF_COOKIE_NAME] = value;
+		case CSRF_COOKIE:
+			cookies[CSRF_COOKIE] = value;
 			break;
 		default:
 			break;
@@ -70,12 +81,12 @@ function setKnownCookie(cookies, name, value) {
 
 function parseCookies(cookieHeader) {
 	const cookies = {
-		auth_token: undefined,
-		oidc_state: undefined,
-		oidc_nonce: undefined,
-		oidc_verifier: undefined,
-		oidc_redirect: undefined,
-		[CSRF_COOKIE_NAME]: undefined,
+		[AUTH_COOKIE]: undefined,
+		[OIDC_STATE_COOKIE]: undefined,
+		[OIDC_NONCE_COOKIE]: undefined,
+		[OIDC_VERIFIER_COOKIE]: undefined,
+		[OIDC_REDIRECT_COOKIE]: undefined,
+		[CSRF_COOKIE]: undefined,
 	};
 	if (typeof cookieHeader !== "string" || cookieHeader.length === 0) {
 		return cookies;
@@ -168,17 +179,22 @@ async function bootstrap() {
 		next();
 	});
 
-	// CRITICAL: Set trust proxy BEFORE any cookie/session middleware
-	// This ensures Express correctly identifies HTTPS requests behind a reverse proxy
-	if (process.env.REMOTE_HEADER_LOGIN || oidc.isOIDCEnabled()) {
-		// Set trust proxy dynamically based on trustedProxyIPs, fallback to '1'
-		if (trustedProxyIPs.some((ip) => ip)) {
-			const trustProxyRanges = trustedProxyIPs.join(",");
-			app.set("trust proxy", trustProxyRanges);
-			logger.info(`Trust proxy enabled with IPs: ${trustProxyRanges}`);
-		} else {
-			logger.warn("No valid IPs in REVERSE_PROXY_WHITELIST. Falling back to trust proxy: 1.");
-			app.set("trust proxy", 1);
+	// CRITICAL: Set trust proxy BEFORE any cookie/session middleware.
+	// Forwarded headers count only from a trusted proxy (see proxyTrust.js).
+	const trustProxy = trustProxySetting(process.env, { oidcEnabled: oidc.isOIDCEnabled() });
+	if (trustProxy === PRIVATE_NETWORKS) {
+		logger.warn(
+			"REVERSE_PROXY_WHITELIST is empty: forwarded headers count only from loopback and private-network addresses. Set it to your proxy's address.",
+		);
+	}
+	if (trustProxy) {
+		try {
+			app.set("trust proxy", trustProxy);
+			logger.info(`Trust proxy enabled for: ${trustProxy.join(", ")}`);
+		} catch (err) {
+			logger.error(
+				`REVERSE_PROXY_WHITELIST should list IP addresses or CIDR ranges; forwarded headers count from no one. ${err.message}`,
+			);
 		}
 	}
 
@@ -216,12 +232,13 @@ async function bootstrap() {
 	mountMediaProxy();
 
 	app.use((req, res, next) => {
-		let csrfToken = req.cookies?.[CSRF_COOKIE_NAME];
+		let csrfToken = req.cookies?.[CSRF_COOKIE];
 		if (typeof csrfToken !== "string" || csrfToken.length < 32) {
 			csrfToken = generateCsrfToken();
-			res.cookie(CSRF_COOKIE_NAME, csrfToken, {
+			res.cookie(CSRF_COOKIE, csrfToken, {
 				httpOnly: true,
-				secure: req.secure,
+				// Like the session cookie's, which this token guards.
+				secure: SECURE_COOKIES,
 				sameSite: "Strict",
 				path: "/",
 			});
@@ -232,7 +249,7 @@ async function bootstrap() {
 
 	app.use((req, res, next) => {
 		if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
-		const cookieToken = req.cookies?.[CSRF_COOKIE_NAME];
+		const cookieToken = req.cookies?.[CSRF_COOKIE];
 		const requestToken = req.get("x-csrf-token") || req.body?._csrf;
 
 		if (!safeTokenCompare(cookieToken, requestToken)) {

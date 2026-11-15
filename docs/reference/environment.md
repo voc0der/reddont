@@ -37,22 +37,29 @@ entry with an empty value.
     for OIDC refresh tokens. Default: randomly generated on each start.
 
 `REDDONT_DISABLE_SSL`
-:   Default: secure login cookies. The exact value `true` removes their
-    Secure flag for HTTP-only deployments. It does not disable the HTTPS listener.
+:   Default: secure login cookies, named with the `__Host-` prefix
+    (`__Host-auth_token`, `__Host-csrf_token`). The exact value `true` removes
+    their Secure flag and prefix for HTTP-only deployments. It does not
+    disable the HTTPS listener.
 
 `REMOTE_HEADER_LOGIN`
 :   Enable remote header SSO with `true` or `1`. Default: disabled when
-    unset. Leave unset when unused; a nonempty `false` still enables the
-    server's forwarded-request trust setup.
+    unset. Leave unset when unused; with `REVERSE_PROXY_WHITELIST` empty, a
+    nonempty `false` still makes the server count forwarded headers from
+    loopback and private-network addresses.
 
 `ADMIN_GROUP`
 :   Administrator group for remote header login. Default: `admin`.
 
 `REVERSE_PROXY_WHITELIST`
-:   Comma-separated trusted direct proxy IPs. Default: unset. When proxy
-    handling is active and this is empty, Express trusts one hop. Header SSO
-    independently accepts only loopback or explicitly listed IPs, not CIDRs.
-    This setting does not configure API access.
+:   Comma-separated trusted direct proxy IPs. `X-Forwarded-For` and
+    `X-Forwarded-Proto` count only from these, for the client address that
+    the browser rate limit and failed sign-in limits count by. Default:
+    unset; then, with OIDC or header login on, forwarded headers count only
+    from loopback and private-network addresses (10.0.0.0/8, 172.16.0.0/12,
+    192.168.0.0/16, fc00::/7, link-local), and otherwise from no one. Header
+    SSO independently accepts only loopback or explicitly listed IPs, not
+    CIDRs. This setting does not configure API access.
 
 See [accounts](../administration/accounts.md), [SSO](../administration/sso.md),
 and [reverse proxies](../deployment/reverse-proxy.md).

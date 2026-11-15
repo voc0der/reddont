@@ -21,14 +21,19 @@ on a shared Docker network or `http://127.0.0.1:3000` on the same host.
   size. nginx's default `client_max_body_size` of 1 MB covers groups of about
   65,000 replies.
 
-When OIDC or remote header login is active, explicitly set
-`REVERSE_PROXY_WHITELIST` to the proxy IPs. Without it, the app's forwarded
-request handling falls back to trusting one proxy hop. Header authentication
-still separately checks the direct proxy address.
+Set `REVERSE_PROXY_WHITELIST` to the proxy IPs. reddont then reads the
+client's address from the proxy's `X-Forwarded-For`, so the browser rate limit
+and the [failed sign-in limits](../administration/accounts.md#failed-sign-ins)
+count each client on its own, and the scheme from `X-Forwarded-Proto`.
+Forwarded headers from any other address are ignored. Without the list, OIDC
+and remote header login count forwarded headers only from loopback and
+private-network addresses, and password-only deployments count none, so every
+client shares the proxy's address and its budgets. Header authentication still
+separately checks the direct proxy address.
 
-For password-only deployments, leave `REMOTE_HEADER_LOGIN` unset if you do
-not use header SSO. In the current version, even the nonempty string `false`
-enables Express's proxy-trust setup, although it does not enable header login.
+Leave `REMOTE_HEADER_LOGIN` unset if you do not use header SSO. Even the
+nonempty string `false` counts as header login for that default, although it
+does not enable header login.
 
 ## API requests through a proxy
 

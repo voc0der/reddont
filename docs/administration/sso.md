@@ -50,6 +50,9 @@ available and are reported in the logs.
 
 `OIDC_GROUP_CLAIM` extracts groups from the identity claims. Claim paths can
 use dots and simple indexes, such as `realm_access.roles` or `groups[0]`.
+The claims are those of the signed ID token. Userinfo adds only the claims
+the token leaves out, such as groups some providers send only there; it
+never overrides one in the token.
 If `OIDC_ALLOWED_GROUPS` is set, the user must match at least one listed group.
 Omitting it imposes no additional group restriction in reddont.
 
@@ -61,8 +64,16 @@ and uses the provider's `admin` group instead.
 
 ### Existing accounts and registration
 
+An OIDC identity's username is its `preferred_username`, its `email` if the
+provider marks the address verified (`email_verified`), its `upn`, or else its
+`sub`. An unverified address doesn't count, since anyone can type one, and
+neither does the display name (`name`).
+
 When an OIDC identity is not already linked, a matching local username can
 be linked automatically. Use a trusted provider with controlled usernames.
+An account already linked to another OIDC identity is never linked again:
+that sign-in is refused, so someone given a former user's name at the
+provider can't take over their reddont account.
 `OIDC_AUTO_REGISTER=false` stops new account creation, but does not disable
 linking to an existing matching username.
 

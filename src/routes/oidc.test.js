@@ -56,7 +56,8 @@ async function signIn(target, answer, { redirect = "/", forge = {} } = {}) {
 		...answer,
 	});
 	const query = new URLSearchParams({ code, state: forge.state || authorize.searchParams.get("state") });
-	const cookies = Object.entries(responseCookies(start)).map(([name, { value }]) => `${name}=${value}`);
+	const rename = forge.cookieName || ((name) => name);
+	const cookies = Object.entries(responseCookies(start)).map(([name, { value }]) => `${rename(name)}=${value}`);
 	return get(target, `/auth/oidc/callback?${query}`, forge.cookies ?? cookies.join("; "));
 }
 
@@ -124,7 +125,7 @@ describe("single sign-on login", () => {
 	});
 
 	test("gives later accounts admin rights only when their groups say so", async () => {
-		await signIn(server, { claims: { sub: "sub-reader", email: "reader@example.com", groups: ["readers"] } });
+		await signIn(server, { claims: { sub: "sub-reader", email: "reader@example.com", email_verified: true, groups: ["readers"] } });
 		await signIn(server, { claims: { sub: "sub-boss", preferred_username: "boss", groups: ["readers", "admin"] } });
 
 		expect(account("sub-reader")).toMatchObject({ username: "reader@example.com", isAdmin: 0 });
@@ -134,7 +135,7 @@ describe("single sign-on login", () => {
 	test("turns away accounts outside the allowed groups", async () => {
 		const response = await signIn(server, { claims: { sub: "sub-guest", preferred_username: "guest", groups: ["guests"] } });
 
-		expect(loginMessage(response)).toBe("Not allowed (missing required group)");
+		expect(loginMessage(response)).toBe("oidc-group-missing");
 		expect(responseCookies(response).auth_token).toBeUndefined();
 		expect(account("sub-guest")).toBeNull();
 	});
@@ -147,26 +148,50 @@ describe("single sign-on login", () => {
 		expect(jwt.verify(responseCookies(response).auth_token.value, secret).id).toBe(Number(lastInsertRowid));
 	});
 
+	test("never hands an account linked to one identity to another with the same username", async () => {
+		const owner = account("sub-boss");
+		const response = await signIn(server, { claims: { sub: "sub-impostor", preferred_username: "boss", groups: ["readers", "admin"] } });
+
+		expect(loginMessage(response)).toBe("oidc-name-taken");
+		expect(responseCookies(response).auth_token).toBeUndefined();
+		expect(account("sub-boss")).toMatchObject({ id: owner.id, username: "boss" });
+		expect(account("sub-impostor")).toBeNull();
+	});
+
+	test("links by email only when the provider has verified the address", async () => {
+		const { lastInsertRowid } = db.query("INSERT INTO users (username, password_hash) VALUES ('mail@example.com', 'x')").run();
+		const unverified = await signIn(server, { claims: { sub: "sub-typed", email: "mail@example.com", groups: ["readers"] } });
+
+		expect(jwt.verify(responseCookies(unverified).auth_token.value, secret).id).not.toBe(Number(lastInsertRowid));
+		expect(account("sub-typed")).toMatchObject({ username: "sub-typed" });
+
+		const verified = await signIn(server, {
+			claims: { sub: "sub-mail", email: "mail@example.com", email_verified: true, groups: ["readers"] },
+		});
+		expect(jwt.verify(responseCookies(verified).auth_token.value, secret).id).toBe(Number(lastInsertRowid));
+		expect(account("sub-mail")).toMatchObject({ id: Number(lastInsertRowid), username: "mail@example.com" });
+	});
+
 	test("updates a returning account's groups and refresh token", async () => {
 		const before = account("sub-reader");
 		await signIn(server, {
-			claims: { sub: "sub-reader", email: "reader@example.com", groups: ["readers", "admin"] },
+			claims: { sub: "sub-reader", email: "reader@example.com", email_verified: true, groups: ["readers", "admin"] },
 			refreshToken: "keep-1",
 		});
 		const updated = account("sub-reader");
 		expect(updated).toMatchObject({ id: before.id, isAdmin: 1, groups: '["readers","admin"]' });
 		expect(updated.oidc_refresh_token).not.toBeNull();
 
-		await signIn(server, { claims: { sub: "sub-reader", email: "reader@example.com", groups: ["readers"] } });
+		await signIn(server, { claims: { sub: "sub-reader", email: "reader@example.com", email_verified: true, groups: ["readers"] } });
 		expect(account("sub-reader")).toMatchObject({ isAdmin: 0, oidc_refresh_token: updated.oidc_refresh_token });
 	});
 
 	test("sends failed callbacks back to the manual login form", async () => {
 		const answer = { claims: { sub: "sub-first", preferred_username: "first", groups: ["readers"] } };
 
-		expect(loginMessage(await signIn(server, answer, { forge: { cookies: "" } }))).toBe("OIDC session expired, try again");
-		expect(loginMessage(await signIn(server, answer, { forge: { state: "forged" } }))).toBe("OIDC login failed");
-		expect(loginMessage(await signIn(server, answer, { forge: { codeChallenge: "forged" } }))).toBe("OIDC login failed");
+		expect(loginMessage(await signIn(server, answer, { forge: { cookies: "" } }))).toBe("oidc-session-expired");
+		expect(loginMessage(await signIn(server, answer, { forge: { state: "forged" } }))).toBe("oidc-failed");
+		expect(loginMessage(await signIn(server, answer, { forge: { codeChallenge: "forged" } }))).toBe("oidc-failed");
 	});
 
 	test("keeps manual login available", async () => {
@@ -239,11 +264,47 @@ describe("provider token refresh", () => {
 	});
 });
 
+describe("single sign-on over HTTPS", () => {
+	const flight = ["oidc_state", "oidc_nonce", "oidc_verifier", "oidc_redirect"];
+	const answer = { claims: { sub: "sub-secure", preferred_username: "secure", groups: ["readers"] } };
+	let secure;
+
+	beforeAll(async () => {
+		secure = await startServer("oidc-server.cjs", "oidc-test", { ...PROVIDER, REDDONT_DISABLE_SSL: "false" });
+	}, 15000);
+
+	afterAll(() => secure?.stop());
+
+	test("keeps the sign-in in flight in __Host- cookies for the whole site", async () => {
+		const cookies = responseCookies(await get(secure, "/auth/oidc/login?redirect=%2Fsubs"));
+		for (const name of flight) {
+			expect(cookies[name]).toBeUndefined();
+			expect(cookies[`__Host-${name}`].attributes).toEqual(
+				expect.arrayContaining(["max-age=600", "path=/", "httponly", "secure", "samesite=lax"]),
+			);
+		}
+
+		const response = await signIn(secure, answer, { redirect: "/subs" });
+		expect(response.headers.get("location")).toBe("/subs");
+		const after = responseCookies(response);
+		expect(jwt.verify(after["__Host-auth_token"].value, secret)).toMatchObject({ username: "secure" });
+		for (const name of flight) {
+			expect(after[`__Host-${name}`]).toMatchObject({ value: "", attributes: expect.arrayContaining(["path=/", "secure"]) });
+		}
+	});
+
+	test("ignores a sign-in in flight under bare cookie names", async () => {
+		const response = await signIn(secure, answer, { forge: { cookieName: (name) => name.replace("__Host-", "") } });
+		expect(loginMessage(response)).toBe("oidc-session-expired");
+		expect(responseCookies(response)["__Host-auth_token"]).toBeUndefined();
+	});
+});
+
 describe("single sign-on without auto-registration", () => {
 	test("refuses unknown accounts", async () => {
 		const response = await signIn(restricted, { claims: { sub: "sub-new", preferred_username: "newcomer", groups: ["readers"] } });
 
-		expect(loginMessage(response)).toBe("Account not registered");
+		expect(loginMessage(response)).toBe("oidc-not-registered");
 		const users = new Database(path.join(restricted.dataDir, "reddont.db"), { readonly: true });
 		expect(users.query("SELECT COUNT(*) AS count FROM users").get().count).toBe(0);
 		users.close();

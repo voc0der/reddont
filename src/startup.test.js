@@ -94,6 +94,29 @@ describe("server startup", () => {
 		}
 	}, 15000);
 
+	test("starts with an unusable REVERSE_PROXY_WHITELIST and trusts no forwarded headers", async () => {
+		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
+		const app = startApp(dataDir, { REVERSE_PROXY_WHITELIST: "reverse-proxy", REDDONT_DISABLE_SSL: "true" });
+		try {
+			await waitForLog(app, "HTTP server started");
+			expect(app.log).toContain("REVERSE_PROXY_WHITELIST should list IP addresses or CIDR ranges");
+			const base = `http://127.0.0.1:${app.log.match(/HTTP server started on port (\d+)/)[1]}`;
+			const page = await fetch(`${base}/login`);
+			const csrf = page.headers.getSetCookie()[0].split(";")[0];
+			const response = await fetch(`${base}/login`, {
+				method: "POST",
+				headers: { Cookie: csrf, "X-Forwarded-For": "198.51.100.7" },
+				body: new URLSearchParams({ _csrf: csrf.split("=")[1], username: "nobody", password: "wrong" }),
+			});
+			expect(response.status).toBe(200);
+			await waitForLog(app, 'Failed sign-in for user "nobody" from 127.0.0.1');
+		} finally {
+			app.kill();
+			await app.exited;
+			fs.rmSync(dataDir, { recursive: true, force: true });
+		}
+	}, 15000);
+
 	test("serves HTTPS with the configured certificate and secure cookies", async () => {
 		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
 		const { cert, key } = selfSignedCertificate();
@@ -111,7 +134,12 @@ describe("server startup", () => {
 
 			expect(response.status).toBe(200);
 			expect(await response.text()).toContain('name="password"');
-			expect(responseCookies(response).csrf_token.attributes).toContain("secure");
+			// Secure cookies take the __Host- prefix, which a browser accepts
+			// only from this host, over HTTPS, for the whole site.
+			const cookies = responseCookies(response);
+			expect(cookies.csrf_token).toBeUndefined();
+			expect(cookies["__Host-csrf_token"].attributes).toEqual(expect.arrayContaining(["secure", "path=/"]));
+			expect(cookies["__Host-csrf_token"].attributes.some((attribute) => attribute.startsWith("domain="))).toBe(false);
 		} finally {
 			app.kill();
 			await app.exited;

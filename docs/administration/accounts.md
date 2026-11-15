@@ -36,6 +36,26 @@ For HTTP-only access, `REDDONT_DISABLE_SSL=true` allows the login cookie to
 be sent without HTTPS. Leave it unset or `false` when the browser uses HTTPS,
 including when TLS terminates at a reverse proxy.
 
+Over HTTPS the session cookie is `__Host-auth_token`, and the CSRF and OIDC
+cookies carry the same `__Host-` prefix. Browsers accept these only from
+reddont's own host, so a site on another subdomain of the same domain can't
+set them to sign a visitor in to an account it controls. Updating from 0.1.16
+or earlier signs everyone out once.
+
+## Failed sign-ins
+
+reddont stops checking passwords from an address after 10 failed sign-ins for
+one username, or 30 for any usernames, within 15 minutes. An IPv6 address
+counts by its /56, as with `RATE_LIMIT`. Until the 15
+minutes from the first failure are up, that address's sign-ins (for that
+username) are refused, even with the right password. A successful sign-in
+clears its username's count. Each failure is logged as a warning naming the
+username and the address, for tools such as fail2ban.
+
+Behind a reverse proxy, set `REVERSE_PROXY_WHITELIST` to the proxy's address
+so these limits count each client rather than the proxy; see
+[reverse proxy and HTTPS](../deployment/reverse-proxy.md).
+
 ## SSO accounts
 
 Remote header login provisions users from the authenticated proxy username.

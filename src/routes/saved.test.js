@@ -79,9 +79,8 @@ describe("saving", () => {
 		}
 		const saved = await get("/saved");
 		expect(saved.status).toBe(302);
-		expect(new URL(saved.headers.get("location"), server.baseUrl).searchParams.get("message")).toBe(
-			"Saving is turned off. Turn it on in your preferences.",
-		);
+		expect(new URL(saved.headers.get("location"), server.baseUrl).searchParams.get("message")).toBe("saving-off");
+		expect(await page("/dashboard?message=saving-off")).toContain("Saving is turned off. Turn it on in your preferences.");
 		expect(await page("/dashboard")).toContain('id="pref-enable-saving" name="enableSaving" value="1" aria-describedby="pref-enable-saving-help"');
 		expect(savedNames()).toEqual([]);
 	});

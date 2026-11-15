@@ -23,8 +23,8 @@ async function startServer(script, marker, env = {}) {
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 	});
+	let log = "";
 	const baseUrl = await new Promise((resolve, reject) => {
-		let log = "";
 		const timeout = setTimeout(() => reject(new Error(`Startup timed out: ${log}`)), 10000);
 		const read = (chunk) => {
 			log += chunk;
@@ -49,6 +49,16 @@ async function startServer(script, marker, env = {}) {
 	return {
 		baseUrl,
 		dataDir,
+		// Everything the server has logged so far.
+		log: () => log,
+		// Resolves once the log holds `text`; a line can arrive just after
+		// the response it was written for.
+		async waitForLog(text) {
+			for (let i = 0; i < 100 && !log.includes(text); i++) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+			}
+			if (!log.includes(text)) throw new Error(`The server never logged ${JSON.stringify(text)}`);
+		},
 		requests() {
 			const file = path.join(dataDir, "requests.jsonl");
 			if (!fs.existsSync(file)) return [];

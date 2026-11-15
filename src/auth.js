@@ -3,11 +3,12 @@ const { db } = require("./db");
 const { JWT_KEY } = require("./");
 const logger = require("./logger");
 const oidc = require("./oidc");
+const { AUTH_COOKIE, SECURE_COOKIES } = require("./cookieNames");
 
 const AUTH_TOKEN_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000;
 const AUTH_TOKEN_COOKIE_OPTIONS = {
 	httpOnly: true,
-	secure: process.env.REDDONT_DISABLE_SSL !== "true",
+	secure: SECURE_COOKIES,
 	sameSite: "Strict",
 	path: "/",
 };
@@ -69,14 +70,14 @@ function setAuthTokenCookie(res, username, userId) {
 	const token = jwt.sign({ username, id: userId }, JWT_KEY, {
 		expiresIn: "5d",
 	});
-	res.cookie("auth_token", token, {
+	res.cookie(AUTH_COOKIE, token, {
 		...AUTH_TOKEN_COOKIE_OPTIONS,
 		maxAge: AUTH_TOKEN_MAX_AGE_MS,
 	});
 }
 
 function clearAuthTokenCookie(res) {
-	res.clearCookie("auth_token", AUTH_TOKEN_COOKIE_OPTIONS);
+	res.clearCookie(AUTH_COOKIE, AUTH_TOKEN_COOKIE_OPTIONS);
 }
 
 function getLoginRedirectPath(req, message) {
@@ -101,7 +102,7 @@ function getUserFromDecodedToken(decoded) {
 }
 
 function getAuthSession(req) {
-	const token = req.cookies?.auth_token;
+	const token = req.cookies?.[AUTH_COOKIE];
 	if (!token) {
 		return { status: "missing" };
 	}
@@ -136,7 +137,7 @@ async function authenticateToken(req, res, next) {
 		? 1
 		: 0;
 
-	if (!req.cookies?.auth_token) {
+	if (!req.cookies?.[AUTH_COOKIE]) {
 		logger.debug("No token found, redirecting to login.");
 		return res.redirect(getLoginRedirectPath(req));
 	}
@@ -146,7 +147,7 @@ async function authenticateToken(req, res, next) {
 	if (session.status === "expired") {
 		logger.debug("Token expired:", session.error);
 		clearAuthTokenCookie(res);
-		return res.redirect(getLoginRedirectPath(req, "Session expired"));
+		return res.redirect(getLoginRedirectPath(req, "session-expired"));
 	}
 	if (session.status === "invalid") {
 		logTokenError("Token verification failed:", session.error);
@@ -155,7 +156,7 @@ async function authenticateToken(req, res, next) {
 	}
 	if (session.status === "db_error") {
 		logger.error("Database error:", session.error);
-		return res.redirect("/login?message=Database error.");
+		return res.redirect("/login?message=database-error");
 	}
 	if (session.status === "missing_user") {
 		logger.debug(
@@ -163,7 +164,7 @@ async function authenticateToken(req, res, next) {
 			session.decoded?.username,
 		);
 		clearAuthTokenCookie(res);
-		return res.redirect(getLoginRedirectPath(req, "User not found."));
+		return res.redirect(getLoginRedirectPath(req, "user-not-found"));
 	}
 	const decoded = session.decoded;
 	const dbUser = session.dbUser;
@@ -229,7 +230,7 @@ async function authenticateAdmin(req, res, next) {
 		? 1
 		: 0;
 
-	if (!req.cookies?.auth_token) {
+	if (!req.cookies?.[AUTH_COOKIE]) {
 		logger.debug("No token found, redirecting to login for admin.");
 		return res.redirect(getLoginRedirectPath(req));
 	}
@@ -239,7 +240,7 @@ async function authenticateAdmin(req, res, next) {
 	if (session.status === "expired") {
 		logger.debug("Admin token expired:", session.error);
 		clearAuthTokenCookie(res);
-		return res.redirect(getLoginRedirectPath(req, "Session expired"));
+		return res.redirect(getLoginRedirectPath(req, "session-expired"));
 	}
 	if (session.status === "invalid") {
 		logTokenError("Admin token verification failed:", session.error);
@@ -248,7 +249,7 @@ async function authenticateAdmin(req, res, next) {
 	}
 	if (session.status === "db_error") {
 		logger.error("Database error:", session.error);
-		return res.redirect("/login?message=Database error.");
+		return res.redirect("/login?message=database-error");
 	}
 	if (session.status === "missing_user") {
 		logger.debug(
@@ -256,7 +257,7 @@ async function authenticateAdmin(req, res, next) {
 			session.decoded?.username,
 		);
 		clearAuthTokenCookie(res);
-		return res.redirect(getLoginRedirectPath(req, "Admin user not found."));
+		return res.redirect(getLoginRedirectPath(req, "user-not-found"));
 	}
 	const decoded = session.decoded;
 	const dbUser = session.dbUser;
