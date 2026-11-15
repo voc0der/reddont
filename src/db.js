@@ -206,4 +206,14 @@ runMigration("add-api-key-column", () => {
   `).run();
 });
 
+// Reddit folds some comments, such as those with a "comment score below
+// threshold", by sending collapsed: true. reddont folds them too unless the
+// user turns this off.
+runMigration("add-follow-reddit-collapse-column", () => {
+	db.query(`
+    ALTER TABLE users
+    ADD COLUMN followRedditCollapse INTEGER NOT NULL DEFAULT 1
+  `).run();
+});
+
 module.exports = { db, dataDir };

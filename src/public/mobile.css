@@ -1791,6 +1791,20 @@ details.link-details,
   display: block;
 }
 
+/* Reddit's reason for folding a comment shows only while it's folded, in
+   the space the rest of the line leaves, so the author's name stays whole. */
+.m-comment-collapsed-reason {
+  display: none;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comment > details:not([open]) > summary .m-comment-collapsed-reason {
+  display: block;
+}
+
 .m-comment-author {
   min-width: 0;
   overflow: hidden;

@@ -12,7 +12,8 @@ include ../mixins/head
 - var imagesTab = viewQuery === 'card' ? { label: 'hide images', href: '/saved?view=compact' } : { label: 'show images', href: '/saved?view=card' }
 
 //- A saved comment as old reddit lists one: the post it's on, then the
-//- comment with its usual buttons, save among them.
+//- comment with its usual buttons, save among them. It stays open even when
+//- Reddit folds it in its thread.
 mixin savedComment(c)
   - var postId = String(c.link_id || '').replace(/^t3_/, '')
   - var postHref = `/comments/${postId}?view=${viewQuery}`
@@ -22,7 +23,7 @@ mixin savedComment(c)
       |  in
       |
       a(href=`/r/${c.subreddit}?view=${viewQuery}`) r/#{c.subreddit}
-    +comment({ kind: 't1', data: c }, true, postId, null, null, 0)
+    +comment({ kind: 't1', data: Object.assign({}, c, { collapsed: false }) }, true, postId, null, null, 0)
 
 doctype html
 html

@@ -17,6 +17,7 @@ for (const theme of ["res", "light", "dark"]) {
 db.query("INSERT INTO users (username, redditAuthHeaders) VALUES (?, ?)")
 	.run("reader_cookie", JSON.stringify({ cookie: "reddit_session=comments-test" }));
 
+// Reddit folds comments whose ids start with "folded" for their score.
 const comment = (id, parent_id = "t3_post1", replies = []) => ({
 	kind: "t1",
 	data: {
@@ -25,6 +26,7 @@ const comment = (id, parent_id = "t3_post1", replies = []) => ({
 		body_html: `&lt;div class="md"&gt;&lt;p&gt;Comment ${id}: &amp;lt;script&amp;gt; stays text.&lt;/p&gt;&lt;/div&gt;`,
 		permalink: `/r/test/comments/post1/discussion/${id}/`,
 		replies: replies.length ? { kind: "Listing", data: { children: replies } } : "",
+		...(id.startsWith("folded") && { collapsed: true, collapsed_reason: "comment score below threshold", collapsed_reason_code: "LOW_SCORE" }),
 	},
 });
 const more = (children, parent_id = "t3_post1") => ({
