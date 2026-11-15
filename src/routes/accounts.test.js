@@ -306,9 +306,14 @@ describe("remote header sign-in", () => {
 describe("preferences", () => {
 	test("saves display preferences and treats unchecked boxes as off", async () => {
 		const token = sessionFor("reader");
+		const collapseBox = 'id="pref-follow-reddit-collapse" name="followRedditCollapse" value="1"';
+		// Folding the comments Reddit folds is on until the reader turns it off.
+		expect(user("reader").followRedditCollapse).toBe(1);
+		expect(await (await request("/dashboard", { token })).text()).toContain(`${collapseBox} checked`);
+
 		const response = await request("/update-preferences", {
 			token,
-			fields: { infiniteScroll: "1", useClassicLayout: "1", themePreference: "dark", highResThumbnails: "1", showNsfwThumbnails: "1", enableSaving: "1" },
+			fields: { infiniteScroll: "1", useClassicLayout: "1", themePreference: "dark", highResThumbnails: "1", showNsfwThumbnails: "1", enableSaving: "1", followRedditCollapse: "1" },
 		});
 		expect(redirectTarget(response)).toEqual({ path: "/dashboard" });
 		expect(user("reader")).toMatchObject({
@@ -318,6 +323,7 @@ describe("preferences", () => {
 			highResThumbnails: 1,
 			showNsfwThumbnails: 1,
 			enableSaving: 1,
+			followRedditCollapse: 1,
 		});
 
 		await request("/update-preferences", { token, fields: {} });
@@ -328,7 +334,9 @@ describe("preferences", () => {
 			highResThumbnails: 0,
 			showNsfwThumbnails: 0,
 			enableSaving: 0,
+			followRedditCollapse: 0,
 		});
+		expect(await (await request("/dashboard", { token })).text()).toContain(`${collapseBox} aria-describedby`);
 	});
 
 	test("rejects an unusable Reddit credential without saving anything", async () => {

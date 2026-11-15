@@ -22,12 +22,25 @@ include desktop
       return total + 1 + countReplies(child.data);
     }, 0);
   }
+-
+  // Reddit folds some comments, e.g. a "comment score below threshold", with
+  // collapsed: true; the reason stays on a permalinked comment that Reddit
+  // opens. reddont folds the same ones unless the reader turned that off.
+  function collapsedByReddit(data) {
+    if (data.collapsed !== true) return false;
+    return typeof user === 'undefined' || !user || user.followRedditCollapse !== 0;
+  }
+  function collapsedReason(data) {
+    return collapsedByReddit(data) && typeof data.collapsed_reason === 'string' ? data.collapsed_reason.trim() : '';
+  }
 
-//- old reddit's comment tagline. The [–] / [+] toggle and the "(N children)"
-//- note come from CSS, following the comment's open state.
+//- old reddit's comment tagline. The [–] / [+] toggle, the "(N children)"
+//- note and Reddit's reason for folding come from CSS, following the
+//- comment's open state.
 mixin infoContainer(data)
   - var deleted = data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
   - var children = countReplies(data)
+  - var reason = collapsedReason(data)
   - var role = data.distinguished == "moderator" ? 'moderator' : data.distinguished == "admin" ? 'admin' : ''
   +midcol()
   div.comment-info-container
@@ -49,6 +62,8 @@ mixin infoContainer(data)
           if role
             span(class=role title=role) #{role === 'admin' ? 'A' : 'M'}
           | ]
+      if reason
+        span.collapsed-reason #{reason}
       if data.score_hidden
         span.score.score-hidden [score hidden]
       else
@@ -101,6 +116,7 @@ mixin commentButtons(data, postId, next_id, prev_id)
 
 mixin commentHead(data)
   - var isMod = data.distinguished == "moderator"
+  - var reason = collapsedReason(data)
   span.m-comment-head.m-only
     span.m-comment-avatar(aria-hidden="true")
       img(src=defaultAvatar(data.author) alt="" loading="lazy" onerror="this.style.visibility='hidden'")
@@ -125,6 +141,10 @@ mixin commentHead(data)
       span.m-comment-sticky
         +icon("pin")
         | Stickied comment
+    if reason
+      span.m-comment-collapsed-reason
+        span.m-meta-sep(aria-hidden="true") •
+        | #{reason}
 
 mixin commentActions(data, next_id, prev_id)
   - var deleted = data.collapsed_reason_code == "DELETED" || data.author == "[deleted]"
@@ -195,7 +215,7 @@ mixin comment(com, isfirst, parent_id, next_id, prev_id, depth)
     //- reddit folds stickied moderator comments on mobile; see comments.pug
     - var foldOnMobile = data.stickied && data.distinguished == "moderator"
     div(class=`comment ${isfirst ? 'first' : ''} ${data.stickied ? 'sticky' : ''} ${hasReplyData ? 'has-replies' : ''} ${level % 2 ? 'alt' : ''}` data-fold=(foldOnMobile ? '1' : false))
-      details(id=`${data.id}` open="")
+      details(id=`${data.id}` open=(collapsedByReddit(data) ? false : ""))
         summary.expand-comments
           +infoContainer(data)
           +commentHead(data)

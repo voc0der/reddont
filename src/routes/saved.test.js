@@ -87,7 +87,8 @@ describe("saving", () => {
 	});
 
 	test("the preference adds save to posts and comments, and saved to the account links", async () => {
-		const response = await savePreference({ enableSaving: "1" });
+		// As the dashboard sends it, with comment folding left on.
+		const response = await savePreference({ enableSaving: "1", followRedditCollapse: "1" });
 		expect(response.headers.get("location")).toBe("/dashboard");
 		expect(await page("/dashboard")).toContain('name="enableSaving" value="1" checked aria-describedby');
 
@@ -179,6 +180,9 @@ describe("saving", () => {
 		expect(html).toContain("<p>Comment orphan: &lt;b&gt; stays text.</p>");
 		expect(html).toContain('<a href="/comments/gone/comment/orphan">permalink</a>');
 		expect(html).toContain('<a href="/comments/a/comment/c1">permalink</a>');
+		// Folded by Reddit in its thread, a saved comment still shows open.
+		expect(html).toContain('<details id="orphan" open="">');
+		expect(html).not.toContain("collapsed-reason");
 	});
 
 	test("what Reddit no longer returns keeps its place and can be unsaved", async () => {

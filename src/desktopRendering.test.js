@@ -27,7 +27,7 @@ function comment(id, extra = {}, replies = []) {
 	};
 }
 
-function renderComments(comments) {
+function renderComments(comments, reader = user) {
 	return pug.renderFile("src/views/comments.pug", {
 		data: {
 			post: {
@@ -47,7 +47,7 @@ function renderComments(comments) {
 			comments,
 		},
 		isSubbed: false,
-		user,
+		user: reader,
 		query: {},
 		navSubscriptions: () => ["test", "Other"],
 	});
@@ -111,6 +111,32 @@ describe("desktop comments", () => {
 		]);
 
 		expect(html).toContain('<span class="numchildren">(7 children)</span>');
+	});
+
+	// As Reddit sends them for post 1xwv2xs on 2026-11-15. A permalinked
+	// comment keeps the reason but comes back with collapsed: false.
+	const lowScore = { collapsed: true, collapsed_reason: "comment score below threshold", collapsed_reason_code: "LOW_SCORE", score_hidden: true };
+
+	test("fold the comments Reddit folds, with its reason in the tagline", () => {
+		const html = renderComments([
+			comment("c1", lowScore, [comment("c2", { parent_id: "t1_c1" })]),
+			comment("c3", { ...lowScore, collapsed: false }),
+			comment("c4"),
+		]);
+
+		expect(html).toContain('<details id="c1">');
+		expect(html).toContain('<details id="c2" open="">');
+		expect(html).toContain('<details id="c3" open="">');
+		expect(html).toContain('<details id="c4" open="">');
+		expect(html.match(/<span class="collapsed-reason">comment score below threshold<\/span>/g)).toHaveLength(1);
+		expect(html.match(/<span class="m-comment-collapsed-reason">/g)).toHaveLength(1);
+	});
+
+	test("open every comment when the reader turns folding off", () => {
+		const html = renderComments([comment("c1", lowScore)], { ...user, followRedditCollapse: 0 });
+
+		expect(html).toContain('<details id="c1" open="">');
+		expect(html).not.toContain("collapsed-reason");
 	});
 
 	test("link the permalink, parent, and reddit buttons", () => {

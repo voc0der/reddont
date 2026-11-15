@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Comments that Reddit collapses, such as those with a comment score below
+  threshold, start collapsed, with Reddit's reason beside the author, as on
+  old reddit. A permalinked comment stays open, as on Reddit. Turn off
+  **Collapse comments that Reddit collapses** in the preferences to open them
+  all. On by default
+
 ## [0.1.15] - 2026-11-09
 
 ### Added

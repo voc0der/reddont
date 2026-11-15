@@ -81,6 +81,13 @@ Comments open the discussion page, where `[–]` collapses a comment and its
 replies, **hide child comments** folds just the replies, and **permalink**
 opens a single comment thread.
 
+Comments that Reddit collapses, such as those with a comment score below
+threshold, start collapsed with Reddit's reason beside the author, as on old
+reddit; `[+]` opens one. As on Reddit, a comment you open through its
+permalink stays open, though its folded replies don't, and saved comments
+always show open. Turn off **Collapse comments that Reddit collapses** in your
+[preferences](preferences.md) to open them all.
+
 **load more comments** adds the next batch of comments and their replies in
 place. With **Never Ending Reddit** enabled, the next batch loads automatically
 as you reach the bottom of the discussion. Nested reply groups still open when

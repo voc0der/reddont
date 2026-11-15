@@ -825,6 +825,7 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		highResThumbnails: req.user.highResThumbnails,
 		showNsfwThumbnails: req.user.showNsfwThumbnails,
 		enableSaving: req.user.enableSaving,
+		followRedditCollapse: req.user.followRedditCollapse,
 	});
 
 	let redditAuthStatus = { configured: false, description: "not configured" };
@@ -884,6 +885,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		highResThumbnails,
 		showNsfwThumbnails,
 		enableSaving,
+		followRedditCollapse,
 		redditAuthCredential,
 		redditAuthType,
 		clearRedditAuth,
@@ -898,6 +900,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 	const highResThumbnailsValue = highResThumbnails === "1" ? 1 : 0;
 	const showNsfwThumbnailsValue = showNsfwThumbnails === "1" ? 1 : 0;
 	const enableSavingValue = enableSaving === "1" ? 1 : 0;
+	const followRedditCollapseValue = followRedditCollapse === "1" ? 1 : 0;
 	const themeValue = themePreference || "auto";
 	const hasRedditAuthCredentialInput =
 		typeof redditAuthCredential === "string" &&
@@ -957,6 +960,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		highResThumbnails,
 		showNsfwThumbnails,
 		enableSaving,
+		followRedditCollapse,
 		hasRedditAuthCredentialInput,
 		clearRedditAuth: clearRedditAuth === "1",
 		computed: {
@@ -966,6 +970,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			highResThumbnailsValue,
 			showNsfwThumbnailsValue,
 			enableSavingValue,
+			followRedditCollapseValue,
 		},
 		userId: req.user.id,
 	});
@@ -985,6 +990,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			highResThumbnails: highResThumbnailsValue,
 			showNsfwThumbnails: showNsfwThumbnailsValue,
 			enableSaving: enableSavingValue,
+			followRedditCollapse: followRedditCollapseValue,
 			shareRedditCookie: shareRedditCookieValue,
 			shareRedditOAuth: shareRedditOAuthValue,
 			redditAuthPrimary: redditAuthPrimaryValue,
@@ -1000,7 +1006,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 
 		const result = db
 			.query(
-				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, enableSaving = $enableSaving, shareRedditCookie = $shareRedditCookie, shareRedditOAuth = $shareRedditOAuth, redditAuthPrimary = $redditAuthPrimary${redditAuthSql} WHERE id = $id`,
+				`UPDATE users SET infiniteScroll = $infiniteScroll, useClassicLayout = $useClassicLayout, themePreference = $themePreference, highResThumbnails = $highResThumbnails, showNsfwThumbnails = $showNsfwThumbnails, enableSaving = $enableSaving, followRedditCollapse = $followRedditCollapse, shareRedditCookie = $shareRedditCookie, shareRedditOAuth = $shareRedditOAuth, redditAuthPrimary = $redditAuthPrimary${redditAuthSql} WHERE id = $id`,
 			)
 			.run(updateParams);
 
@@ -1009,7 +1015,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 		// Verify the update
 		const updatedUser = db
 			.query(
-				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, enableSaving, redditAuthHeaders, redditOAuthAppId FROM users WHERE id = $id",
+				"SELECT infiniteScroll, useClassicLayout, themePreference, highResThumbnails, showNsfwThumbnails, enableSaving, followRedditCollapse, redditAuthHeaders, redditOAuthAppId FROM users WHERE id = $id",
 			)
 			.get({ id: req.user.id });
 		logger.debug("User after update:", {
@@ -1019,6 +1025,7 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 			highResThumbnails: updatedUser?.highResThumbnails,
 			showNsfwThumbnails: updatedUser?.showNsfwThumbnails,
 			enableSaving: updatedUser?.enableSaving,
+			followRedditCollapse: updatedUser?.followRedditCollapse,
 			redditAuthConfigured: Boolean(updatedUser?.redditAuthHeaders),
 			redditOAuthConfigured: Boolean(updatedUser?.redditOAuthAppId),
 		});

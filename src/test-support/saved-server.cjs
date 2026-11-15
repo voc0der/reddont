@@ -21,7 +21,8 @@ const post = (id) => ({
 		url: `https://www.reddit.com/r/test/comments/${id}/post/`,
 	},
 });
-// Like /api/info's comments: no title for the post they're on.
+// Like /api/info's comments: no title for the post they're on. Reddit
+// folds "orphan" for its score.
 const comment = (id, postId) => ({
 	kind: "t1",
 	data: {
@@ -29,6 +30,7 @@ const comment = (id, postId) => ({
 		subreddit: "test", subreddit_id: "t5_test", score: 4, ups: 4, created: now - 30, created_utc: now - 30, edited: false,
 		body_html: `&lt;div class="md"&gt;&lt;p&gt;Comment ${id}: &amp;lt;b&amp;gt; stays text.&lt;/p&gt;&lt;/div&gt;`,
 		permalink: `/r/test/comments/${postId}/post/${id}/`, replies: "",
+		collapsed: id === "orphan", collapsed_reason: id === "orphan" ? "comment score below threshold" : null,
 	},
 });
 // Comment "orphan" is on a post Reddit no longer returns.

@@ -92,6 +92,14 @@ describe("load more comment routes", () => {
 		expect(lastUpstreamRequest()).toMatchObject({ host: "oauth.reddit.com", path: "/api/morechildren", params: { children: "c0,c1", sort: "new", link_id: "t3_post1" }, authenticated: true });
 	});
 
+	test("folds the loaded comments Reddit folds", async () => {
+		const response = await load({ children: "folded1,c5", count: "2" });
+		const { html } = await response.json();
+		expect(html).toContain('<details id="folded1">');
+		expect(html).toContain('<span class="collapsed-reason">comment score below threshold</span>');
+		expect(html).toContain('<details id="c5" open="">');
+	});
+
 	test("loads groups through old.reddit.com for a cookie credential", async () => {
 		const token = jwt.sign({ id: 7 }, secret, { expiresIn: "1h" });
 		const response = await load({}, "application/json", `auth_token=${token}; csrf_token=${csrf}`);
