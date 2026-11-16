@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-11-15
+
 ### Security
 
 - An OIDC sign-in can no longer take over an account linked to another OIDC
