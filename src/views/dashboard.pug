@@ -143,7 +143,7 @@ html
                 input(type="hidden" name="_csrf" value=csrfToken)
                 button(type="submit") Revoke key
 
-        if isAdmin
+        if isAdmin || invites
           h2 invites
 
           if invites
@@ -163,9 +163,12 @@ html
                   else
                     td unclaimed
                   td
-                    a(href=`/delete-invite/${invite.id}`) delete
+                    form.invite-delete(action=`/delete-invite/${invite.id}` method="POST")
+                      input(type="hidden" name="_csrf" value=csrfToken)
+                      button(type="submit") delete
 
-          a(href="/create-invite") create invite
+          if isAdmin
+            a(href="/create-invite") create invite
 
         else
           p you aren't an admin and therefore there is nothing to see here yet

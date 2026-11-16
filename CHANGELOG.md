@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-11-15
+
 ### Security
 
 - An OIDC sign-in can no longer take over an account linked to another OIDC
@@ -24,6 +26,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   a site on another subdomain can't set them. Everyone signs in again once
 - The sign-in page and the dashboard show only their own messages: `?message=`
   names one by code, and any other text is left out
+- Only administrators and an invite's creator can delete it. Before, any
+  signed-in account could delete any invite. Deleting is now a form with a
+  CSRF token rather than a link
+- Without `JWT_SECRET_KEY`, the session key is 256 random bits from the
+  system's secure generator, and startup logs a warning that sessions end on
+  restart. Before, it came from `Math.random()`. Invite tokens are 128 random
+  bits from the same generator, rather than 40 bits from `Math.random()`
+
+### Fixed
+
+- The dashboard's invite times are right when the server's time zone isn't
+  UTC (`TZ`). They were read as local time, so a new invite could show as
+  created hours in the future, such as `-17998s ago`
 
 ## [0.1.16] - 2026-11-15
 

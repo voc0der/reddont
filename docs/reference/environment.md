@@ -2,7 +2,7 @@
 
 Set these on the application process or under Compose's `environment:`.
 Recreate a container after changing its environment. Values below describe
-reddont 0.1.16; omit optional settings when unused instead of filling every
+reddont 0.1.17; omit optional settings when unused instead of filling every
 entry with an empty value.
 
 ## Server and storage
@@ -34,7 +34,10 @@ entry with an empty value.
 
 `JWT_SECRET_KEY`
 :   Persistent session-signing secret, also used to derive the encryption key
-    for OIDC refresh tokens. Default: randomly generated on each start.
+    for OIDC refresh tokens. Use a long random value, such as the output of
+    `openssl rand -hex 32`. Default: a random 256-bit key generated on each
+    start, with a warning in the log; sessions and stored OIDC refresh tokens
+    then last only until the next restart.
 
 `REDDONT_DISABLE_SSL`
 :   Default: secure login cookies, named with the `__Host-` prefix
