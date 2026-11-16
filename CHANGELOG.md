@@ -32,6 +32,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   restart. Before, it came from `Math.random()`. Invite tokens are 128 random
   bits from the same generator, rather than 40 bits from `Math.random()`
 
+### Fixed
+
+- The dashboard's invite times are right when the server's time zone isn't
+  UTC (`TZ`). They were read as local time, so a new invite could show as
+  created hours in the future, such as `-17998s ago`
+
 ## [0.1.16] - 2026-11-15
 
 ### Added

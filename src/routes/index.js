@@ -170,6 +170,12 @@ function sanitizeSavedName(value) {
 	return /^t[13]_[a-z0-9]{1,20}$/.test(name) ? name : "";
 }
 
+// SQLite's CURRENT_TIMESTAMP is UTC written without a zone
+// ("2026-11-15 20:26:50"), which Date.parse would take as local time.
+function sqliteTimestampMs(value) {
+	return value ? Date.parse(`${String(value).replace(" ", "T")}Z`) : Number.NaN;
+}
+
 function savingEnabled(user) {
 	return user?.enableSaving === 1;
 }
@@ -842,8 +848,8 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		isAdmin || inviteRows.length > 0
 			? inviteRows.map((inv) => ({
 					...inv,
-					createdAt: Date.parse(inv.createdAt),
-					usedAt: Date.parse(inv.usedAt),
+					createdAt: sqliteTimestampMs(inv.createdAt),
+					usedAt: sqliteTimestampMs(inv.usedAt),
 				}))
 			: null;
 

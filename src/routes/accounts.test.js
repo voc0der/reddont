@@ -16,6 +16,9 @@ beforeAll(async () => {
 		JWT_SECRET_KEY: secret,
 		REMOTE_HEADER_LOGIN: "true",
 		REVERSE_PROXY_WHITELIST: "203.0.113.10",
+		// Away from UTC, where SQLite's timestamps are, so reading one as
+		// local time shows.
+		TZ: "America/New_York",
 	});
 	db = new Database(path.join(server.dataDir, "reddont.db"));
 }, 15000);
@@ -89,7 +92,9 @@ describe("registration", () => {
 		const invite = db.query("SELECT * FROM invites ORDER BY id DESC").get();
 		expect(invite.token).toMatch(/^[0-9a-f]{32}$/);
 		expect(invite.createdBy).toBe(user("owner").id);
-		expect(await (await request("/dashboard", { token: owner })).text()).toContain(`href="/register?token=${invite.token}"`);
+		const dashboard = await (await request("/dashboard", { token: owner })).text();
+		expect(dashboard).toContain(`href="/register?token=${invite.token}"`);
+		expect(dashboard).toMatch(/<td>[0-9]s ago<\/td><td>unclaimed<\/td>/);
 
 		const route = `/register?token=${invite.token}`;
 		for (const [fields, status, message] of [
