@@ -50,6 +50,8 @@ describe("server startup", () => {
 		const app = startApp(dataDir, {});
 		try {
 			await waitForLog(app, "HTTP server started");
+			// No JWT_SECRET_KEY here: the log says sessions end on restart.
+			expect(app.log).toContain("[WARN] JWT_SECRET_KEY is unset");
 			const base = `http://127.0.0.1:${app.log.match(/HTTP server started on port (\d+)/)[1]}`;
 			for (const route of ["/login", "/styles.css", "/vendor/dash.all.min.js", "/api/v1/health", "/missing-page"]) {
 				const response = await fetch(base + route, { redirect: "manual" });
@@ -96,10 +98,15 @@ describe("server startup", () => {
 
 	test("starts with an unusable REVERSE_PROXY_WHITELIST and trusts no forwarded headers", async () => {
 		const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "reddont-startup-"));
-		const app = startApp(dataDir, { REVERSE_PROXY_WHITELIST: "reverse-proxy", REDDONT_DISABLE_SSL: "true" });
+		const app = startApp(dataDir, {
+			REVERSE_PROXY_WHITELIST: "reverse-proxy",
+			REDDONT_DISABLE_SSL: "true",
+			JWT_SECRET_KEY: "isolated-startup-secret",
+		});
 		try {
 			await waitForLog(app, "HTTP server started");
 			expect(app.log).toContain("REVERSE_PROXY_WHITELIST should list IP addresses or CIDR ranges");
+			expect(app.log).not.toContain("JWT_SECRET_KEY is unset");
 			const base = `http://127.0.0.1:${app.log.match(/HTTP server started on port (\d+)/)[1]}`;
 			const page = await fetch(`${base}/login`);
 			const csrf = page.headers.getSetCookie()[0].split(";")[0];

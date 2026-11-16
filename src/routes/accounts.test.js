@@ -87,7 +87,8 @@ describe("registration", () => {
 		const owner = sessionFor("owner");
 		expect(redirectTarget(await request("/create-invite", { token: owner }))).toEqual({ path: "/dashboard" });
 		const invite = db.query("SELECT * FROM invites ORDER BY id DESC").get();
-		expect(invite.token).toMatch(/^[0-9a-f]{10}$/);
+		expect(invite.token).toMatch(/^[0-9a-f]{32}$/);
+		expect(invite.createdBy).toBe(user("owner").id);
 		expect(await (await request("/dashboard", { token: owner })).text()).toContain(`href="/register?token=${invite.token}"`);
 
 		const route = `/register?token=${invite.token}`;
@@ -115,16 +116,51 @@ describe("registration", () => {
 		expect(user("second")).toBeNull();
 	});
 
-	test("only admins create invites, and admins can delete them", async () => {
+	test("only admins create invites", async () => {
 		const refused = await request("/create-invite", { token: sessionFor("reader") });
 		expect(refused.status).toBe(403);
 		expect(await refused.text()).toBe("Only admins can access this route.");
+	});
 
+	test("only admins and an invite's creator delete it, with a form", async () => {
 		const owner = sessionFor("owner");
+		const reader = sessionFor("reader");
+		const newestInvite = () => db.query("SELECT id FROM invites ORDER BY id DESC").get().id;
+		const exists = (id) => db.query("SELECT id FROM invites WHERE id = ?").get(id) !== null;
+		const remove = (id, token) => request(`/delete-invite/${id}`, { token, fields: {} });
+
 		await request("/create-invite", { token: owner });
-		const { id } = db.query("SELECT id FROM invites ORDER BY id DESC").get();
-		expect(redirectTarget(await request(`/delete-invite/${id}`, { token: owner }))).toEqual({ path: "/dashboard" });
-		expect(db.query("SELECT id FROM invites WHERE id = ?").get(id)).toBeNull();
+		const owners = newestInvite();
+		expect(await (await request("/dashboard", { token: owner })).text()).toContain(
+			`<form class="invite-delete" action="/delete-invite/${owners}" method="POST"><input type="hidden" name="_csrf" value="${csrf}">`,
+		);
+		// A link can't delete one.
+		expect((await request(`/delete-invite/${owners}`, { token: owner })).status).toBe(404);
+		expect(exists(owners)).toBe(true);
+
+		const refused = await remove(owners, reader);
+		expect(refused.status).toBe(403);
+		expect(await refused.text()).toBe("Only admins and the invite's creator can delete it.");
+		expect(exists(owners)).toBe(true);
+		expect(await (await request("/dashboard", { token: reader })).text()).not.toContain("invite-table");
+
+		// An admin who made an invite and then lost the role still sees and
+		// deletes it, and only it.
+		db.query("UPDATE users SET isAdmin = 1 WHERE username = 'reader'").run();
+		await request("/create-invite", { token: reader });
+		const readers = newestInvite();
+		db.query("UPDATE users SET isAdmin = 0 WHERE username = 'reader'").run();
+		const dashboard = await (await request("/dashboard", { token: reader })).text();
+		expect(dashboard).toContain(`action="/delete-invite/${readers}"`);
+		expect(dashboard).not.toContain(`action="/delete-invite/${owners}"`);
+		expect(dashboard).not.toContain('href="/create-invite"');
+		expect(redirectTarget(await remove(readers, reader))).toEqual({ path: "/dashboard" });
+		expect(exists(readers)).toBe(false);
+
+		// Admins delete anyone's.
+		expect(redirectTarget(await remove(owners, owner))).toEqual({ path: "/dashboard" });
+		expect(exists(owners)).toBe(false);
+		expect((await remove(owners, owner)).status).toBe(404);
 	});
 });
 
@@ -544,7 +580,9 @@ describe("database failures", () => {
 			expect(await (await request("/create-invite", { token: owner })).text()).toBe("failed to create invite");
 		});
 		await withFailingWrites(server.dataDir, "DELETE", "invites", async () => {
-			expect(await (await request(`/delete-invite/${invite.id}`, { token: owner })).text()).toBe("failed to delete invite");
+			expect(await (await request(`/delete-invite/${invite.id}`, { token: owner, fields: {} })).text()).toBe(
+				"failed to delete invite",
+			);
 		});
 		await withFailingWrites(server.dataDir, "UPDATE", "invites", async () => {
 			const response = await request(`/register?token=${invite.token}`, {

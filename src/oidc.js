@@ -29,12 +29,13 @@ function _getRequiredEnv(name) {
 }
 
 function _deriveEncryptionKey(jwtKey) {
-  const secret = (jwtKey && String(jwtKey)) || process.env.JWT_SECRET_KEY || '';
-  // NOTE: if JWT_SECRET_KEY is not set, the app may generate a random key on boot.
-  // That is already required to keep cookies valid across restarts.
+  const envKey = process.env.JWT_SECRET_KEY;
+  const secret = (jwtKey && String(jwtKey)) || (envKey?.trim() ? envKey : '');
+  // The server passes its session key (src/jwtKey.js), random when
+  // JWT_SECRET_KEY is unset. Without one, a random key for this process
+  // only: never a fixed one, which anyone could read here.
   if (!secret) {
-    // Still derive a key (will be consistent only for this process)
-    return crypto.createHash('sha256').update('reddont-default-key').digest();
+    return crypto.randomBytes(32);
   }
   return crypto.createHash('sha256').update(secret).digest(); // 32 bytes
 }

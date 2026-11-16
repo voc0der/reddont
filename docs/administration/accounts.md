@@ -26,6 +26,11 @@ Each invite can be claimed once. The table shows its creation and claim
 status. Delete an unused invite to withdraw it. Deleting a claimed invite
 does not delete the account created with it.
 
+Administrators can delete any invite. Anyone else can delete only the invites
+they created, which happens when an administrator who made invites loses the
+role: their dashboard still lists those invites. Invites made before 0.1.17
+record no creator, so only administrators can delete them.
+
 ## Sessions
 
 Local login sessions last five days. Set a persistent `JWT_SECRET_KEY` so a

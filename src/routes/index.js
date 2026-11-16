@@ -823,22 +823,29 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 		isAdmin: req.user.isAdmin,
 	});
 
-	let invites = null;
 	const isAdmin = db
 		.query("SELECT isAdmin FROM users WHERE id = $id and isAdmin = 1")
 		.get({
 			id: req.user.id,
 		});
-	if (isAdmin) {
-		invites = db
-			.query("SELECT * FROM invites")
-			.all()
-			.map((inv) => ({
-				...inv,
-				createdAt: Date.parse(inv.createdAt),
-				usedAt: Date.parse(inv.usedAt),
-			}));
-	}
+	// Admins see every invite. Anyone else sees the ones they created, if
+	// any (an admin who has since lost the role), so they can still delete
+	// them.
+	const inviteRows = db
+		.query(
+			isAdmin
+				? "SELECT * FROM invites"
+				: "SELECT * FROM invites WHERE createdBy = $id",
+		)
+		.all({ id: req.user.id });
+	const invites =
+		isAdmin || inviteRows.length > 0
+			? inviteRows.map((inv) => ({
+					...inv,
+					createdAt: Date.parse(inv.createdAt),
+					usedAt: Date.parse(inv.usedAt),
+				}))
+			: null;
 
 	logger.debug("Dashboard - rendering with user:", {
 		infiniteScroll: req.user.infiniteScroll,
@@ -1065,18 +1072,12 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 });
 
 router.get("/create-invite", authenticateAdmin, async (req, res) => {
-	function generateInviteToken() {
-		const hasher = new Bun.CryptoHasher("sha256");
-		return hasher.update(Math.random().toString()).digest("hex").slice(0, 10);
-	}
-
-	function createInvite() {
-		const token = generateInviteToken();
-		db.run("INSERT INTO invites (token) VALUES ($token)", { token });
-	}
-
 	try {
-		createInvite();
+		// An invite works like a password, so its token is 128 random bits.
+		db.run("INSERT INTO invites (token, createdBy) VALUES ($token, $createdBy)", {
+			token: crypto.randomBytes(16).toString("hex"),
+			createdBy: req.user.id,
+		});
 		return res.redirect("/dashboard");
 	} catch (err) {
 		logger.error(err);
@@ -1084,11 +1085,28 @@ router.get("/create-invite", authenticateAdmin, async (req, res) => {
 	}
 });
 
-router.get("/delete-invite/:id", authenticateToken, async (req, res) => {
+// Admins can delete any invite, and its creator their own. A POST, so it
+// takes the CSRF token: a link elsewhere can't delete one.
+router.post("/delete-invite/:id", authenticateToken, async (req, res) => {
 	try {
-		db.run("DELETE FROM invites WHERE id = $id", { id: req.params.id });
+		const invite = db
+			.query("SELECT id, createdBy FROM invites WHERE id = $id")
+			.get({ id: req.params.id });
+		if (!invite) {
+			return res.status(404).send("Invite not found.");
+		}
+		if (!req.user.isAdmin && invite.createdBy !== req.user.id) {
+			logger.warn(
+				`Refused to let ${req.user.username} (${req.user.id}) delete invite ${invite.id}: not an admin or its creator`,
+			);
+			return res
+				.status(403)
+				.send("Only admins and the invite's creator can delete it.");
+		}
+		db.run("DELETE FROM invites WHERE id = $id", { id: invite.id });
 		return res.redirect("/dashboard");
 	} catch (err) {
+		logger.error("Failed to delete invite", err);
 		return res.send("failed to delete invite");
 	}
 });

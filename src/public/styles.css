@@ -848,6 +848,15 @@ form input[type="submit"]:hover {
   font-family: monospace;
 }
 
+/* A token is 32 characters: let it wrap on a phone. */
+.invite-link a {
+  overflow-wrap: anywhere;
+}
+
+.invite-delete {
+  margin: 0;
+}
+
 .search-bar {
   display: flex;
   flex-direction: row;

@@ -216,4 +216,13 @@ runMigration("add-follow-reddit-collapse-column", () => {
   `).run();
 });
 
+// Who created each invite: besides admins, only they can delete it. Older
+// invites have no creator, so only admins can.
+runMigration("add-invite-created-by-column", () => {
+	db.query(`
+    ALTER TABLE invites
+    ADD COLUMN createdBy INTEGER
+  `).run();
+});
+
 module.exports = { db, dataDir };

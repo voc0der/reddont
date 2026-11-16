@@ -306,6 +306,23 @@ describe("refresh token storage", () => {
 		expect(() => oidc.decryptRefreshToken(sealed)).toThrow();
 	});
 
+	test("never falls back to a fixed key without a secret", async () => {
+		const crypto = require("node:crypto");
+		// What the old fixed fallback key would have sealed.
+		const fixedKey = crypto.createHash("sha256").update("reddont-default-key").digest();
+		const iv = crypto.randomBytes(12);
+		const cipher = crypto.createCipheriv("aes-256-gcm", fixedKey, iv);
+		const ciphertext = Buffer.concat([cipher.update("refresh-secret", "utf8"), cipher.final()]);
+		const forged = [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString("base64")).join(".");
+
+		for (const secret of [undefined, "   "]) {
+			configure({ ...PROVIDER, JWT_SECRET_KEY: secret });
+			await oidc.initializeOIDC({ jwtKey: "" });
+			expect(() => oidc.decryptRefreshToken(forged)).toThrow();
+			expect(oidc.decryptRefreshToken(oidc.encryptRefreshToken("refresh-secret"))).toBe("refresh-secret");
+		}
+	});
+
 	test("treats missing or malformed values as no token", () => {
 		expect(oidc.encryptRefreshToken("")).toBeNull();
 		expect(oidc.decryptRefreshToken(null)).toBeNull();

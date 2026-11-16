@@ -8,6 +8,7 @@ const logger = require("./logger");
 const oidc = require("./oidc");
 const { Geddit } = require("./geddit.js");
 const { PRIVATE_NETWORKS, trustProxySetting } = require("./proxyTrust");
+const { resolveJwtKey } = require("./jwtKey");
 const {
 	AUTH_COOKIE,
 	CSRF_COOKIE,
@@ -30,8 +31,7 @@ const {
 // csrf_token cookie against the form's _csrf field or X-CSRF-Token).
 // nosemgrep: javascript.express.security.audit.express-check-csurf-middleware-usage.express-check-csurf-middleware-usage
 const app = express();
-const hasher = new Bun.CryptoHasher("sha256", "secret-key");
-const JWT_KEY = process.env.JWT_SECRET_KEY || hasher.update(Math.random().toString()).digest("hex");
+const { key: JWT_KEY, generated: jwtKeyGenerated } = resolveJwtKey();
 const httpBinding = process.env.HTTP_BINDING || "0.0.0.0";
 
 function generateCsrfToken() {
@@ -148,6 +148,11 @@ function mountMediaProxy() {
 }
 
 async function bootstrap() {
+	if (jwtKeyGenerated) {
+		logger.warn(
+			"JWT_SECRET_KEY is unset: sessions are signed with a random key made at startup, so they end when reddont restarts, and so do stored OIDC refresh tokens. Set JWT_SECRET_KEY to a long random value, such as the output of `openssl rand -hex 32`.",
+		);
+	}
 	startInstanceRedditOAuth();
 	// Initialize OIDC early so route priority behaves deterministically
 	try {
