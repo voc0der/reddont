@@ -28,6 +28,9 @@ const DASHBOARD_MESSAGES = new Map([
 		"OAuth app saved, but Reddit didn't grant it a token. Check that the ID belongs to an installed app.",
 	],
 	["preferences-failed", "Failed to update preferences"],
+	["user-updated", "User updated"],
+	["user-deleted", "User deleted"],
+	["user-delete-failed", "Failed to delete user. Try again."],
 ]);
 
 function pick(messages, code) {

@@ -1,0 +1,44 @@
+include ../mixins/header
+include ../mixins/head
+
+doctype html
+html
+  +head(deleting ? 'delete user' : 'edit user')
+  body(data-theme=user.themePreference)
+    main#content
+      +header(user, { name: 'preferences', href: '/dashboard' })
+      div.hero
+        h1= deleting ? 'delete user' : 'edit user'
+        if message
+          p.dashboard-error-message(role="alert")= message
+
+        if deleting
+          p
+            | Permanently delete #[strong #{account.username}]? This removes their subscriptions, saved posts and comments, credentials, API key, and invites they created. This cannot be undone.
+          p.dashboard-help If they use single sign-on, also remove their access at the identity provider or proxy to prevent a new account being created.
+          form(action=`/users/${account.id}/delete` method="POST")
+            input(type="hidden" name="_csrf" value=csrfToken)
+            button(type="submit") Delete user
+        else
+          form(action=`/users/${account.id}/edit` method="POST")
+            input(type="hidden" name="_csrf" value=csrfToken)
+            fieldset.dashboard-fieldset
+              legend account details
+              label(for="user-username") Username
+              input#user-username(type="text" name="username" value=account.username required autocomplete="off")
+              if remoteHeaderLogin
+                p.dashboard-help For proxy sign-in, keep this username in sync with the username sent by the proxy.
+              label(for="user-role") Role
+              select#user-role(name="role")
+                option(value="user" selected=!account.isAdmin) User
+                option(value="admin" selected=!!account.isAdmin) Administrator
+              p.dashboard-help Single sign-on can update this role from your identity provider or proxy groups.
+              label(for="user-password") New local password
+              input#user-password(type="password" name="password" autocomplete="new-password" aria-describedby="user-password-help")
+              label(for="user-confirm-password") Confirm new password
+              input#user-confirm-password(type="password" name="confirm_password" autocomplete="new-password")
+              p#user-password-help.dashboard-help Leave both password fields blank to keep the current password. This does not change a single sign-on password.
+            button(type="submit") Save user
+
+        p
+          a(href="/dashboard#users") Cancel

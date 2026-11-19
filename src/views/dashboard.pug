@@ -172,3 +172,25 @@ html
 
         else
           p you aren't an admin and therefore there is nothing to see here yet
+
+        if isAdmin
+          h2#users users
+          table.users-table
+            thead
+              tr
+                th(scope="col") username
+                th(scope="col") role
+                th(scope="col") actions
+            tbody
+              each account in users
+                tr
+                  td
+                    = account.username
+                    if account.id === user.id
+                      |  (you)
+                  td= account.isAdmin ? 'administrator' : 'user'
+                  td
+                    div.user-actions
+                      a(href=`/users/${account.id}/edit` aria-label=`Edit ${account.username}`) edit
+                      if account.id !== user.id
+                        a(href=`/users/${account.id}/delete` aria-label=`Delete ${account.username}`) delete
