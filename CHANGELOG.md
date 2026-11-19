@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-11-19
+
+### Added
+
+- An administrator-only **users** section after **invites** in preferences,
+  with edit and delete actions. Administrators can change usernames and roles
+  or reset local passwords. New accounts still join through invites or SSO
+- User deletion has a confirmation page and removes the account's
+  subscriptions, saved items, credentials, API key, and invites in one
+  transaction. Administrators cannot delete their own account or remove the
+  last administrator
+
+### Security
+
+- User deletion rechecks administrator access inside its transaction. A
+  pending deletion is refused if another administrator revokes the acting
+  account's role or deletes it during an SSO refresh
+
+### Changed
+
+- Expanded user-management regression coverage for concurrent account
+  changes, malformed forms, username escaping, proxy trust, and rollback
+  after failed writes
+- Updated application and development dependencies
+
 ## [0.1.17] - 2026-11-15
 
 ### Security
