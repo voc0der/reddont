@@ -1,5 +1,6 @@
 const { afterAll, beforeAll, beforeEach, describe, expect, test } = require("bun:test");
 const { Database } = require("bun:sqlite");
+const fs = require("node:fs");
 const path = require("node:path");
 const jwt = require("jsonwebtoken");
 const { startServer, withFailingWrites } = require("../test-support/server.cjs");
@@ -12,7 +13,11 @@ let db;
 let passwordHash;
 
 beforeAll(async () => {
-	server = await startServer("accounts-server.cjs", "accounts-test", { JWT_SECRET_KEY: secret });
+	server = await startServer("users-server.cjs", "accounts-test", {
+		JWT_SECRET_KEY: secret,
+		REMOTE_HEADER_LOGIN: "true",
+		REVERSE_PROXY_WHITELIST: "203.0.113.10",
+	});
 	db = new Database(path.join(server.dataDir, "reddont.db"));
 	passwordHash = await Bun.password.hash("original-password");
 }, 15000);
@@ -34,13 +39,37 @@ function account(id = 2) {
 	return db.query("SELECT * FROM users WHERE id = ?").get(id);
 }
 
-function request(route, { id = 1, fields, csrfToken = csrf } = {}) {
+function request(route, { id = 1, fields, csrfToken = csrf, headers = {}, session = token(id) } = {}) {
 	return fetch(server.baseUrl + route, {
 		method: fields ? "POST" : "GET",
-		headers: { Cookie: [`csrf_token=${csrf}`, id && `auth_token=${token(id)}`].filter(Boolean).join("; ") },
+		headers: { Cookie: [`csrf_token=${csrf}`, id && `auth_token=${session}`].filter(Boolean).join("; "), ...headers },
 		body: fields ? new URLSearchParams({ _csrf: csrfToken, ...fields }) : undefined,
 		redirect: "manual",
 	});
+}
+
+async function whilePaused(operation, startRequest, change) {
+	const pause = path.join(server.dataDir, `${operation}.pause`);
+	const waiting = path.join(server.dataDir, `${operation}.waiting`);
+	fs.writeFileSync(pause, "Pause the next operation");
+	const pending = startRequest();
+	let response;
+	try {
+		const deadline = Date.now() + 3000;
+		while (!fs.existsSync(waiting)) {
+			if (Date.now() > deadline) throw new Error(`Request never paused at ${operation}`);
+			await Bun.sleep(10);
+		}
+		await change();
+	} finally {
+		fs.rmSync(pause, { force: true });
+		try {
+			response = await pending;
+		} finally {
+			fs.rmSync(waiting, { force: true });
+		}
+	}
+	return response;
 }
 
 describe("user management", () => {
@@ -81,6 +110,30 @@ describe("user management", () => {
 		expect(account()).not.toBeNull();
 	});
 
+	test("usernames are escaped in the list, form values, and deletion confirmation", async () => {
+		const username = 'reader"><img src=x onerror=alert(1)>';
+		expect((await request("/users/2/edit", { fields: { username, role: "user" } })).status).toBe(302);
+		expect(account().username).toBe(username);
+		for (const route of ["/dashboard", "/users/2/edit", "/users/2/delete"]) {
+			const html = await (await request(route)).text();
+			expect(html).not.toContain(username);
+			expect(html).not.toContain("<img src=x");
+			expect(html).toContain("reader&quot;&gt;&lt;img src=x onerror=alert(1)&gt;");
+		}
+	});
+
+	test("renaming yourself preserves an existing session and API key", async () => {
+		const session = jwt.sign({ id: 1, username: "owner" }, secret, { expiresIn: "1h" });
+		const response = await request("/users/1/edit", { session, fields: { username: "renamed-owner", role: "admin" } });
+		expect(response.status).toBe(302);
+		const dashboard = await (await request("/dashboard", { session })).text();
+		expect(dashboard).toContain("renamed-owner (you)");
+		expect((await request("/users/2/edit", { session })).status).toBe(200);
+		const api = await fetch(`${server.baseUrl}/api/v1/whoami`, { headers: { "X-API-Key": "reddont_owner" } });
+		expect(api.status).toBe(200);
+		expect(await api.json()).toMatchObject({ username: "renamed-owner", isAdmin: true });
+	});
+
 	test("renames and promotes an account while preserving a blank password and preferences", async () => {
 		db.query("UPDATE users SET themePreference = 'dark', oidc_sub = 'linked-identity' WHERE id = 2").run();
 		const response = await request("/users/2/edit", { fields: { username: " renamed ", role: "admin", password: "", confirm_password: "" } });
@@ -109,10 +162,21 @@ describe("user management", () => {
 			[{ password: "different", confirm_password: "mismatch" }, 400],
 			[{ password: "", confirm_password: "unexpected" }, 400],
 			[{ "username[]": "nested", username: "reader" }, 400],
+			[{ "role[]": "admin" }, 400],
+			[{ "password[]": "replacement", confirm_password: "replacement" }, 400],
+			[{ password: "replacement", "confirm_password[]": "replacement" }, 400],
 		]) {
 			const fields = { username: "reader", role: "admin", ...changes };
 			expect((await request("/users/2/edit", { fields })).status).toBe(status);
 			expect(account()).toMatchObject({ username: "reader", isAdmin: 0, password_hash: passwordHash });
+		}
+	});
+
+	test("missing required fields and nested form values cannot edit an account", async () => {
+		const before = account();
+		for (const fields of [{}, { username: "reader" }, { role: "admin" }, { "username[name]": "changed", role: "admin" }]) {
+			expect((await request("/users/2/edit", { fields })).status).toBe(400);
+			expect(account()).toEqual(before);
 		}
 	});
 
@@ -127,6 +191,94 @@ describe("user management", () => {
 		expect((await request("/users/1/edit", { fields })).status).toBe(302);
 		expect(account(1).isAdmin).toBe(0);
 		expect((await request("/users/2/edit")).status).toBe(403);
+	});
+
+	test.each(["demoted", "deleted"])("a password reset is refused if the editor is %s while hashing", async (change) => {
+		db.query("UPDATE users SET isAdmin = 1 WHERE id = 3").run();
+		const before = account();
+		const response = await whilePaused("password", () => request("/users/2/edit", {
+			fields: { username: "changed", role: "admin", password: "replacement", confirm_password: "replacement" },
+		}), async () => {
+			const route = change === "demoted" ? "/users/1/edit" : "/users/1/delete";
+			const fields = change === "demoted" ? { username: "owner", role: "user" } : {};
+			expect((await request(route, { id: 3, fields })).status).toBe(302);
+		});
+		expect(response.status).toBe(403);
+		expect(await response.text()).toContain("Only admins can access this route.");
+		expect(account()).toEqual(before);
+	});
+
+	test("a target deleted during password hashing is not recreated or confused with a reused username", async () => {
+		const response = await whilePaused("password", () => request("/users/2/edit", {
+			fields: { username: "changed", role: "admin", password: "replacement", confirm_password: "replacement" },
+		}), async () => {
+			expect((await request("/users/2/delete", { fields: {} })).status).toBe(302);
+			expect((await request("/users/3/edit", { fields: { username: "reader", role: "user" } })).status).toBe(302);
+		});
+		expect(response.status).toBe(404);
+		expect(await response.text()).toContain("User not found.");
+		expect(account()).toBeNull();
+		expect(account(3)).toMatchObject({ username: "reader", isAdmin: 0, password_hash: passwordHash });
+	});
+
+	test("a username claimed during hashing rejects the entire pending edit", async () => {
+		const before = account();
+		const response = await whilePaused("password", () => request("/users/2/edit", {
+			fields: { username: "claimed", role: "admin", password: "replacement", confirm_password: "replacement" },
+		}), async () => {
+			expect((await request("/users/3/edit", { fields: { username: "claimed", role: "user" } })).status).toBe(302);
+		});
+		expect(response.status).toBe(409);
+		expect(await response.text()).toContain("That username is already in use.");
+		expect(account()).toEqual(before);
+		expect(account(3).username).toBe("claimed");
+	});
+
+	test("overlapping self-demotions leave one administrator", async () => {
+		db.query("UPDATE users SET isAdmin = 1 WHERE id = 3").run();
+		const before = account(1);
+		const response = await whilePaused("password", () => request("/users/1/edit", {
+			fields: { username: "owner", role: "user", password: "replacement", confirm_password: "replacement" },
+		}), async () => {
+			expect((await request("/users/3/edit", { id: 3, fields: { username: "other", role: "user" } })).status).toBe(302);
+		});
+		expect(response.status).toBe(409);
+		expect(await response.text()).toContain("Keep at least one administrator.");
+		expect(account(1)).toEqual(before);
+		expect(account(3).isAdmin).toBe(0);
+	});
+
+	test.each(["demoted", "deleted"])("a pending deletion is refused if the editor is %s during SSO refresh", async (change) => {
+		db.query("UPDATE users SET isAdmin = 1 WHERE id = 3").run();
+		db.query("UPDATE users SET oidc_sub = 'owner-sso', oidc_token_expires_at = 1 WHERE id = 1").run();
+		seedRelatedData();
+		const before = account();
+		const response = await whilePaused("refresh", () => request("/users/2/delete", { fields: {} }), async () => {
+			const route = change === "demoted" ? "/users/1/edit" : "/users/1/delete";
+			const fields = change === "demoted" ? { username: "owner", role: "user" } : {};
+			expect((await request(route, { id: 3, fields })).status).toBe(302);
+		});
+		expect(response.status).toBe(403);
+		expect(await response.text()).toBe("Only admins can access this route.");
+		expect(account()).toEqual(before);
+		for (const table of ["subscriptions", "saved_things", "invites"]) {
+			expect(db.query(`SELECT COUNT(*) AS count FROM ${table}`).get().count).toBe(2);
+		}
+	});
+
+	test("proxy groups revoke user-management access and untrusted headers cannot restore it", async () => {
+		const before = account();
+		for (const action of ["edit", "delete"]) {
+			const fields = { username: "changed", role: "admin" };
+			const denied = await request(`/users/2/${action}`, { fields, headers: { "Remote-Groups": "readers" } });
+			expect(denied.status).toBe(403);
+			expect(account(1).isAdmin).toBe(0);
+			const forged = await request(`/users/2/${action}`, {
+				fields, headers: { "Remote-Groups": "admin", "X-Test-Peer": "198.51.100.7" },
+			});
+			expect(forged.status).toBe(403);
+			expect(account()).toEqual(before);
+		}
 	});
 
 	test("unknown and malformed IDs cannot change an account", async () => {
@@ -173,24 +325,32 @@ describe("user management", () => {
 		expect(account(3)).not.toBeNull();
 	});
 
-	test("a failed deletion rolls back all related data", async () => {
+	test.each(["subscriptions", "saved_things", "invites", "users"])("a failed deletion from %s rolls back all related data", async (table) => {
 		seedRelatedData();
-		await withFailingWrites(server.dataDir, "DELETE", "users", async () => {
+		db.query("UPDATE invites SET usedAt = '2026-01-01 00:00:00' WHERE createdBy = 2").run();
+		const snapshot = () => Object.fromEntries(["subscriptions", "saved_things", "invites", "users"].map((name) => [
+			name, db.query(`SELECT * FROM ${name} ORDER BY id`).all(),
+		]));
+		const before = snapshot();
+		await withFailingWrites(server.dataDir, "DELETE", table, async () => {
 			const response = await request("/users/2/delete", { fields: {} });
 			expect(response.headers.get("location")).toBe("/dashboard?message=user-delete-failed#users");
 		});
-		expect(account()).not.toBeNull();
-		for (const table of ["subscriptions", "saved_things", "invites"]) {
-			expect(db.query(`SELECT COUNT(*) AS count FROM ${table}`).get().count).toBe(2);
-		}
+		expect(snapshot()).toEqual(before);
+		expect((await request("/dashboard", { id: 2 })).status).toBe(200);
+		const api = await fetch(`${server.baseUrl}/api/v1/whoami`, { headers: { "X-API-Key": "reddont_reader" } });
+		expect(api.status).toBe(200);
 	});
 
 	test("a failed update reports the error and preserves the account", async () => {
+		const before = account();
 		await withFailingWrites(server.dataDir, "UPDATE", "users", async () => {
-			const response = await request("/users/2/edit", { fields: { username: "changed", role: "admin" } });
+			const response = await request("/users/2/edit", {
+				fields: { username: "changed", role: "admin", password: "replacement", confirm_password: "replacement" },
+			});
 			expect(response.status).toBe(500);
 			expect(await response.text()).toContain("Failed to update user. Try again.");
 		});
-		expect(account()).toMatchObject({ username: "reader", isAdmin: 0, password_hash: passwordHash });
+		expect(account()).toEqual(before);
 	});
 });
