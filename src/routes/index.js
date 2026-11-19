@@ -1201,6 +1201,8 @@ router.get("/users/:id/delete", authenticateAdmin, (req, res) => {
 router.post("/users/:id/delete", authenticateAdmin, (req, res) => {
 	try {
 		const result = db.transaction(() => {
+			// Authentication can await an SSO refresh while another admin revokes access.
+			if (!managedUser(req.user.id)?.isAdmin) return [403, "Only admins can access this route."];
 			const account = managedUser(req.params.id);
 			if (!account) return [404, "User not found."];
 			if (account.id === req.user.id) return [409, "You cannot delete your own account."];
