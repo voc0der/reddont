@@ -31,6 +31,27 @@ they created, which happens when an administrator who made invites loses the
 role: their dashboard still lists those invites. Invites made before 0.1.17
 record no creator, so only administrators can delete them.
 
+## Manage users
+
+Administrators have a **users** section after **invites** in preferences.
+It lists usernames and roles, with **edit** and **delete** actions. New
+accounts still join through invites or single sign-on.
+
+Choose **edit** to change a username, assign or remove administrator access,
+or set a new local password. Leave both password fields blank to keep the
+current password. At least one administrator must remain.
+
+Choose **delete** to review and confirm permanent removal. This also removes
+the account's subscriptions, saved posts and comments, credentials, API key,
+and invites it created. Its sessions and API key stop working. You cannot
+delete the account you are currently signed in to.
+
+For single sign-on, role mappings can override role changes on a later
+sign-in or request. Keep proxy usernames in sync with the proxy's identity.
+Setting a local password does not change the identity provider's password.
+To prevent a deleted user from rejoining through single sign-on, also revoke
+their access at the identity provider or proxy.
+
 ## Sessions
 
 Local login sessions last five days. Set a persistent `JWT_SECRET_KEY` so a

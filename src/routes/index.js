@@ -876,6 +876,9 @@ router.get("/dashboard", authenticateToken, async (req, res) => {
 	res.render("dashboard", {
 		invites,
 		isAdmin,
+		users: isAdmin
+			? db.query("SELECT id, username, isAdmin FROM users ORDER BY username COLLATE NOCASE, id").all()
+			: [],
 		user: req.user,
 		redditAuthStatus,
 		redditOAuthStatus: getRedditOAuthStatus(req.user.redditOAuthAppId),
@@ -1114,6 +1117,104 @@ router.post("/delete-invite/:id", authenticateToken, async (req, res) => {
 	} catch (err) {
 		logger.error("Failed to delete invite", err);
 		return res.send("failed to delete invite");
+	}
+});
+
+function managedUser(id) {
+	if (!/^[1-9][0-9]*$/.test(id)) return null;
+	return db.query("SELECT id, username, isAdmin FROM users WHERE id = ?").get(id);
+}
+
+function isLastAdmin(user) {
+	return user.isAdmin && db.query("SELECT COUNT(*) AS count FROM users WHERE isAdmin = 1").get().count <= 1;
+}
+
+function renderUserForm(req, res, account, options = {}) {
+	return res.render("user", {
+		user: req.user,
+		account,
+		query: {},
+		remoteHeaderLogin: isRemoteHeaderLoginEnabled(),
+		...commonRenderOptions,
+		...options,
+	});
+}
+
+router.get("/users/:id/edit", authenticateAdmin, (req, res) => {
+	const account = managedUser(req.params.id);
+	if (!account) return res.status(404).send("User not found.");
+	return renderUserForm(req, res, account);
+});
+
+router.post("/users/:id/edit", authenticateAdmin, async (req, res) => {
+	const account = managedUser(req.params.id);
+	if (!account) return res.status(404).send("User not found.");
+	const { username, role, password = "", confirm_password = "" } = req.body;
+	const fail = (status, message) => renderUserForm(req, res.status(status), account, { message });
+	if (typeof username !== "string" || !username.trim()) {
+		return fail(400, "Username is required.");
+	}
+	if (role !== "admin" && role !== "user") {
+		return fail(400, "Choose a valid role.");
+	}
+	if (typeof password !== "string" || typeof confirm_password !== "string" || password !== confirm_password) {
+		return fail(400, "Passwords do not match.");
+	}
+
+	try {
+		const passwordHash = password ? await Bun.password.hash(password) : null;
+		// Recheck access and the last administrator inside the write transaction,
+		// including after an optional password hash has yielded to other requests.
+		const result = db.transaction(() => {
+			if (!managedUser(req.user.id)?.isAdmin) return [403, "Only admins can access this route."];
+			const current = managedUser(account.id);
+			if (!current) return [404, "User not found."];
+			if (role !== "admin" && isLastAdmin(current)) {
+				return [409, "Keep at least one administrator."];
+			}
+			if (db.query("SELECT id FROM users WHERE username = ? AND id != ?").get(username.trim(), account.id)) {
+				return [409, "That username is already in use."];
+			}
+			db.query(`UPDATE users SET username = $username, isAdmin = $isAdmin,
+				password_hash = COALESCE($passwordHash, password_hash) WHERE id = $id`).run({
+				username: username.trim(),
+				isAdmin: role === "admin" ? 1 : 0,
+				passwordHash,
+				id: account.id,
+			});
+		}).immediate();
+		if (result) return fail(...result);
+		return res.redirect("/dashboard?message=user-updated#users");
+	} catch (err) {
+		logger.error("Failed to update user", err);
+		return fail(500, "Failed to update user. Try again.");
+	}
+});
+
+router.get("/users/:id/delete", authenticateAdmin, (req, res) => {
+	const account = managedUser(req.params.id);
+	if (!account) return res.status(404).send("User not found.");
+	if (account.id === req.user.id) return res.status(409).send("You cannot delete your own account.");
+	return renderUserForm(req, res, account, { deleting: true });
+});
+
+router.post("/users/:id/delete", authenticateAdmin, (req, res) => {
+	try {
+		const result = db.transaction(() => {
+			const account = managedUser(req.params.id);
+			if (!account) return [404, "User not found."];
+			if (account.id === req.user.id) return [409, "You cannot delete your own account."];
+			if (isLastAdmin(account)) return [409, "Keep at least one administrator."];
+			db.query("DELETE FROM subscriptions WHERE user_id = ?").run(account.id);
+			db.query("DELETE FROM saved_things WHERE user_id = ?").run(account.id);
+			db.query("DELETE FROM invites WHERE createdBy = ?").run(account.id);
+			db.query("DELETE FROM users WHERE id = ?").run(account.id);
+		}).immediate();
+		if (result) return res.status(result[0]).send(result[1]);
+		return res.redirect("/dashboard?message=user-deleted#users");
+	} catch (err) {
+		logger.error("Failed to delete user", err);
+		return res.redirect("/dashboard?message=user-delete-failed#users");
 	}
 });
 

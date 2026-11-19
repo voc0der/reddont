@@ -857,6 +857,26 @@ form input[type="submit"]:hover {
   margin: 0;
 }
 
+.users-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+  padding: 5px 10px 5px 0;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 15px;
+}
+
 .search-bar {
   display: flex;
   flex-direction: row;
