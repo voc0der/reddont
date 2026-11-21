@@ -26,13 +26,13 @@
     },
   },
   "packages": {
-    "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.14", "", {}, "sha512-CXvKMFvM80ihI7Vox9jb+kQjnyjESQNPM+vB7U0Zz6TWuZA+Z/FL0QPMH300h33qJtIx+REeBhXqWOPW48TcAQ=="],
+    "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.15", "", {}, "sha512-C2FuapQ2Kh1OnVHAoLi5rD3GBJ8COb9Q609T6HEpLqaBAo560PDP5OxBE5dCI/h951MBO/+bCUYU5SZ+8ZlV+w=="],
 
     "@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.29.7", "", {}, "sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg=="],
 
-    "@babel/parser": ["@babel/parser@7.29.14", "", { "dependencies": { "@babel/types": "^7.29.14" }, "bin": "./bin/babel-parser.js" }, "sha512-VL220vXuyO2z3rNIQwY7ftj9UwpqOt+33sH+sBWkOekbsSR2g7EEMnOx24ZlCH0xOA3DM/33SifVFGbnJD8r/w=="],
+    "@babel/parser": ["@babel/parser@7.29.15", "", { "dependencies": { "@babel/types": "^7.29.15" }, "bin": "./bin/babel-parser.js" }, "sha512-RpKWyisHoP81twtSCgmE02iU0RnPcq1DN5bBEbpUePrjA9Q3wXhufnCJrrayPpoZieqFh3zyZQqwtSK0gGccRA=="],
 
-    "@babel/types": ["@babel/types@7.29.14", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.14", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-UjI/dKmwJwT9pOszJitq2G6EObZPnsZUfdCr92z2TlF3EZK9J3EdfOKUrCzHl6wFthbzwhzl1Soc/UIwxRiq6w=="],
+    "@babel/types": ["@babel/types@7.29.15", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.15", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-/XKpKDakL//LZ66bq1XsZOswuqeI5MZqPLDu18o3XdkU1fNJ7bdPtzgnc4ZNS+bBGHV0FJG8jjb8SwcC3nNVQQ=="],
 
     "@svta/cml-608": ["@svta/cml-608@1.1.0", "", {}, "sha512-r427FE+vTYsgh9wi7lc6gkixFpdBiTSy+fIy4zdwe8+mgOtMiVjP9xHW68z1KcH/WNSGRDzCEunNIsX4tIljTA=="],
 
@@ -314,7 +314,7 @@
 
     "negotiator": ["negotiator@1.1.0", "", { "dependencies": { "content-type": "^2.1.0" } }, "sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg=="],
 
-    "oauth4webapi": ["oauth4webapi@3.8.8", "", {}, "sha512-8N28E+a/oxfXWBgOMt+ZP/JUf/XR+IFbvkAEPP3gznXOMv9BpAAwiIj0TFNz3tGTPc0ZQ8zmWBNgN1nAys0gng=="],
+    "oauth4webapi": ["oauth4webapi@3.8.9", "", {}, "sha512-gyn4jpaxyYFm1epl3mwqc1sFShLjT9eq/63JW+Nvk286Lz6FC72pVv/SyhJHxo+sQiHEcjIHs4TtFKX/+Md07A=="],
 
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 
@@ -324,7 +324,7 @@
 
     "once": ["once@1.4.0", "", { "dependencies": { "wrappy": "1" } }, "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w=="],
 
-    "openid-client": ["openid-client@6.9.0", "", { "dependencies": { "jose": "^6.2.15", "oauth4webapi": "^3.8.8" } }, "sha512-2IvamJR8PAnWHngaCsGGA8TYfcLI2egvuqa9cOQYHIISwIUhxJwwwcCnkgVX95fzZ6J0TAna0aVGUMOxnPeRqg=="],
+    "openid-client": ["openid-client@6.9.1", "", { "dependencies": { "jose": "^6.2.18", "oauth4webapi": "^3.8.9" } }, "sha512-wysSRjtNRRpu1S/HCVaQ7LRPSNc42lhS1szB1SihVTcA2kAarpzKyvAd+sjFX41ky7iDblGerORC8ASwpt3zqA=="],
 
     "parseurl": ["parseurl@1.3.3", "", {}, "sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ=="],
 
