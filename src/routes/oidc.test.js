@@ -230,7 +230,7 @@ describe("provider token refresh", () => {
 
 		// Admin pages refresh too, and present the rotated token.
 		expireSoon("sub-first");
-		expect((await sessionFor("sub-first", "/create-invite")).status).toBe(302);
+		expect((await sessionFor("sub-first", `/users/${account("sub-first").id}/edit`)).status).toBe(200);
 		expect(refreshes().at(-1).params.refresh_token).toBe("rotate-2");
 	});
 
@@ -259,7 +259,7 @@ describe("provider token refresh", () => {
 		}
 		db.query("UPDATE users SET oidc_refresh_token = 'a.b.c' WHERE oidc_sub = 'sub-boss'").run();
 		expireSoon("sub-boss");
-		expect((await sessionFor("sub-boss", "/create-invite")).status).toBe(302);
+		expect((await sessionFor("sub-boss", `/users/${account("sub-boss").id}/edit`)).status).toBe(200);
 		expect(refreshes()).toHaveLength(count + 1);
 	});
 });

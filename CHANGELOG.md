@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-11-21
+
+### Fixed
+
+- Signing in through an OIDC provider on another site no longer loops back to
+  the provider until the browser reports too many redirects (#114). The
+  session cookie is now `SameSite=Lax` rather than `Strict`, so the browser
+  sends it on the provider's redirect home. A link to reddont from another
+  site also opens signed in, where before it started the same loop
+
+### Security
+
+- Creating an invite is now a form with a CSRF token rather than a link, so
+  a link on another site can't create one now that the session cookie comes
+  along. Every form still needs the CSRF token, whose cookie stays
+  `SameSite=Strict`
+
 ## [0.1.18] - 2026-11-19
 
 ### Added

@@ -51,8 +51,11 @@ describe("secure cookies", () => {
 		for (const { attributes } of [page["__Host-csrf_token"], cookies["__Host-auth_token"]]) {
 			expect(attributes.some((attribute) => attribute.startsWith("domain="))).toBe(false);
 		}
+		// Lax, so a page opened from another site (an OIDC provider's redirect
+		// home among them) arrives signed in. The CSRF cookie every POST needs
+		// stays Strict.
 		expect(cookies["__Host-auth_token"].attributes).toEqual(
-			expect.arrayContaining(["path=/", "httponly", "secure", "samesite=strict"]),
+			expect.arrayContaining(["path=/", "httponly", "secure", "samesite=lax"]),
 		);
 
 		const signedOut = responseCookies(await request("/logout", { cookie: `__Host-auth_token=${session()}` }));

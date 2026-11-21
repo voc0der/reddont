@@ -168,7 +168,9 @@ html
                       button(type="submit") delete
 
           if isAdmin
-            a(href="/create-invite") create invite
+            form.invite-create(action="/create-invite" method="POST")
+              input(type="hidden" name="_csrf" value=csrfToken)
+              button(type="submit") create invite
 
         else
           p you aren't an admin and therefore there is nothing to see here yet
