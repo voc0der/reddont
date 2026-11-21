@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-11-21
+
 ### Fixed
 
 - Signing in through an OIDC provider on another site no longer loops back to
