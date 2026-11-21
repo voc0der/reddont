@@ -88,7 +88,7 @@ describe("registration", () => {
 
 	test("an invite registers exactly one account", async () => {
 		const owner = sessionFor("owner");
-		expect(redirectTarget(await request("/create-invite", { token: owner }))).toEqual({ path: "/dashboard" });
+		expect(redirectTarget(await request("/create-invite", { token: owner, fields: {} }))).toEqual({ path: "/dashboard" });
 		const invite = db.query("SELECT * FROM invites ORDER BY id DESC").get();
 		expect(invite.token).toMatch(/^[0-9a-f]{32}$/);
 		expect(invite.createdBy).toBe(user("owner").id);
@@ -121,10 +121,30 @@ describe("registration", () => {
 		expect(user("second")).toBeNull();
 	});
 
-	test("only admins create invites", async () => {
-		const refused = await request("/create-invite", { token: sessionFor("reader") });
+	test("only admins create invites, with a form", async () => {
+		const owner = sessionFor("owner");
+		const count = () => db.query("SELECT COUNT(*) AS count FROM invites").get().count;
+		const before = count();
+		expect(await (await request("/dashboard", { token: owner })).text()).toContain(
+			`<form class="invite-create" action="/create-invite" method="POST"><input type="hidden" name="_csrf" value="${csrf}">`,
+		);
+
+		// The session cookie comes along on a link from another site, but a
+		// link can't make an invite, and neither can a form without the token.
+		expect((await request("/create-invite", { token: owner })).status).toBe(404);
+		const forged = await realFetch(`${server.baseUrl}/create-invite`, {
+			method: "POST",
+			headers: { Cookie: `auth_token=${owner}` },
+			body: new URLSearchParams({ _csrf: csrf }),
+			redirect: "manual",
+		});
+		expect(forged.status).toBe(403);
+		expect(await forged.text()).toBe("Invalid CSRF token");
+
+		const refused = await request("/create-invite", { token: sessionFor("reader"), fields: {} });
 		expect(refused.status).toBe(403);
 		expect(await refused.text()).toBe("Only admins can access this route.");
+		expect(count()).toBe(before);
 	});
 
 	test("only admins and an invite's creator delete it, with a form", async () => {
@@ -134,7 +154,7 @@ describe("registration", () => {
 		const exists = (id) => db.query("SELECT id FROM invites WHERE id = ?").get(id) !== null;
 		const remove = (id, token) => request(`/delete-invite/${id}`, { token, fields: {} });
 
-		await request("/create-invite", { token: owner });
+		await request("/create-invite", { token: owner, fields: {} });
 		const owners = newestInvite();
 		expect(await (await request("/dashboard", { token: owner })).text()).toContain(
 			`<form class="invite-delete" action="/delete-invite/${owners}" method="POST"><input type="hidden" name="_csrf" value="${csrf}">`,
@@ -152,13 +172,13 @@ describe("registration", () => {
 		// An admin who made an invite and then lost the role still sees and
 		// deletes it, and only it.
 		db.query("UPDATE users SET isAdmin = 1 WHERE username = 'reader'").run();
-		await request("/create-invite", { token: reader });
+		await request("/create-invite", { token: reader, fields: {} });
 		const readers = newestInvite();
 		db.query("UPDATE users SET isAdmin = 0 WHERE username = 'reader'").run();
 		const dashboard = await (await request("/dashboard", { token: reader })).text();
 		expect(dashboard).toContain(`action="/delete-invite/${readers}"`);
 		expect(dashboard).not.toContain(`action="/delete-invite/${owners}"`);
-		expect(dashboard).not.toContain('href="/create-invite"');
+		expect(dashboard).not.toContain('action="/create-invite"');
 		expect(redirectTarget(await remove(readers, reader))).toEqual({ path: "/dashboard" });
 		expect(exists(readers)).toBe(false);
 
@@ -181,7 +201,7 @@ describe("password login", () => {
 		const { auth_token } = responseCookies(response);
 		expect(jwt.verify(auth_token.value, secret)).toMatchObject({ id: user("owner").id, username: "owner" });
 		expect(auth_token.attributes).toEqual(
-			expect.arrayContaining(["max-age=432000", "path=/", "httponly", "samesite=strict"]),
+			expect.arrayContaining(["max-age=432000", "path=/", "httponly", "samesite=lax"]),
 		);
 		// REDDONT_DISABLE_SSL serves plain HTTP, where a Secure cookie would never return.
 		expect(auth_token.attributes).not.toContain("secure");
@@ -270,7 +290,7 @@ describe("password login", () => {
 describe("sessions", () => {
 	test("an expired session asks the reader to sign in again", async () => {
 		const token = jwt.sign({ id: user("owner").id, exp: Math.floor(Date.now() / 1000) - 60 }, secret);
-		for (const route of ["/subs", "/create-invite"]) {
+		for (const route of ["/subs", "/users/1/edit"]) {
 			const response = await request(route, { token });
 			expect(redirectTarget(response)).toEqual({ path: "/login", redirect: route, message: "session-expired" });
 			expect(responseCookies(response).auth_token.value).toBe("");
@@ -282,7 +302,7 @@ describe("sessions", () => {
 
 	test("a session signed with another key is discarded", async () => {
 		const token = jwt.sign({ id: user("owner").id }, "another-secret");
-		for (const route of ["/subs", "/create-invite"]) {
+		for (const route of ["/subs", "/users/1/edit"]) {
 			const response = await request(route, { token });
 			expect(redirectTarget(response)).toEqual({ path: "/login", redirect: route });
 			expect(responseCookies(response).auth_token.value).toBe("");
@@ -299,9 +319,9 @@ describe("sessions", () => {
 			redirect: "/subs",
 			message: "user-not-found",
 		});
-		expect(redirectTarget(await request("/create-invite", { token }))).toEqual({
+		expect(redirectTarget(await request("/users/1/edit", { token }))).toEqual({
 			path: "/login",
-			redirect: "/create-invite",
+			redirect: "/users/1/edit",
 			message: "user-not-found",
 		});
 		expect(await (await request("/login", { token })).text()).toContain("User not found.");
@@ -313,7 +333,7 @@ describe("sessions", () => {
 	});
 
 	test("anonymous visitors go to login with the page they wanted", async () => {
-		for (const route of ["/subs", "/create-invite"]) {
+		for (const route of ["/subs", "/users/1/edit"]) {
 			expect(redirectTarget(await request(route))).toEqual({ path: "/login", redirect: route });
 		}
 	});
@@ -334,12 +354,12 @@ describe("remote header sign-in", () => {
 		expect(user("proxied")).toMatchObject({ isAdmin: 0, groups: '["staff"]' });
 
 		const token = sessionFor("proxied");
-		expect((await request("/create-invite", { token, headers: { "Remote-Groups": "staff,admin" } })).status).toBe(302);
+		expect((await request("/create-invite", { token, fields: {}, headers: { "Remote-Groups": "staff,admin" } })).status).toBe(302);
 		expect(user("proxied")).toMatchObject({ isAdmin: 1, groups: '["staff","admin"]' });
 
 		expect((await request("/subs", { token, headers: { "Remote-Groups": "staff" } })).status).toBe(200);
 		expect(user("proxied")).toMatchObject({ isAdmin: 0, groups: '["staff"]' });
-		expect((await request("/create-invite", { token })).status).toBe(403);
+		expect((await request("/create-invite", { token, fields: {} })).status).toBe(403);
 	});
 
 	test("treats a missing groups header as no admin rights and no group change", async () => {
@@ -381,6 +401,7 @@ describe("remote header sign-in", () => {
 		const token = sessionFor("proxied");
 		const untrusted = await request("/create-invite", {
 			token,
+			fields: {},
 			headers: { "Remote-Groups": "staff,admin", "X-Test-Peer": "198.51.100.7" },
 		});
 		expect(untrusted.status).toBe(403);
@@ -540,7 +561,7 @@ describe("database failures", () => {
 	test("signed-in pages keep the session and explain a locked database", async () => {
 		const token = sessionFor("owner");
 		await withLockedDatabase(server.dataDir, async () => {
-			for (const route of ["/subs", "/create-invite"]) {
+			for (const route of ["/subs", "/users/1/edit"]) {
 				const response = await request(route, { token });
 				expect(redirectTarget(response)).toEqual({ path: "/login", message: "database-error" });
 				expect(responseCookies(response).auth_token).toBeUndefined();
@@ -576,13 +597,13 @@ describe("database failures", () => {
 
 	test("invites and registration report failures and leave invites unchanged", async () => {
 		const owner = sessionFor("owner");
-		await request("/create-invite", { token: owner });
+		await request("/create-invite", { token: owner, fields: {} });
 		const invites = () => db.query("SELECT id, usedAt FROM invites ORDER BY id").all();
 		const before = invites();
 		const invite = db.query("SELECT id, token FROM invites ORDER BY id DESC").get();
 
 		await withFailingWrites(server.dataDir, "INSERT", "invites", async () => {
-			expect(await (await request("/create-invite", { token: owner })).text()).toBe("failed to create invite");
+			expect(await (await request("/create-invite", { token: owner, fields: {} })).text()).toBe("failed to create invite");
 		});
 		await withFailingWrites(server.dataDir, "DELETE", "invites", async () => {
 			expect(await (await request(`/delete-invite/${invite.id}`, { token: owner, fields: {} })).text()).toBe(

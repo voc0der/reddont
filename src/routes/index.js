@@ -1080,7 +1080,9 @@ router.post("/update-preferences", authenticateToken, async (req, res) => {
 	}
 });
 
-router.get("/create-invite", authenticateAdmin, async (req, res) => {
+// A POST, so it takes the CSRF token: the session cookie comes along when
+// another site links here, but a link can't make an invite.
+router.post("/create-invite", authenticateAdmin, async (req, res) => {
 	try {
 		// An invite works like a password, so its token is 128 random bits.
 		db.run("INSERT INTO invites (token, createdBy) VALUES ($token, $createdBy)", {

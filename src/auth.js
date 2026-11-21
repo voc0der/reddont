@@ -6,10 +6,17 @@ const oidc = require("./oidc");
 const { AUTH_COOKIE, SECURE_COOKIES } = require("./cookieNames");
 
 const AUTH_TOKEN_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000;
+// Lax, so a page opened from another site arrives signed in, including the
+// redirect home from an OIDC provider on another domain. Under Strict the
+// browser held the session back there, and the reader was sent to sign in
+// again, in a loop. Lax still keeps it off other sites' frames, scripts and
+// form posts, but a link brings it along, so GET routes change nothing
+// (signing in and out aside). Changes are POSTs, which need the CSRF cookie,
+// and that stays Strict.
 const AUTH_TOKEN_COOKIE_OPTIONS = {
 	httpOnly: true,
 	secure: SECURE_COOKIES,
-	sameSite: "Strict",
+	sameSite: "Lax",
 	path: "/",
 };
 

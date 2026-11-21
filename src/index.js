@@ -242,8 +242,10 @@ async function bootstrap() {
 			csrfToken = generateCsrfToken();
 			res.cookie(CSRF_COOKIE, csrfToken, {
 				httpOnly: true,
-				// Like the session cookie's, which this token guards.
 				secure: SECURE_COOKIES,
+				// Strict, unlike the Lax session cookie: a browser never sends
+				// it with a request another site starts, so no such request
+				// passes the check below.
 				sameSite: "Strict",
 				path: "/",
 			});
