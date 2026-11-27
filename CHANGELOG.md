@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-11-27
+
+### Changed
+
+- Updated development, documentation, and CI dependencies, including
+  fast-check 4.11.0 for the fuzz tests and Zensical 0.1.3 for the
+  documentation build. The application's runtime dependencies are unchanged
+
 ## [0.1.19] - 2026-11-21
 
 ### Fixed
